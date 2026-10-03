@@ -1,0 +1,697 @@
+{
+ "_readme": "Reading orders for Voynich Viewer. Edit by hand. Each order is a list of gatherings, front to back. A gathering is 'nested' (a normal quire: bifolia listed outer to inner, read through the middle and back out) or 'singulions' (each bifolium read on its own). Per-sheet options in 'sheets': spine (index of the first panel right of the spine, inside face) and inside_out. An order with 'base' copies that order and swaps in the gatherings listed in 'replace'. 'evidence' holds the notes shown for a sheet, keyed by bifolium; every 'src' must be a key of 'sources'.",
+ "sources": {
+  "LFD2025blog": {
+   "cite": "Lisa Fagin Davis, \"Voynich Codicology\", Manuscript Road Trip (19 Jan 2025).",
+   "url": "https://manuscriptroadtrip.wordpress.com/2025/01/19/voynich-codicology/"
+  },
+  "LD2026": {
+   "cite": "Colin Layfield & Lisa Fagin Davis, \"Singulion Structure and the Voynich Manuscript\", Digital Medievalist (2026).",
+   "url": "https://journals.openedition.org/digitalmedievalist/2331"
+  },
+  "LFD2025talk": {
+   "cite": "Lisa Fagin Davis, \"The Materiality of the Voynich Manuscript\", Centre for Medieval Studies, University of Toronto (26 Sep 2025).",
+   "url": "https://www.youtube.com/watch?v=nH28ltqYIyo"
+  },
+  "Davis2020": {
+   "cite": "Lisa Fagin Davis, \"How Many Glyphs and How Many Scribes? Digital Paleography and the Voynich Manuscript\", Manuscript Studies 5:1 (2020).",
+   "url": "https://repository.upenn.edu/mss_sims/vol5/iss1/6"
+  },
+  "Davis2024": {
+   "cite": "Lisa Fagin Davis, \"Multispectral Imaging and the Voynich Manuscript\", Manuscript Road Trip (8 Sep 2024).",
+   "url": "https://manuscriptroadtrip.wordpress.com/2024/09/08/multispectral-imaging-and-the-voynich-manuscript/"
+  },
+  "VN": {
+   "cite": "René Zandbergen, quire-by-quire description of MS 408, voynich.nu.",
+   "url": "https://www.voynich.nu/q09/index.html"
+  },
+  "VNorigin": {
+   "cite": "René Zandbergen, physical evidence for the origin of the MS (paint transfers, folio and quire numbers), voynich.nu.",
+   "url": "https://www.voynich.nu/extra/sp_origin.html"
+  },
+  "VNq20": {
+   "cite": "René Zandbergen, quire 20, voynich.nu.",
+   "url": "https://www.voynich.nu/q20/index.html"
+  },
+  "ZL": {
+   "cite": "René Zandbergen, ZL transliteration of MS 408 (IVTFF format), voynich.nu: page variables only (illustration type, Currier language).",
+   "url": "https://www.voynich.nu/transcr.html"
+  },
+  "Pelling2006": {
+   "cite": "Nick Pelling, The Curse of the Voynich (Compelling Press, 2006), p. 62: the waterspouts on 78v and the pools on 81r.",
+   "url": ""
+  },
+  "Pelling2022": {
+   "cite": "Nick Pelling, \"What happened to Voynich Q8 and Q14?\", Cipher Mysteries (29 Dec 2022).",
+   "url": "https://ciphermysteries.com/2022/12/29/what-happened-to-voynich-q8-and-q14"
+  },
+  "Pelling2025": {
+   "cite": "Nick Pelling, report on the Toronto lecture, Cipher Mysteries (11 Oct 2025).",
+   "url": "https://ciphermysteries.com/2025/10/11/lisa-fagin-davis-the-materiality-of-the-voynich-manuscript"
+  },
+  "Clemens2016": {
+   "cite": "Raymond Clemens (ed.), The Voynich Manuscript (Yale University Press, 2016), p. 26: conservator Paula Zyatts on the rebinding.",
+   "url": ""
+  },
+  "Hodgins2009": {
+   "cite": "Greg Hodgins, radiocarbon report on MS 408, University of Arizona (17 Feb 2009).",
+   "url": "https://www.voynich.nu/papers/Carbon_GH_2009.pdf"
+  },
+  "McCrone2009": {
+   "cite": "Joseph G. Barabe (McCrone Associates), materials analysis of MS 408 (1 Apr 2009).",
+   "url": "https://web.archive.org/web/20131102072035id_/http://beinecke.library.yale.edu/sites/default/files/voynich_analysis.pdf"
+  },
+  "Yale": {
+   "cite": "Beinecke Rare Book and Manuscript Library, Yale University, MS 408: photographs in Yale University Library's digital collections.",
+   "url": "https://collections.library.yale.edu/catalog/2002046"
+  }
+ },
+ "orders": [
+  {
+   "id": "beinecke",
+   "title": "Current binding (folio order)",
+   "subtitle": "Beinecke MS 408 as it is sewn today, in folio order; collation and scribes from Davis's quire diagram (2025)",
+   "sources": [
+    "LFD2025blog"
+   ],
+   "gatherings": [
+    {
+     "quire": 1,
+     "type": "nested",
+     "bifolia": [
+      "1|8",
+      "2|7",
+      "3|6",
+      "4|5"
+     ]
+    },
+    {
+     "quire": 2,
+     "type": "nested",
+     "bifolia": [
+      "9|16",
+      "10|15",
+      "11|14",
+      "12|13"
+     ]
+    },
+    {
+     "quire": 3,
+     "type": "nested",
+     "bifolia": [
+      "17|24",
+      "18|23",
+      "19|22",
+      "20|21"
+     ]
+    },
+    {
+     "quire": 4,
+     "type": "nested",
+     "bifolia": [
+      "25|32",
+      "26|31",
+      "27|30",
+      "28|29"
+     ]
+    },
+    {
+     "quire": 5,
+     "type": "nested",
+     "bifolia": [
+      "33|40",
+      "34|39",
+      "35|38",
+      "36|37"
+     ]
+    },
+    {
+     "quire": 6,
+     "type": "nested",
+     "bifolia": [
+      "41|48",
+      "42|47",
+      "43|46",
+      "44|45"
+     ]
+    },
+    {
+     "quire": 7,
+     "type": "nested",
+     "bifolia": [
+      "49|56",
+      "50|55",
+      "51|54",
+      "52|53"
+     ]
+    },
+    {
+     "quire": 8,
+     "type": "nested",
+     "bifolia": [
+      "57|66",
+      "58|65",
+      "59|64",
+      "60|63",
+      "61|62"
+     ]
+    },
+    {
+     "quire": 9,
+     "type": "nested",
+     "bifolia": [
+      "67|68"
+     ]
+    },
+    {
+     "quire": 10,
+     "type": "nested",
+     "bifolia": [
+      "69|70"
+     ]
+    },
+    {
+     "quire": 11,
+     "type": "nested",
+     "bifolia": [
+      "71|72"
+     ]
+    },
+    {
+     "quire": 12,
+     "type": "nested",
+     "bifolia": [
+      "73|74"
+     ]
+    },
+    {
+     "quire": 13,
+     "type": "nested",
+     "bifolia": [
+      "75|84",
+      "76|83",
+      "77|82",
+      "78|81",
+      "79|80"
+     ]
+    },
+    {
+     "quire": 14,
+     "type": "nested",
+     "bifolia": [
+      "85|86"
+     ]
+    },
+    {
+     "quire": 15,
+     "type": "nested",
+     "bifolia": [
+      "87|90",
+      "88|89"
+     ]
+    },
+    {
+     "quire": 16,
+     "type": "nested",
+     "bifolia": [
+      "91|92"
+     ]
+    },
+    {
+     "quire": 17,
+     "type": "nested",
+     "bifolia": [
+      "93|96",
+      "94|95"
+     ]
+    },
+    {
+     "quire": 18,
+     "type": "nested",
+     "bifolia": [
+      "97|98"
+     ]
+    },
+    {
+     "quire": 19,
+     "type": "nested",
+     "bifolia": [
+      "99|102",
+      "100|101"
+     ]
+    },
+    {
+     "quire": 20,
+     "type": "nested",
+     "bifolia": [
+      "103|116",
+      "104|115",
+      "105|114",
+      "106|113",
+      "107|112",
+      "108|111",
+      "109|110"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "davis",
+   "title": "Davis: complete proposed order",
+   "subtitle": "Every sheet read on its own (singulions), as the 2026 paper proposes for the whole book; quires 13 and 20 re-sequenced; quire 9 re-sewn",
+   "sources": [
+    "LD2026",
+    "LFD2025blog",
+    "LFD2025talk"
+   ],
+   "summary": "Everything Davis has proposed about the order, in one sequence. Layfield & Davis (2026) conclude that the entire manuscript \"was originally intended to be read as a series of sequential singulions\": single folded sheets, each read first leaf recto, first leaf verso, second leaf recto, second leaf verso. Their evidence is that the two halves of one sheet are more alike than pages that face each other in the binding (quire 1: 0.399 against 0.246). So here every sheet is read on its own, and 1v faces 8r, its other half. Where they recovered a sequence, it is used: quires 13 and 20 follow the highest average LSA facing score (table 14), Q13 0.461 → 0.517 (+12.1%), Q20 0.438 → 0.526 (+20%). Where they did not, the sheets keep their current sequence, outermost first. They left the botanical sheets in place because \"each page is a distinct botanical topic\", and did not test the pharmaceutical quires. From Davis's \"Voynich Codicology\" post (Jan 2025), quire 9 is sewn in its original fold between 67v2 and 67v1. That post's waterspout evidence for 78|81 is satisfied too, because every sheet's own centre is now an opening (78v | 81r). The lost bifolium 109|110 cannot be placed.",
+   "gatherings": [
+    {
+     "quire": 1,
+     "type": "singulions",
+     "bifolia": [
+      "1|8",
+      "2|7",
+      "3|6",
+      "4|5"
+     ],
+     "note": "Sheets kept in their current sequence; Davis read the botanical sheets as singulions but did not re-sequence them."
+    },
+    {
+     "quire": 2,
+     "type": "singulions",
+     "bifolia": [
+      "9|16",
+      "10|15",
+      "11|14",
+      "12|13"
+     ],
+     "note": "Sheets kept in their current sequence."
+    },
+    {
+     "quire": 3,
+     "type": "singulions",
+     "bifolia": [
+      "17|24",
+      "18|23",
+      "19|22",
+      "20|21"
+     ],
+     "note": "Sheets kept in their current sequence."
+    },
+    {
+     "quire": 4,
+     "type": "singulions",
+     "bifolia": [
+      "25|32",
+      "26|31",
+      "27|30",
+      "28|29"
+     ],
+     "note": "Sheets kept in their current sequence. Scribes change sheet by sheet here (1, 2, 1, 1), which singulions explain."
+    },
+    {
+     "quire": 5,
+     "type": "singulions",
+     "bifolia": [
+      "33|40",
+      "34|39",
+      "35|38",
+      "36|37"
+     ],
+     "note": "Sheets kept in their current sequence."
+    },
+    {
+     "quire": 6,
+     "type": "singulions",
+     "bifolia": [
+      "41|48",
+      "42|47",
+      "43|46",
+      "44|45"
+     ],
+     "note": "Sheets kept in their current sequence."
+    },
+    {
+     "quire": 7,
+     "type": "singulions",
+     "bifolia": [
+      "49|56",
+      "50|55",
+      "51|54",
+      "52|53"
+     ],
+     "note": "Sheets kept in their current sequence."
+    },
+    {
+     "quire": 8,
+     "type": "singulions",
+     "bifolia": [
+      "57|66",
+      "58|65",
+      "59|64",
+      "60|63",
+      "61|62"
+     ],
+     "note": "Sheets kept in their current sequence; three of the five are lost."
+    },
+    {
+     "quire": 9,
+     "type": "singulions",
+     "bifolia": [
+      "67|68"
+     ],
+     "sheets": {
+      "67|68": {
+       "spine": 1
+      }
+     },
+     "note": "Sewn in the fold between 67v2 and 67v1, where Davis found tiny original sewing holes; the quire mark on 67r1 then falls on the last verso, where quire marks belong (LFD2025blog)."
+    },
+    {
+     "quire": 10,
+     "type": "singulions",
+     "bifolia": [
+      "69|70"
+     ]
+    },
+    {
+     "quire": 11,
+     "type": "singulions",
+     "bifolia": [
+      "71|72"
+     ]
+    },
+    {
+     "quire": 12,
+     "type": "singulions",
+     "bifolia": [
+      "73|74"
+     ]
+    },
+    {
+     "quire": 13,
+     "type": "singulions",
+     "bifolia": [
+      "77|82",
+      "78|81",
+      "75|84",
+      "76|83",
+      "79|80"
+     ],
+     "note": "Top LSA sequence, average facing score 0.517 vs 0.461 as bound (LD2026, table 14)."
+    },
+    {
+     "quire": 14,
+     "type": "singulions",
+     "bifolia": [
+      "85|86"
+     ]
+    },
+    {
+     "quire": 15,
+     "type": "singulions",
+     "bifolia": [
+      "87|90",
+      "88|89"
+     ],
+     "note": "Sheets kept in their current sequence; the pharmaceutical quires were not tested."
+    },
+    {
+     "quire": 16,
+     "type": "singulions",
+     "bifolia": [
+      "91|92"
+     ]
+    },
+    {
+     "quire": 17,
+     "type": "singulions",
+     "bifolia": [
+      "93|96",
+      "94|95"
+     ],
+     "note": "Sheets kept in their current sequence; the pharmaceutical quires were not tested."
+    },
+    {
+     "quire": 18,
+     "type": "singulions",
+     "bifolia": [
+      "97|98"
+     ]
+    },
+    {
+     "quire": 19,
+     "type": "singulions",
+     "bifolia": [
+      "99|102",
+      "100|101"
+     ],
+     "note": "Sheets kept in their current sequence; the pharmaceutical quires were not tested."
+    },
+    {
+     "quire": 20,
+     "type": "singulions",
+     "bifolia": [
+      "105|114",
+      "104|115",
+      "106|113",
+      "107|112",
+      "108|111",
+      "103|116"
+     ],
+     "unplaced": [
+      "109|110"
+     ],
+     "note": "Top LSA sequence, 0.526 vs 0.438 as bound (LD2026, table 14). It opens on 105r, the only page in the section that begins with an oversize glyph, and ends on 116v, originally blank."
+    }
+   ]
+  }
+ ],
+ "evidence": {
+  "67|68": [
+   {
+    "src": "LFD2025blog",
+    "text": "Sewn today in the fold between 67v1 and 68r1, with the quire mark on the first recto (67r1). Minuscule sewing holes in the fold between 67v2 and 67v1 show where the sheet was first sewn; folded there, 67r1 becomes the last verso, where quire marks belong. The re-sewing came after the quire marks and before the foliation."
+   },
+   {
+    "src": "VN",
+    "text": "Which way the panels fold is not recorded. Folio numbers were written while the foldouts were folded, which is why '68' sits on 68v2: folded, the centre opening shows 67r2 | 68v2."
+   },
+   {
+    "src": "Hodgins2009",
+    "text": "Leaf 68 was radiocarbon-dated: 1385-1436 (53%) or 1308-1362 (43%), a two-peaked result."
+   }
+  ],
+  "78|81": [
+   {
+    "src": "LFD2025blog",
+    "text": "Waterspouts at the left centre of 78v line up across the gutter with the women in pools on 81r (Pelling). The two pages were once a facing opening, so 78|81 was the innermost bifolium; it is now second from the centre."
+   }
+  ],
+  "76|83": [
+   {
+    "src": "VN",
+    "text": "Liquid on 76v continues on the conjugate 83r."
+   },
+   {
+    "src": "LD2026",
+    "text": "76r opens with an enlarged initial glyph; the runner-up Q13 sequence (0.494) starts here."
+   }
+  ],
+  "77|82": [
+   {
+    "src": "LD2026",
+    "text": "First sheet of the top-scoring Q13 sequence (average facing score 0.517 vs 0.461 as bound)."
+   }
+  ],
+  "75|84": [
+   {
+    "src": "LD2026",
+    "text": "75|84 and 78|81 both show bathing women; the top Q13 sequence puts them next to each other."
+   }
+  ],
+  "105|114": [
+   {
+    "src": "LD2026",
+    "text": "105r is the only page in the stars section that begins with an oversize glyph, which suits the start of the section; it opens the top Q20 sequence (0.526 vs 0.438 as bound)."
+   }
+  ],
+  "103|116": [
+   {
+    "src": "LD2026",
+    "text": "116v was originally blank, the natural end of the section; the top Q20 sequence ends here."
+   },
+   {
+    "src": "VN",
+    "text": "The quire mark '20' is on 103r, lower left, which is unusual."
+   }
+  ],
+  "109|110": [
+   {
+    "src": "LFD2025blog",
+    "text": "The central bifolium of quire 20 (ff. 109-110) is lost."
+   },
+   {
+    "src": "LD2026",
+    "text": "The central bifolium of quire 20 is lost. Its place in a singulion sequence cannot be recovered."
+   }
+  ],
+  "25|32": [
+   {
+    "src": "LFD2025blog",
+    "text": "Quire 4 changes scribe bifolium by bifolium: 25|32 is Scribe 1, 26|31 Scribe 2, the next two Scribe 1. Davis reads this mixing as a sign the bifolia were written separately and later reshuffled."
+   },
+   {
+    "src": "LFD2025blog",
+    "text": "The waterstain on 32v is clearly smaller and narrower than on the facing 33r, so the spill happened before these leaves came to face each other."
+   },
+   {
+    "src": "Davis2024",
+    "text": "An offset of the plant on 25v shows on the facing 26r only under multispectral light; it matches the present facing."
+   }
+  ],
+  "26|31": [
+   {
+    "src": "LFD2025blog",
+    "text": "Scribe 2 inside a Scribe 1 quire (see 25|32)."
+   },
+   {
+    "src": "Hodgins2009",
+    "text": "Leaf 26 was radiocarbon-dated: 1391-1447 (83%), the same age as the Scribe 1 and Scribe 4 leaves."
+   }
+  ],
+  "33|40": [
+   {
+    "src": "LFD2025blog",
+    "text": "The waterstain on 33r is larger than on the facing 32v (see 25|32)."
+   },
+   {
+    "src": "LD2026",
+    "text": "The blue petals of 33v cross the gutter onto 40r, its conjoint page, which it does not face in the binding: this sheet was painted while it lay open on its own."
+   },
+   {
+    "src": "VNorigin",
+    "text": "Quire mark 5 is on 40v, a Currier-B leaf: this Scribe 2 sheet was already the outer sheet of quire 5 when the quires were numbered."
+   }
+  ],
+  "12|13": [
+   {
+    "src": "LFD2025blog",
+    "text": "f12 is lost; the foliation skips from 11 to 13 and a stub remains."
+   }
+  ],
+  "59|64": [
+   {
+    "src": "LFD2025blog",
+    "text": "Quire 8 lacks ff. 59-64: three whole bifolia, lost after the 17th-century foliation."
+   }
+  ],
+  "73|74": [
+   {
+    "src": "VN",
+    "text": "f74 was cut out; a stub remains and cut marks show on f75r. Its quire mark was presumably on f74v."
+   }
+  ],
+  "91|92": [
+   {
+    "src": "LFD2025blog",
+    "text": "Quire 16 (ff. 91-92) is lost entirely."
+   }
+  ],
+  "97|98": [
+   {
+    "src": "LFD2025blog",
+    "text": "Quire 18 (ff. 97-98) is lost entirely."
+   }
+  ],
+  "85|86": [
+   {
+    "src": "VN",
+    "text": "One sheet of about 45 x 45 cm, 2 rows x 3 columns, sewn at the first vertical crease in the lower half only. Folded it reads 84v | 85r1, 85r2 | 86v5, 86v3 | 87r; the rosettes are inside."
+   },
+   {
+    "src": "Pelling2022",
+    "text": "Unexplained paint transfers on 85r2 and 86v6 match no page they face now."
+   }
+  ],
+  "87|90": [
+   {
+    "src": "VN",
+    "text": "Yale labels the photograph of 90v2 as '90r'."
+   }
+  ],
+  "1|8": [
+   {
+    "src": "VN",
+    "text": "The quire mark of quire 1 (\"pmus\") is at the lower right of 8v, the last verso of this outer sheet, so the quire was nested when it was numbered (15th century)."
+   },
+   {
+    "src": "Hodgins2009",
+    "text": "Leaf 8 was radiocarbon-dated: the animal died 1394-1458 (92% of the probability); the four samples together give 1404-1438."
+   },
+   {
+    "src": "McCrone2009",
+    "text": "The ink of the quire mark on 8v is a different, very low-iron ink from the text ink."
+   }
+  ],
+  "10|15": [
+   {
+    "src": "LD2026",
+    "text": "A splashed stain crosses the gutter between 10v and 15r, the two inner pages of this sheet, which do not face each other in the binding: it happened while the sheet lay open on its own (after Pelling 2006)."
+   }
+  ],
+  "41|48": [
+   {
+    "src": "VNorigin",
+    "text": "Quire mark 6 is on 48v: this Scribe 5 sheet was the outer sheet of quire 6 when the quires were numbered."
+   }
+  ],
+  "42|47": [
+   {
+    "src": "VNorigin",
+    "text": "On 42r the folio number lies under the green paint (seen by Barabe in 2009): some painting came after the foliation."
+   },
+   {
+    "src": "Hodgins2009",
+    "text": "Leaf 47 was radiocarbon-dated: 1392-1449 (88%)."
+   },
+   {
+    "src": "VNorigin",
+    "text": "Blue paint from 46v transferred onto 47r, which faces it now: the blue was still wet in the present binding order."
+   }
+  ],
+  "57|66": [
+   {
+    "src": "Davis2020",
+    "text": "Scribe 5 wrote 57r, 66r and 66v; Scribe 1 wrote the circular diagram on 57v. Which came first is not known."
+   },
+   {
+    "src": "Pelling2022",
+    "text": "Pelling proposes that quire 8 once read f65, f66, f57, f58, and that the Rosettes sheet once lay in it."
+   }
+  ],
+  "58|65": [
+   {
+    "src": "LD2026",
+    "text": "A bit of green leaf crosses the gutter between 58v and 65r, the sheet's inner pages: painted while the sheet lay open."
+   }
+  ],
+  "93|96": [
+   {
+    "src": "Davis2024",
+    "text": "On 93r the text is written over a paint spill, so here some colour came before the writing."
+   }
+  ],
+  "104|115": [
+   {
+    "src": "Davis2020",
+    "text": "Scribe 2 wrote the first twelve lines of 115r, then Scribe 3 took over."
+   },
+   {
+    "src": "VNq20",
+    "text": "Zandbergen sees an ink change on 115r at the end of the fifth paragraph; published counts of Scribe 2's lines there are 12, 18 and 33."
+   }
+  ]
+ }
+}

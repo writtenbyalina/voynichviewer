@@ -1,0 +1,1831 @@
+/* Voynich Viewer, 3D view: MS 408 as a book block you can turn in any direction.
+   WebGL with three.js r184 (vendored in ./vendor, MIT). app.js loads this module the first time the 3D tab opens;
+   it reads app.js's globals (D, SHEETS, ORDERS, S, POS, sidesOf, handled, varsOf, h, ...) directly.
+
+   The model is physical. Every leaf is a hinged chain of panels, ported from the old CSS sheet3D(): spine index,
+   inside-out, rot180, extra panels rolled onto the inside of the sheet, the Rose sheet's top half folded down.
+   Leaves stand in the order they lie in the closed book, each pivoting at the spine, and a sheet's two leaves are
+   joined by its fold at the back: the folds of a nested quire wrap one inside another, a singulion has its own.
+
+   Book space: thickness along +x (front of the book on the left, so reading order runs left to right), head +y,
+   fore-edge +z. A leaf's angle a is 0 when the book is closed, -90 lying open to the left, +90 to the right.
+   Standing, book space is world space (the book stands on its tail); lying, it is turned onto the desk. */
+import * as THREE from "./vendor/three.module.min.js";
+
+const H = 100;                 // page height in world units
+const T_REAL = 0.1;            // a vellum leaf at that scale (~0.25 mm on a ~235 mm page)
+const DEG = Math.PI / 180;
+const GOLD = 0xf3c35c;
+const PARCH = 0xe2d4b6;        // face colour until its photograph arrives
+const EDGE = [0xd9ccae, 0xd2c4a5, 0xddd1b5];   // page edges vary a little, so single leaves read at the fore-edge
+const FOLD = 0xc4b48f;                          // the folds at the spine, a shade darker than the edges
+const SPREAD_STOPS = [[0, "closed"], [0.12, "nearly closed"], [0.32, "fanned"], [0.58, "open fan"], [0.8, "pulled apart"], [0.97, "exploded"]];
+
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const ease = k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const spreadName = s => SPREAD_STOPS.reduce((n, [v, name]) => s >= v - 1e-6 ? name : n, "closed");
+
+// ---------------------------------------------------------------- state
+const V = {
+  built: false, gl: true, order: null, model: null, layout: null,
+  spread: store.get("3d:spread", 0.32), thick: store.get("3d:thick", 4), posture: store.get("3d:posture", "stand"),
+  mode: "block", opening: 1, cur: 0, hover: null, preset: 1,
+  inspect: false,      // the current sheet is pulled out and the inspector is open
+  hand: { on: false, turned: false, folded: true, flat: false, yaw: 0, pitch: 0, cam: null },   // lifted clear to look at
+  unfoldOpening: false, slow: store.get("3d:slow", false), prevOrder: null, flash: null,
+  overlay: store.get("3d:overlay", "none"),
+  contact: { on: false, i: 0, newOnly: false, list: [] },
+  objs: new Map(),     // current order: sheet id -> sheet object
+  cache: new Map(),    // id + handling -> sheet object, reused across orders
+};
+const CUR = { poses: new Map(), sg: new Map(), t: T_REAL * V.thick, lie: V.posture === "lie" ? 1 : 0, beta: 0 };
+let TW = { on: false };
+const CAM = { target: new THREE.Vector3(0, H / 2, 0), yaw: 32, pitch: 22, dist: 480, fov: 32, k: 9, goal: null };
+CAM.goal = { target: CAM.target.clone(), yaw: CAM.yaw, pitch: CAM.pitch, dist: CAM.dist, fov: CAM.fov };
+
+let renderer, scene, camera, book, table, shadow, stage, labelsEl, tipEl;
+let raf = 0, lastT = 0, appliedT = -1;
+const pickables = [];
+const M = {};          // shared materials
+
+// ---------------------------------------------------------------- textures
+const IMG = new Map(), TEX = new Map();
+let ANISO = 4;
+const imgLoad = url => {
+  if (!IMG.has(url)) IMG.set(url, new Promise((res, rej) => {
+    const i = new Image(); i.decoding = "async"; i.onload = () => res(i); i.onerror = rej; i.src = url;
+  }));
+  return IMG.get(url);
+};
+/* A texture for one panel at one size; rotated panels (seg.rot) get their own copy. Resolves when the image is in. */
+const rotOf = seg => (((seg.rot || 0) % 360) + 360) % 360;
+const texKey = (seg, size) => `${seg.img}|${size}|${seg.v || ""}|${rotOf(seg)}`;
+function texFor(seg, size) {
+  const rot = rotOf(seg), key = texKey(seg, size);
+  if (!TEX.has(key)) TEX.set(key, imgLoad(imgUrl(seg.img, size, seg.v)).then(img => {
+    const t = new THREE.Texture(img);
+    t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = ANISO;
+    if (rot) { t.center.set(.5, .5); t.rotation = rot * DEG; }
+    t.needsUpdate = true;
+    return t;
+  }));
+  return TEX.get(key);
+}
+function faceMat(seg) {
+  if (seg.missing) return M.ghost;
+  const m = new THREE.MeshLambertMaterial({ color: PARCH });
+  m.userData = { seg, want: "s" };
+  texFor(seg, "s").then(t => { if (m.userData.want !== "s") return; m.map = t; m.color.set(0xffffff); m.needsUpdate = true; wake(); }).catch(() => {});
+  return m;
+}
+/* Large photographs (l) for the sheets being looked at closely, small ones (s) everywhere else. */
+const DETAIL = new Set();
+function updateDetail() {
+  const want = new Set(), en = V.model?.all[V.cur];
+  if (en && (V.inspect || V.hand.on)) want.add(V.objs.get(en.id));
+  if (V.mode === "opening") for (const L of [V.model.leaves[V.opening - 1], V.model.leaves[V.opening]]) if (L) want.add(V.objs.get(L.e.id));
+  for (const o of [...DETAIL]) if (!want.has(o)) { setSize(o, "s"); DETAIL.delete(o); }
+  for (const o of want) if (o && !DETAIL.has(o)) { setSize(o, "l"); DETAIL.add(o); }
+}
+function setSize(o, size) {
+  for (const mesh of o.panels) for (const mat of mesh.material.slice(0, 2)) {
+    const seg = mat.userData?.seg;
+    if (!seg || mat.userData.want === size) continue;
+    mat.userData.want = size;
+    texFor(seg, size).then(t => {
+      if (mat.userData.want !== size) return;
+      mat.map = t; mat.color.set(0xffffff); mat.needsUpdate = true; wake();
+      if (size === "s") { const k = texKey(seg, "l"); TEX.get(k)?.then(x => x.dispose()); TEX.delete(k); }
+    }).catch(() => {});
+  }
+}
+
+/* A unit box with three material groups: 0 the front (+z, the inside face), 1 the back (-z, the outside face),
+   2 the four edges. three.js maps the back so it reads correctly from behind, like the old card's rotateY(180deg). */
+const BOX = (() => {
+  const g = new THREE.BoxGeometry(1, 1, 1);
+  const ix = g.index.array, face = k => Array.from(ix.slice(k * 6, k * 6 + 6));   // order: +x -x +y -y +z -z
+  g.setIndex([...face(4), ...face(5), ...face(0), ...face(1), ...face(2), ...face(3)]);
+  g.clearGroups(); g.addGroup(0, 6, 0); g.addGroup(6, 6, 1); g.addGroup(12, 24, 2);
+  return g;
+})();
+const RECT = new THREE.BufferGeometry().setFromPoints([[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5], [-.5, -.5]].map(([x, y]) => new THREE.Vector3(x, y, 0)));
+
+function makeMaterials() {
+  M.ghost = new THREE.MeshBasicMaterial({ color: 0xe9e3d8, transparent: true, opacity: .06, depthWrite: false });
+  M.ghostEdge = new THREE.MeshBasicMaterial({ color: 0xe9e3d8, transparent: true, opacity: .16, depthWrite: false });
+  M.ghostLine = new THREE.LineDashedMaterial({ color: 0xe9e3d8, transparent: true, opacity: .5, dashSize: .035, gapSize: .025 });
+  M.thread = new THREE.LineDashedMaterial({ color: 0xb4452f, dashSize: 3, gapSize: 2 });
+}
+
+// ---------------------------------------------------------------- the order as gatherings and leaves
+/* Sheets in reading order, gatherings as they are sewn (each singulion is its own), and leaves front to back. */
+function modelOf(order) {
+  const base = ORDERS.get("beinecke");
+  const was = new Map();
+  base.gatherings.forEach(g => g.bifolia.forEach((id, i) => was.set(id, { q: g.quire, i, o: JSON.stringify((g.sheets || {})[id] || {}) })));
+  const sheets = [], gathers = [], leaves = [], quires = [];
+  order.gatherings.forEach((g, qi) => {
+    const es = g.bifolia.map((id, i) => {
+      const opts = (g.sheets || {})[id] || {}, w = was.get(id);
+      const moved = order.id !== "beinecke" && (!w || w.q !== g.quire || w.i !== i);
+      return { id, sheet: SHEETS.get(id), opts, quire: g.quire, type: g.type, idx: i, count: g.bifolia.length, note: g.note, qi,
+               moved, resewn: order.id !== "beinecke" && !moved && !!w && w.o !== JSON.stringify(opts) };
+    });
+    quires.push({ qi, quire: g.quire, type: g.type, leaves: [] });
+    const groups = g.type === "singulions" ? es.map(e => [e]) : [es];
+    for (const grp of groups) {
+      const gi = gathers.length;
+      const ls = [...grp.map(e => [e, 0]), ...grp.slice().reverse().map(e => [e, 1])];
+      const ga = { gi, qi, quire: g.quire, leaves: [] };
+      ls.forEach(([e, k], j) => {
+        const L = { key: `${e.id}:${k}`, e, k, gi, qi, j, depth: g.type === "singulions" ? 0 : e.idx, n: leaves.length };
+        ga.leaves.push(L); quires[qi].leaves.push(L); leaves.push(L);
+      });
+      gathers.push(ga);
+    }
+    sheets.push(...es);
+  });
+  const unplaced = unplacedOf(order).map(id => ({ id, sheet: SHEETS.get(id), opts: {}, quire: SHEETS.get(id).quire, unplaced: true, type: "aside", idx: 0, count: 1 }));
+  return { sheets, gathers, leaves, quires, unplaced, all: [...sheets, ...unplaced] };
+}
+
+// ---------------------------------------------------------------- one sheet as hinged panels
+/* Port of the old CSS sheet3D(). Each leaf is a group whose origin is the foot of the spine fold; its proper panel
+   starts there and further panels hang from hinges, each folding back over the last. A hinge is
+   translateZ(g/2) rotate translateZ(-g/2): the fold line sits g/2 inside, so the folded panel lands g in front, on
+   the inside of the sheet. The Rose sheet's top row hangs from the top edge of the bottom row and folds down. */
+function makeSheet(entry) {
+  const sh = entry.sheet, v = handled(sh, entry.opts);
+  const n = v.n, s = v.spine, rows = v.inside.length, prow = v.proper;
+  const colW = c => {
+    let a = 0;
+    for (let r = 0; r < rows; r++) {
+      const fi = v.inside[r][c], bo = v.outside[r][n - 1 - c];
+      a = Math.max(a, ((fi.missing ? .68 : aspect(fi)) + (bo.missing ? .68 : aspect(bo))) / 2);
+    }
+    return a * H;
+  };
+  const o = { id: entry.id, v, n, s, rows, group: new THREE.Group(), leaves: [], panels: [], creases: [], lost: sh.missing.every(Boolean) };
+  o.group.name = entry.id;
+  const leafLost = k => sh.missing[k];
+  /* Pieces of one leaf's panels in hinge order. Folded, each piece lies back over the last. A panel too wide to lie
+     flat inside the leaf (68r3, 72r3, 89r2 …) would reach past the spine or the fore-edge, so it gets an extra crease
+     there and its remainder rolls back inside: inferred, like the fold direction itself. */
+  const MARGIN = 1.2;
+  const piecesOf = cols => {
+    const out = [];
+    if (!cols.length) return out;
+    const w0 = colW(cols[0]);
+    out.push({ c: cols[0], a: 0, b: w0, w: w0 });
+    let end = w0, d = -1;   // folded: where the last piece ends, and which way the next one runs
+    for (const c of cols.slice(1)) {
+      const w = colW(c);
+      let a = 0;
+      while (w - a > .01) {
+        const room = d < 0 ? end - MARGIN : w0 - MARGIN - end;
+        // a few units over is loose cropping, not a crease
+        const take = w - a - room < 5 ? w - a : Math.min(w - a, Math.max(room, Math.min(w - a, 4)));
+        if (a > 0) o.creases.push({ page: v.inside[prow][c].page, at: a / w });
+        out.push({ c, a, b: a + take, w, cont: a > 0 });
+        end += d * take; d = -d; a += take;
+      }
+    }
+    return out;
+  };
+  const geoFor = (p0, p1) => {   // the box with its front and back faces showing only [p0, p1] of the panel's width
+    if (p0 <= 0 && p1 >= 1) return BOX;
+    const g = BOX.clone(), uv = g.attributes.uv;
+    for (let i = 16; i < 20; i++) uv.setX(i, p0 + uv.getX(i) * (p1 - p0));               // front (+z)
+    for (let i = 20; i < 24; i++) uv.setX(i, 1 - p1 + uv.getX(i) * (p1 - p0));           // back (-z): mirrored
+    return g;
+  };
+  const buildLeaf = k => {
+    const dir = k === 0 ? -1 : 1;
+    const cols = k === 0 ? range(0, s).reverse() : range(s, n);
+    const pieces = piecesOf(cols);
+    const L = { k, group: new THREE.Group(), hinges: [], layers: rows * pieces.length, w: cols.length ? colW(cols[0]) : 0,
+                edge: leafLost(k) ? M.ghostEdge : new THREE.MeshLambertMaterial({ color: EDGE[(sh.leaves[k] || 0) % 3] }) };
+    L.base = L.edge.color ? L.edge.color.getHex() : null;
+    const hinge = (parent, x, y, gapU, axis, sign) => {
+      const outer = new THREE.Group(), inner = new THREE.Group();
+      outer.position.set(x, y, 0); outer.add(inner); parent.add(outer);
+      L.hinges.push({ outer, inner, gapU, axis, sign });
+      return inner;
+    };
+    const place = (parent, r, p) => {
+      const front = v.inside[r][p.c], back = v.outside[r][n - 1 - p.c], len = p.b - p.a;
+      // the piece's share of the panel, measured from the panel's left edge (for a left leaf the hinge is on the right)
+      const [p0, p1] = dir > 0 ? [p.a / p.w, p.b / p.w] : [1 - p.b / p.w, 1 - p.a / p.w];
+      const mesh = new THREE.Mesh(geoFor(p0, p1), [faceMat(front), faceMat(back), L.edge]);
+      mesh.position.set(dir * len / 2, H / 2, 0);
+      mesh.scale.set(len, H, 1);
+      mesh.userData = { sheet: o, leaf: L, col: p.c, row: r, front, back, part: p.cont || p.b < p.w - .01 };
+      if (front.missing && back.missing) {
+        const line = new THREE.Line(RECT, M.ghostLine); line.computeLineDistances(); mesh.add(line);
+      }
+      parent.add(mesh); o.panels.push(mesh); pickables.push(mesh);
+      return len;
+    };
+    let parent = L.group, prev = 0;
+    pieces.forEach((p, j) => {
+      let col = parent;
+      if (j > 0) col = hinge(parent, dir * prev, 0, rows * (pieces.length - j) + rows - 1, "y", -dir);
+      prev = place(col, prow, p);
+      if (rows > 1) place(hinge(col, 0, H, 1, "x", 1), prow === 1 ? 0 : 1, p);
+      parent = col;
+    });
+    o.group.add(L.group);
+    return L;
+  };
+  o.leaves = [buildLeaf(0), buildLeaf(1)];
+  o.S = range(0, s).reduce((a, c) => a + colW(c), 0);                 // width left of the spine, opened flat
+  o.leaves[0].full = o.S; o.leaves[1].full = range(s, n).reduce((a, c) => a + colW(c), 0);
+  // the fold at the back: a strip joining the two leaves' spine edges, reshaped every frame
+  const NS = 12;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array((NS + 1) * 2 * 3), 3));
+  const idx = [];
+  for (let i = 0; i < NS; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  geo.setIndex(idx);
+  o.foldMat = o.lost ? M.ghostEdge : new THREE.MeshLambertMaterial({ color: FOLD, side: THREE.DoubleSide });
+  o.fold = new THREE.Mesh(geo, o.foldMat);
+  o.fold.userData = { sheet: o, ns: NS };
+  o.fold.frustumCulled = false;
+  o.group.add(o.fold); pickables.push(o.fold);
+  return o;
+}
+
+function objFor(entry, bind = true) {
+  const key = entry.id + "#" + JSON.stringify(entry.opts || {});
+  if (!V.cache.has(key)) V.cache.set(key, makeSheet(entry));
+  const o = V.cache.get(key);
+  if (bind) o.entry = entry;   // the order's entry, for picking; a lookup (bind = false) leaves it alone
+  return o;
+}
+
+// ---------------------------------------------------------------- layout
+const dirOf = a => [Math.sin(a * DEG), Math.cos(a * DEG)];      // where a leaf points from the spine (x, z)
+const nrmOf = a => [Math.cos(a * DEG), -Math.sin(a * DEG)];     // the way later leaves stack on it (x, z)
+const fanOf = m => Math.min(80, 20 + 6 * m);                   // one gathering's own fan when pulled apart
+
+function postureMatrix(lie, beta) {
+  return new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(-90 * lie * DEG, beta * lie * DEG, 0, "XYZ"));
+}
+
+/* Book-space corners of every placed leaf (lift ignored), for centring and framing; `reach` keeps only the part of
+   each leaf nearest the spine. */
+function leafCorners(poses, model, t, only, reach = 1) {
+  const pts = [], held = V.hand.on ? model.all[V.cur]?.id : null;
+  for (const L of model.leaves) {
+    if (only && !only.has(L.key)) continue;
+    if (L.e.id === held && !only) continue;   // the sheet in hand is not part of the block
+    const p = poses.get(L.key), o = V.objs.get(L.e.id); if (!p || !o) continue;
+    const w = (p.f < .5 ? o.leaves[L.k].full : o.leaves[L.k].w) * reach, [dx, dz] = dirOf(p.a);   // unfolded, the leaf reaches further
+    for (const y of [p.y, p.y + H]) pts.push(new THREE.Vector3(p.x, y, p.z), new THREE.Vector3(p.x + dx * w, y, p.z + dz * w));
+  }
+  return pts;
+}
+
+/* Where the book sits: turned for the posture, centred on the origin, resting on the table. */
+function bookPlacement(poses, model, t, lie, beta) {
+  const R = postureMatrix(lie, beta);
+  const box = new THREE.Box3();
+  for (const p of leafCorners(poses, model, t)) box.expandByPoint(p.applyMatrix4(R));
+  if (box.isEmpty()) box.set(new THREE.Vector3(-1, 0, -1), new THREE.Vector3(1, 1, 1));
+  const c = box.getCenter(new THREE.Vector3());
+  const pos = new THREE.Vector3(-c.x, -box.min.y, -c.z);
+  box.translate(pos);
+  return { R, pos, box, matrix: new THREE.Matrix4().makeTranslation(pos.x, pos.y, pos.z).multiply(R) };
+}
+
+/* Target poses for every leaf. Spread 0 is the closed book; up to 0.55 the whole block fans open; beyond that each
+   gathering fans on its own, quires pull apart and the bifolia of a nested quire step up so each can be grabbed. */
+function computeLayout() {
+  const model = V.model, t = T_REAL * V.thick, sp = V.spread, open = V.mode === "opening";
+  const leaves = model.leaves, N = leaves.length;
+  const sc = Math.min(sp / 0.55, 1), F = 130 * (1 - Math.pow(1 - sc, 1.6));
+  const e = open ? 0 : smooth(0.55, 1, sp);
+  const cur = model.all[V.cur], al = new Array(N);
+  if (open) {
+    // open at an opening: leaves before it in the left pile, the rest in the right; the opening faces you
+    const o = clamp(V.opening, 0, N);
+    leaves.forEach((L, i) => { al[i] = i < o ? -90 + 12 * (i + 1) / o : 78 + 12 * (i - o) / Math.max(1, N - o); });
+  } else {
+    let u = 0; const us = [];
+    leaves.forEach((L, i) => { if (i && L.gi !== leaves[i - 1].gi) u += L.qi !== leaves[i - 1].qi ? 3 : 1; us.push(u); u += 1; });
+    const uMax = Math.max(1, us[N - 1] || 1);
+    leaves.forEach((L, i) => {
+      const m = model.gathers[L.gi].leaves.length, f = fanOf(m);
+      const local = m > 1 ? -f / 2 + f * L.j / (m - 1) : 0;
+      al[i] = (1 - e) * (-F / 2 + F * us[i] / uMax) + e * local;
+    });
+    // the current sheet parts the fan, as a thumb would
+    const mine = leaves.filter(L => L.e === cur).map(L => L.n);
+    if (mine.length === 2 && sp > 0.01) {
+      const d = 6 * Math.min(1, sp / 0.12) * (1 - e);
+      for (let i = 0; i < N; i++) { if (i < mine[0]) al[i] -= d; else if (i > mine[1]) al[i] += d; }
+    }
+  }
+  const hw = gi => {
+    const g = model.gathers[gi];
+    return Math.max(...g.leaves.map(L => V.objs.get(L.e.id).leaves[L.k].w)) * Math.sin(fanOf(g.leaves.length) / 2 * DEG);
+  };
+  const poses = new Map();
+  let px = 0, pz = 0;
+  leaves.forEach((L, i) => {
+    if (i && L.gi !== leaves[i - 1].gi) {
+      const sameQ = L.qi === leaves[i - 1].qi;
+      let gap = open ? t * .6 : t * (sameQ ? .2 + 1.5 * sc : .5 + 6 * sc);
+      if (e) gap += e * (hw(leaves[i - 1].gi) + hw(L.gi) + (sameQ ? 6 : 18));
+      const [gx, gz] = nrmOf((al[i - 1] + al[i]) / 2);
+      px += gx * gap; pz += gz * gap;
+    }
+    const lf = V.objs.get(L.e.id).leaves[L.k];
+    const w = Math.max(1, lf.layers) * t, [nx, nz] = nrmOf(al[i]);
+    // the proper panel lies on the outside of its leaf; the folded panels stack on the inside
+    const off = L.k === 0 ? t / 2 : w - t / 2;
+    // the current sheet stands a little proud; pulled out to inspect, a third of its height
+    poses.set(L.key, { x: px + nx * off, y: e * .05 * H * L.depth, z: pz + nz * off, a: al[i],
+                       f: open && V.unfoldOpening && (i === V.opening - 1 || i === V.opening) ? 0 : 1,
+                       lift: !open && L.e === cur ? (V.inspect ? .34 : .12) * H * (1 - .6 * e) : 0 });
+    px += nx * w; pz += nz * w;
+  });
+  const lie = V.posture === "lie" ? 1 : 0;
+  // lying, the book rests on its back cover, so it tips as it opens; open at an opening, both piles lie on the desk
+  const beta = lie ? (open ? 0 : clamp((1 - e) * (90 - (al[N - 1] || 0)), 0, 90)) : 0;
+  const place = bookPlacement(poses, model, t, lie, beta);
+  // lost sheets this order cannot place lie flat on the table in front of their quire
+  const sg = new Map(), inv = place.matrix.clone().invert();
+  const qx = new Map();
+  for (const q of model.quires) {
+    const pts = leafCorners(poses, model, t, new Set(q.leaves.map(L => L.key)));
+    if (pts.length) qx.set(q.quire, pts.reduce((a, p) => a + p.applyMatrix4(place.matrix).x, 0) / pts.length);
+  }
+  const perQ = new Map();
+  for (const en of model.unplaced) {
+    const k = perQ.get(en.quire) || 0; perQ.set(en.quire, k + 1);
+    const x = (qx.get(en.quire) ?? place.box.max.x + H) + k * H * 1.6;
+    const world = new THREE.Matrix4().makeTranslation(x, .3, place.box.max.z + 1.18 * H).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+    const m = inv.clone().multiply(world), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+    m.decompose(p, q, s);
+    sg.set(en.id, { p, q });
+    poses.set(`${en.id}:0`, { x: 0, y: 0, z: 0, a: -90, f: 1, lift: 0 });
+    poses.set(`${en.id}:1`, { x: 0, y: 0, z: 0, a: 90, f: 1, lift: 0 });
+  }
+  // the sheet in hand rises clear of the block above its slot, turned to face the camera
+  if (V.hand.on && cur) {
+    const a = poses.get(`${cur.id}:0`), b = poses.get(`${cur.id}:1`);
+    const x = !cur.unplaced && a && b ? new THREE.Vector3((a.x + b.x) / 2, 0, (a.z + b.z) / 2).applyMatrix4(place.matrix).x : 0;
+    const c = place.box.getCenter(new THREE.Vector3()), tilt = clamp(V.hand.pitch - 12, 0, 55);
+    const world = new THREE.Matrix4().makeTranslation(x, place.box.max.y + .22 * H, c.z)
+      .multiply(new THREE.Matrix4().makeRotationY((V.hand.yaw + (V.hand.turned ? 180 : 0)) * DEG))
+      .multiply(new THREE.Matrix4().makeRotationX(-tilt * DEG));
+    const m = inv.clone().multiply(world), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+    m.decompose(p, q, s);
+    sg.set(cur.id, { p, q });
+    const phi = V.hand.flat ? 0 : 20, f = V.hand.folded ? 1 : 0;   // phi: how far each leaf is from lying flat
+    poses.set(`${cur.id}:0`, { x: 0, y: 0, z: 0, a: -(90 - phi), f, lift: 0 });
+    poses.set(`${cur.id}:1`, { x: 0, y: 0, z: 0, a: 90 - phi, f, lift: 0 });
+  }
+  const worldBox = place.box.clone();
+  if (model.unplaced.length) worldBox.max.z += 1.3 * H;
+  return { poses, sg, t, lie, beta, place, box: worldBox, al };
+}
+
+// ---------------------------------------------------------------- animation
+/* Every change is a tween of keyframe tracks: each leaf's pose, each sheet's frame and the book's posture. A plain
+   change has two keyframes; the order morph adds lifts, staggers and the flat swap of a re-sewn sheet. */
+const IDENT = { p: new THREE.Vector3(), q: new THREE.Quaternion() };
+const mixPose = (a, b, q) => ({ x: lerp(a.x, b.x, q), y: lerp(a.y, b.y, q), z: lerp(a.z, b.z, q), a: lerp(a.a, b.a, q), f: lerp(a.f, b.f, q), lift: lerp(a.lift, b.lift, q) });
+const mixSg = (a, b, q) => ({ p: a.p.clone().lerp(b.p, q), q: a.q.clone().slerp(b.q, q) });
+const mixG = (a, b, q) => ({ t: lerp(a.t, b.t, q), lie: lerp(a.lie, b.lie, q), beta: lerp(a.beta, b.beta, q) });
+function at(track, k, mix) {
+  let i = 0;
+  while (i < track.length - 2 && k > track[i + 1][0]) i++;
+  const [k0, a] = track[i], [k1, b] = track[i + 1];
+  return mix(a, b, ease(clamp((k - k0) / Math.max(1e-6, k1 - k0))));
+}
+function finishSwaps() {
+  for (const sw of TW.swaps || []) {
+    sw.show.group.visible = !hiddenObj(sw.show);
+    if (![...V.objs.values()].includes(sw.hide)) sw.hide.group.parent?.remove(sw.hide.group);
+  }
+}
+function relayout(dur = 650, morph = null) {
+  if (!V.model) return;
+  if (TW.on) finishSwaps();
+  const L = V.layout = computeLayout();
+  const poses = new Map(), sgs = new Map();
+  for (const [key, b] of L.poses) poses.set(key, [[0, CUR.poses.get(key) || b], [1, b]]);
+  for (const en of V.model.all) sgs.set(en.id, [[0, CUR.sg.get(en.id) || IDENT], [1, L.sg.get(en.id) || IDENT]]);
+  const tw = { poses, sgs, g: [[0, { t: CUR.t, lie: CUR.lie, beta: CUR.beta }], [1, { t: L.t, lie: L.lie, beta: L.beta }]], swaps: [], leaving: [] };
+  if (morph) morph(tw, L);
+  TW = { ...tw, t0: performance.now(), dur: REDUCED ? 0 : dur, on: true };
+  for (const sw of TW.swaps) sw.show.group.visible = false;
+  updateDetail();
+  if (!TW.dur) tweenStep(TW.t0); else wake();
+}
+
+function tweenStep(now) {
+  if (!TW.on) return false;
+  const k = TW.dur ? clamp((now - TW.t0) / TW.dur) : 1;
+  const poses = new Map(), sg = new Map();
+  for (const [key, tr] of TW.poses) poses.set(key, at(tr, k, mixPose));
+  for (const [id, tr] of TW.sgs) sg.set(id, at(tr, k, mixSg));
+  CUR.poses = poses; CUR.sg = sg;
+  Object.assign(CUR, at(TW.g, k, mixG));
+  for (const sw of TW.swaps) { sw.hide.group.visible = k < sw.k && !hiddenObj(sw.hide); sw.show.group.visible = k >= sw.k && !hiddenObj(sw.show); }
+  applyAll();
+  if (k >= 1) { TW.on = false; finishSwaps(); TW.swaps = []; TW.leaving = []; }
+  return TW.on;
+}
+
+/* Put every object where CUR says. */
+function applyAll() {
+  const t = CUR.t;
+  const thick = Math.abs(t - appliedT) > 1e-6;
+  const items = V.model.all.map(en => [V.objs.get(en.id), en.id]).concat((TW.leaving || []).map(x => [x.o, "old:" + x.id]));
+  for (const [o, id] of items) {
+    if (!o) continue;
+    const g = CUR.sg.get(id) || IDENT;
+    o.group.position.copy(g.p); o.group.quaternion.copy(g.q);
+    for (const L of o.leaves) {
+      const p = CUR.poses.get(`${id}:${L.k}`); if (!p) continue;
+      L.group.position.set(p.x, p.y + p.lift, p.z);
+      L.group.rotation.y = (L.k === 0 ? p.a + 90 : p.a - 90) * DEG;
+      for (const hg of L.hinges) {
+        if (hg.axis === "y") hg.outer.rotation.y = hg.sign * Math.PI * p.f; else hg.outer.rotation.x = Math.PI * p.f;
+        if (thick || o.t !== t) { hg.outer.position.z = hg.gapU * t / 2; hg.inner.position.z = -hg.gapU * t / 2; }
+      }
+    }
+    if (thick || o.t !== t) { for (const m of o.panels) m.scale.z = t * .8; o.t = t; }
+    shapeFold(o, id);
+  }
+  appliedT = t;
+  const place = bookPlacement(CUR.poses, V.model, t, CUR.lie, CUR.beta);
+  book.position.copy(place.pos);
+  book.quaternion.setFromRotationMatrix(place.R);
+  shadow.position.set((place.box.min.x + place.box.max.x) / 2, .05, (place.box.min.z + place.box.max.z) / 2);
+  shadow.scale.set(place.box.max.x - place.box.min.x + 60, place.box.max.z - place.box.min.z + 60, 1);
+}
+
+/* The fold at the back: from one leaf's spine edge, round behind the leaves it encloses, to the other's. */
+function shapeFold(o, id) {
+  const a = CUR.poses.get(`${id}:0`), b = CUR.poses.get(`${id}:1`);
+  if (!a || !b || !o.leaves[0].layers || !o.leaves[1].layers) { o.fold.visible = false; return; }
+  o.fold.visible = true;
+  const [ax, az] = dirOf(a.a), [bx, bz] = dirOf(b.a);
+  const d = Math.hypot(b.x - a.x, b.z - a.z), r = Math.max(d * .62, CUR.t * .9);
+  const P = [[a.x, a.z], [a.x - ax * r, a.z - az * r], [b.x - bx * r, b.z - bz * r], [b.x, b.z]];
+  const pos = o.fold.geometry.attributes.position, ns = o.fold.userData.ns;
+  for (let i = 0; i <= ns; i++) {
+    const s = i / ns, u = 1 - s;
+    const w = [u * u * u, 3 * u * u * s, 3 * u * s * s, s * s * s];
+    const x = w.reduce((m, k, j) => m + k * P[j][0], 0), z = w.reduce((m, k, j) => m + k * P[j][1], 0);
+    const y0 = lerp(a.y + a.lift, b.y + b.lift, s);
+    pos.setXYZ(i * 2, x, y0, z); pos.setXYZ(i * 2 + 1, x, y0 + H, z);
+  }
+  pos.needsUpdate = true;
+  o.fold.geometry.computeVertexNormals();
+  if (o.thread?.visible) {   // just outside the apex of the fold
+    const m = ns / 2 * 2, tp = o.thread.geometry.attributes.position;
+    const x = pos.getX(m), z = pos.getZ(m), y = pos.getY(m), [cx, cz] = [(a.x + b.x) / 2, (a.z + b.z) / 2];
+    const l = Math.hypot(x - cx, z - cz) || 1, k = CUR.t * .6 / l;
+    tp.setXYZ(0, x + (x - cx) * k, y + H * .05, z + (z - cz) * k); tp.setXYZ(1, x + (x - cx) * k, y + H * .95, z + (z - cz) * k);
+    tp.needsUpdate = true; o.thread.computeLineDistances();
+  }
+}
+
+// ---------------------------------------------------------------- camera
+function camDir(yaw, pitch) {
+  const cp = Math.cos(pitch * DEG);
+  return new THREE.Vector3(cp * Math.sin(yaw * DEG), Math.sin(pitch * DEG), cp * Math.cos(yaw * DEG));
+}
+function placeCamera() {
+  camera.position.copy(CAM.target).addScaledVector(camDir(CAM.yaw, CAM.pitch), CAM.dist);
+  camera.lookAt(CAM.target);
+  camera.fov = CAM.fov;
+  camera.near = Math.max(.5, CAM.dist * .02); camera.far = CAM.dist * 12 + 6000;
+  camera.updateProjectionMatrix();
+  scene.fog.near = CAM.dist * 1.6; scene.fog.far = CAM.dist * 7 + 2000;
+}
+function camStep(dt) {
+  const g = CAM.goal, a = 1 - Math.exp(-CAM.k * dt);
+  CAM.yaw += (g.yaw - CAM.yaw) * a; CAM.pitch += (g.pitch - CAM.pitch) * a;
+  CAM.dist += (g.dist - CAM.dist) * a; CAM.target.lerp(g.target, a); CAM.fov += (g.fov - CAM.fov) * a;
+  const done = Math.abs(g.yaw - CAM.yaw) < .02 && Math.abs(g.pitch - CAM.pitch) < .02 && Math.abs(g.fov - CAM.fov) < .01
+    && Math.abs(g.dist - CAM.dist) < CAM.dist * 1e-4 && CAM.target.distanceTo(g.target) < .02;
+  if (done) { CAM.yaw = g.yaw; CAM.pitch = g.pitch; CAM.dist = g.dist; CAM.fov = g.fov; CAM.target.copy(g.target); }
+  placeCamera();
+  return !done;
+}
+const PITCH = [2, 89.5];
+function setGoal({ yaw, pitch, dist, target, fov }, k = 10) {
+  const g = CAM.goal;
+  if (fov != null) g.fov = fov;
+  if (yaw != null) g.yaw = yaw;
+  if (pitch != null) g.pitch = clamp(pitch, ...PITCH);
+  if (dist != null) g.dist = clamp(dist, H * .35, H * 160);
+  if (target) g.target.copy(target);
+  CAM.k = k;
+  if (REDUCED && k < 10) { CAM.yaw = g.yaw; CAM.pitch = g.pitch; CAM.dist = g.dist; CAM.fov = g.fov; CAM.target.copy(g.target); }
+  wake();
+}
+/* How far back the camera must stand, looking from (yaw, pitch), for every point to fit the view. */
+function fitDist(points, center, yaw, pitch, margin = 1.1, fov = camera.fov) {
+  const f = camDir(yaw, pitch), right = new THREE.Vector3(0, 1, 0).cross(f).normalize(), up = f.clone().cross(right);
+  if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
+  const tv = Math.tan(fov / 2 * DEG), th = tv * camera.aspect;
+  let need = 0;
+  for (const p of points) {
+    const d = p.clone().sub(center);
+    need = Math.max(need, d.dot(f) + Math.abs(d.dot(right)) / th, d.dot(f) + Math.abs(d.dot(up)) / tv);
+  }
+  return need * margin;
+}
+const boxPoints = b => [0, 1, 2, 3, 4, 5, 6, 7].map(i => new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z));
+const nearestYaw = y => { const c = CAM.yaw; return y + 360 * Math.round((c - y) / 360); };
+
+/* Named views. Each is given in book terms and turned with the posture, so "spine" is always the spine. */
+const PRESETS = [
+  null,
+  { name: "Front ¾", key: "1" },
+  { name: "Spine", key: "2" },
+  { name: "Head", key: "3" },
+  { name: "Fore-edge", key: "4" },
+  { name: "Reader's eye", key: "5" },
+];
+function presetAngles(n, lay) {
+  if (lay.lie < .5) return [null, [32, 22], [200, 14], [0, 89.5], [0, 5], [0, 12]][n];
+  // lying: turn the book-space direction of that edge onto the desk and look at it from a little above
+  const R = postureMatrix(1, lay.beta);
+  const yawOf = v => { const w = v.applyMatrix4(R); return Math.atan2(w.x, w.z) / DEG; };
+  if (n === 1) return [28, 45];
+  if (n === 2) return [yawOf(new THREE.Vector3(0, 0, -1)), 16];
+  if (n === 3) return [180, 28];
+  if (n === 4) return [yawOf(new THREE.Vector3(0, 0, 1)), 12];
+  return [0, 78];
+}
+function preset(n, { instant = false } = {}) {
+  if (!V.layout) return;
+  if (n === 5 && V.mode !== "opening") { setMode("opening", { view: false }); }
+  V.preset = n;
+  const lay = V.layout;
+  const [yaw, pitch] = presetAngles(n, lay);
+  let pts = boxPoints(lay.box);
+  // the spine and head views frame the region by the spine, where folds and nesting show
+  if (n === 2 || n === 3) pts = leafCorners(lay.poses, V.model, lay.t, null, n === 2 ? .3 : .42);
+  if (n === 5) pts = leafCorners(lay.poses, V.model, lay.t, new Set([V.model.leaves[V.opening - 1]?.key, V.model.leaves[V.opening]?.key].filter(Boolean)));
+  if (n !== 1 && n !== 4) pts = pts.map(p => p.applyMatrix4(lay.place.matrix));
+  const center = n === 1 || n === 4 ? lay.box.getCenter(new THREE.Vector3()) : new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3());
+  // the edge views use a long lens, so they read almost like a plan (the quire diagram) rather than a close-up
+  const fov = n === 3 ? 6 : n === 2 || n === 4 ? 10 : 32;
+  setGoal({ yaw: nearestYaw(yaw), pitch, target: center, fov, dist: fitDist(pts, center, yaw, pitch, n === 5 ? 1.04 : 1.12, fov) }, instant ? 100 : 4.5);
+  renderViews();
+  renderNote();
+  pushHash();
+}
+
+// ---------------------------------------------------------------- frame loop
+function active() { return V.built && V.gl && !$("#v-three").hidden && stage.clientWidth > 0; }
+function wake() { if (!raf && active()) raf = requestAnimationFrame(frame); }
+function frame(now) {
+  raf = 0;
+  const dt = lastT ? Math.min(.05, (now - lastT) / 1000) : 1 / 60;
+  lastT = now;
+  const moving = camStep(dt);
+  const anim = tweenStep(now);
+  renderer.render(scene, camera);
+  drawLabels();
+  if (moving || anim || DRAG.on) raf = requestAnimationFrame(frame); else lastT = 0;
+}
+function resize() {
+  if (!V.gl || !stage.clientWidth) return;
+  const w = stage.clientWidth, h2 = stage.clientHeight;
+  renderer.setSize(w, h2, false);
+  camera.aspect = w / h2; camera.updateProjectionMatrix();
+  // still at a named view (not turned, panned or zoomed since): keep it framed as the stage changes size
+  clearTimeout(resize.t);
+  resize.t = setTimeout(() => { if (V.preset && V.layout && !V.hand.on) preset(V.preset, { instant: REDUCED }); }, 120);
+  wake();
+}
+
+// ---------------------------------------------------------------- labels (screen space, always upright)
+const LBL = new Map();
+function lbl(key, cls) {
+  let el = LBL.get(key);
+  if (!el) { el = h("div", { class: "v3-lbl " + cls }); labelsEl.append(el); LBL.set(key, el); el._w = 0; }
+  return el;
+}
+const _v = new THREE.Vector3();
+let SW = 1, SH = 1;   // the stage's size, read once per frame: reading it between label writes would force a layout each time
+function project(p, obj) {
+  _v.copy(p).applyMatrix4(obj.matrixWorld).project(camera);
+  if (_v.z > 1 || _v.z < -1) return null;
+  return [(_v.x + 1) / 2 * SW, (1 - _v.y) / 2 * SH];
+}
+function sheetAnchor(id) {
+  const o = V.objs.get(id), a = CUR.poses.get(`${id}:0`), b = CUR.poses.get(`${id}:1`);
+  if (!o || !a || !b) return null;
+  const [dx, dz] = dirOf(a.a), w = o.leaves[0].w || o.leaves[1].w;
+  return { obj: o.group, p: new THREE.Vector3((a.x + b.x) / 2 + dx * w * .2, Math.max(a.y + a.lift, b.y + b.lift) + H + 2, (a.z + b.z) / 2 + dz * w * .2) };
+}
+function drawLabels() {
+  if (!V.model) return;
+  SW = stage.clientWidth; SH = stage.clientHeight;
+  book.updateMatrixWorld();
+  const want = [];
+  const lay = V.layout, e = V.mode === "opening" ? 0 : smooth(.55, 1, V.spread);
+  const curEn = V.model.all[V.cur];
+  const sheetText = en => en.id + (en.moved ? " •" : en.resewn ? " ○" : "");
+  // quire names above the head of each quire
+  for (const q of V.model.quires) {
+    // open at an opening, the other quires lie under the pages: name only the one in view
+    if (V.mode === "opening" && q.quire !== curEn?.quire) continue;
+    if (hiddenQuires().has(String(q.quire))) continue;
+    const mid = q.leaves[Math.floor(q.leaves.length / 2)], p = CUR.poses.get(mid?.key), o = mid && V.objs.get(mid.e.id);
+    if (!p || !o) continue;
+    // by the spine in the spine and head views, mid-leaf otherwise
+    const [dx, dz] = dirOf(p.a), w = o.leaves[mid.k].w * (V.preset === 2 ? -.05 : V.preset === 3 ? .12 : 1);
+    const sec = (D.quires.find(x => x.q === q.quire) || {}).section || "";
+    want.push({ key: "q" + q.qi, cls: "q", pri: 1, obj: o.group, p: new THREE.Vector3(p.x + dx * w * .5, p.y + H + 6, p.z + dz * w * .5),
+                html: `${qTag(q.quire)}${e > .35 || V.preset === 3 ? `<small>${esc(sec)}${q.type === "singulions" ? " · singulions" : ""}</small>` : ""}` });
+  }
+  for (const en of V.model.all) {
+    const isCur = en === curEn;
+    const show = (isCur || en.unplaced || e > .4 || (en.moved && V.spread > .45)) && !isHidden(en);
+    if (!show) continue;
+    const an = sheetAnchor(en.id); if (!an) continue;
+    const lost = en.sheet.missing.every(Boolean);
+    want.push({ key: "s" + en.id, sheet: V.objs.get(en.id), cls: isCur ? "cur" : lost ? "lost" : en.moved ? "moved" : "",
+                pri: isCur ? 0 : en.unplaced ? 1.2 : en.moved ? 1.5 : 2, ...an,
+                html: esc(sheetText(en)) + (en.unplaced ? (lost ? " <small>lost · place unknown</small>" : " <small>set aside</small>") : lost && (isCur || e > .4) ? " <small>lost</small>" : "") });
+  }
+  want.sort((a, b) => a.pri - b.pri);
+  // a label hides behind the sheets in front of it (checked at most every 150 ms, so orbiting stays smooth)
+  const now = performance.now();
+  if (now - OCC.t > 150) { OCC.t = now; OCC.hid = new Set(want.filter(L => occluded(L.p, L.obj, L.sheet || null)).map(L => L.key)); }
+  const placed = [], seen = new Set();
+  const W = SW, Hh = SH;
+  for (const L of want) {
+    const xy = project(L.p, L.obj);
+    const el = lbl(L.key, "");
+    seen.add(L.key);
+    if (el._html !== L.html) { el.innerHTML = L.html; el._html = L.html; el._w = 0; }
+    const cls = "v3-lbl " + L.cls + (OCC.hid.has(L.key) ? " behind" : "");
+    if (el.className !== cls) el.className = cls;
+    if (!xy || xy[0] < -40 || xy[0] > W + 40 || xy[1] < 0 || xy[1] > Hh + 20) { el.style.display = "none"; continue; }
+    if (OCC.hid.has(L.key) && L.cls !== "cur") { el.style.display = "none"; continue; }
+    if (!el._w) { el.style.display = ""; el._w = el.offsetWidth; el._h = el.offsetHeight; }
+    const r = [xy[0] - el._w / 2 - 3, xy[1] - el._h - 3, xy[0] + el._w / 2 + 3, xy[1] + 1];
+    if (L.pri > 0 && placed.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) { el.style.display = "none"; continue; }
+    placed.push(r);
+    if (el.style.display) el.style.display = "";
+    const tr = `translate(${Math.round(xy[0])}px, ${Math.round(xy[1])}px) translate(-50%, -100%)`;
+    if (el._tr !== tr) { el.style.transform = tr; el._tr = tr; }
+  }
+  for (const [k, el] of LBL) if (!seen.has(k) && el.style.display !== "none") el.style.display = "none";
+}
+
+// ---------------------------------------------------------------- colour overlays
+/* Colour the sheet edges and the folds by a field the data already has, so the fore-edge and spine views read as a
+   continuity chart. Categorical colours in a fixed order, checked for colour-blind separation on this dark scene
+   (dataviz validator): the scribe hues are the viewer's own, stepped for the dark background; the others take the
+   reference palette in the order the values first appear in the book. Faces stay photographic. */
+const SECTION_ORDER = ["Botanical", "Astronomy", "Zodiac", "Balneology", "Rose", "Pharmaceutical", "Starred paragraphs"];
+const SLOTS = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"];
+const OVERLAYS = {
+  none: { name: "None" },
+  scribe: { name: "Scribe", src: "Davis's scribes (2025)",
+    cats: [["1", "Scribe 1", "#2a6fc4"], ["2", "Scribe 2", "#d1495b"], ["3", "Scribe 3", "#c48612"], ["4", "Scribe 4", "#2a9d8f"], ["5", "Scribe 5", "#a47ce2"]],
+    of: seg => (seg.scribes || []).filter(n => SCRIBES[n]).map(String) },
+  section: { name: "Section", src: "Davis's section names (2025)",
+    cats: SECTION_ORDER.map((x, i) => [x, x, SLOTS[i]]),
+    of: seg => String(seg.section || "").split("/").map(x => x.trim()).filter(x => SECTION_ORDER.includes(x)) },
+  illus: { name: "Illustration", src: "IVTFF illustration type ($I)",
+    cats: ["H", "A", "Z", "B", "C", "P", "S", "T"].map((x, i) => [x, SECTION[x], SLOTS[i]]),
+    of: seg => seg.vars?.I && SECTION[seg.vars.I] ? [seg.vars.I] : [] },
+  lang: { name: "Currier language", src: "IVTFF Currier language ($L)",
+    cats: [["A", "Currier A", SLOTS[0]], ["B", "Currier B", SLOTS[1]]],
+    of: seg => seg.vars?.L && LANG[seg.vars.L] ? [seg.vars.L] : [] },
+  moved: { name: "Moved from the binding", src: "this order against the current binding",
+    cats: [["moved", "moved to another place", "#f3c35c"], ["resewn", "sewn or folded differently", "#d95926"], ["same", "where it is bound today", "#5e574d"]],
+    sheet: en => [en.moved ? "moved" : en.resewn ? "resewn" : "same"] },
+  quire: { name: "Quire (current binding)", src: "alternate quires of the current binding, so a sheet keeps its colour when it moves",
+    cats: [["odd", "odd-numbered quire", "#cdbb92"], ["even", "even-numbered quire", "#6f604a"]],
+    sheet: en => [SHEETS.get(en.id).quire % 2 ? "odd" : "even"] },
+};
+const OVERLAY_KEYS = Object.keys(OVERLAYS);
+/* The values one leaf carries for an overlay: both faces of every panel of that leaf. */
+function leafValues(ov, en, k) {
+  if (!ov.of && !ov.sheet) return [];
+  if (en.sheet.missing[k]) return [];
+  if (ov.sheet) return ov.sheet(en);
+  const sides = sidesOf(en.sheet, en.opts);
+  const segs = [...sides[2 * k].segs, ...sides[2 * k + 1].segs];
+  return [...new Set(segs.filter(x => !x.missing).flatMap(ov.of))].sort((a, b) => ov.cats.findIndex(c => c[0] === a) - ov.cats.findIndex(c => c[0] === b));
+}
+const OVM = new Map();
+/* One material per colour (or striped combination), unlit so the colours read exactly as the legend shows them. */
+function overlayMat(colors, double = false) {
+  const key = colors.join("+") + (double ? "|2" : "");
+  if (OVM.has(key)) return OVM.get(key);
+  let m;
+  if (colors.length === 1) m = new THREE.MeshBasicMaterial({ color: colors[0], side: double ? THREE.DoubleSide : THREE.FrontSide });
+  else {   // a leaf with two hands (or sections): diagonal stripes, so every edge shows both
+    const cv = document.createElement("canvas"); cv.width = cv.height = 32;
+    const cx = cv.getContext("2d");
+    for (let i = -32; i < 64; i += 8) colors.forEach((c, j) => {
+      cx.fillStyle = c; cx.beginPath();
+      const x = i + j * 8 / colors.length;
+      cx.moveTo(x, 0); cx.lineTo(x + 8 / colors.length, 0); cx.lineTo(x + 8 / colors.length + 32, 32); cx.lineTo(x + 32, 32); cx.fill();
+    });
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 4);
+    m = new THREE.MeshBasicMaterial({ map: t, side: double ? THREE.DoubleSide : THREE.FrontSide });
+  }
+  OVM.set(key, m);
+  return m;
+}
+const colorsOf = (ov, vals) => vals.map(v => ov.cats.find(c => c[0] === v)?.[2]).filter(Boolean);
+/* How often the value changes from one leaf to the next, front to back (lost leaves skipped). A plain count. */
+function changesIn(order, ov) {
+  const m = order === V.order ? V.model : modelOf(order);
+  let n = 0, last = null;
+  for (const L of m.leaves) {
+    if (L.e.sheet.missing[L.k]) continue;
+    const key = leafValues(ov, L.e, L.k).join("+") || "—";
+    if (last !== null && key !== last) n++;
+    last = key;
+  }
+  return n;
+}
+function renderLegend() {
+  const el = $("#v3-legend"); if (!el || !V.model) return;
+  const ov = OVERLAYS[V.overlay];
+  if (!ov.cats) { el.hidden = true; return; }
+  const counts = new Map();
+  for (const L of V.model.leaves) for (const v of leafValues(ov, L.e, L.k)) counts.set(v, (counts.get(v) || 0) + 1);
+  el.hidden = false; el.innerHTML = "";
+  el.append(h("b", {}, ov.name), h("div", { class: "src" }, ov.src),
+    h("div", { class: "rows" }, ov.cats.filter(c => counts.get(c[0])).map(c => h("span", { class: "row" }, h("i", { style: { background: c[2] } }), c[1], h("small", {}, ` ${counts.get(c[0])}`)))));
+  if (ov.of) {
+    const here = changesIn(V.order, ov), base = V.order.id === "beinecke" ? null : changesIn(ORDERS.get("beinecke"), ov);
+    el.append(h("div", { class: "cont", title: "Counted along the leaves in the order they lie in the closed book; lost leaves are skipped." },
+      `Changes from leaf to leaf: ${here}`, base != null ? h("span", {}, ` (current binding: ${base})`) : ""));
+  } else if (V.overlay === "moved") {
+    const m = V.model.all.filter(e => e.moved).length, r = V.model.all.filter(e => e.resewn).length;
+    el.append(h("div", { class: "cont" }, `${m} sheet${m === 1 ? "" : "s"} moved, ${r} sewn or folded differently`));
+  }
+  el.append(h("div", { class: "src" }, "Colours are on the sheet edges and folds: try the fore-edge (4) and spine (2) views."));
+}
+function setOverlay(k) {
+  V.overlay = OVERLAYS[k] ? k : "none"; store.set("3d:overlay", V.overlay);
+  const sel = $("#v3-overlay"); if (sel) sel.value = V.overlay;
+  tint(); renderLegend(); pushHash();
+}
+
+const OCC = { t: 0, hid: new Set() };
+function occluded(p, obj, sheetObj) {
+  const w = p.clone().applyMatrix4(obj.matrixWorld), d = w.sub(camera.position), dist = d.length();
+  ray.set(camera.position, d.normalize()); ray.far = dist - 1;
+  const see = m => m === M.ghostEdge || (Array.isArray(m) && m[0] === M.ghost && m[1] === M.ghost);   // lost leaves are see-through
+  const hit = ray.intersectObjects(live, false).find(x => x.object.userData.sheet !== sheetObj && !see(x.object.material) && shown(x.object));
+  ray.far = Infinity;
+  return !!hit;
+}
+
+// ---------------------------------------------------------------- highlighting
+function tint() {
+  if (!V.model) return;
+  const curEn = V.model.all[V.cur], ov = OVERLAYS[V.overlay];
+  for (const en of V.model.all) {
+    const o = V.objs.get(en.id); if (!o) continue;
+    const hi = en === curEn || V.flash?.has(en.id) ? GOLD : en === V.hover ? 0xf7dc9a : null;
+    const sheetCols = [];
+    for (const L of o.leaves) {
+      if (L.base == null) continue;   // a lost leaf stays a ghost
+      const cols = ov.cats ? colorsOf(ov, leafValues(ov, en, L.k)) : [];
+      sheetCols.push(...cols);
+      // the current sheet's edges turn gold; with an overlay they keep its colours and the label marks it
+      L.edge.color.setHex(hi ?? L.base);
+      for (const m of o.panels) if (m.userData.leaf === L) m.material[2] = ov.cats && cols.length ? overlayMat(cols) : L.edge;
+    }
+    if (o.foldMat !== M.ghostEdge) {
+      const fc = [...new Set(sheetCols)];
+      o.fold.material = ov.cats && fc.length ? overlayMat(fc, true) : o.foldMat;
+      o.foldMat.color.setHex(hi ?? FOLD);
+    }
+    for (const m of o.panels) for (const mat of m.material.slice(0, 2)) if (mat.emissive) mat.emissive.setHex(en === V.hover ? 0x1c150a : 0);
+  }
+  wake();
+}
+
+// ---------------------------------------------------------------- sheet facts (tooltip)
+function info(en) {
+  const sides = sidesOf(en.sheet, en.opts);
+  const plain = !(en.opts.spine || en.opts.inside_out || en.opts.rot180);
+  const names = sd => sd.lost ? `[${short(sd.shown.page)}]`
+    : en.sheet.read && plain ? short(pageName(sd.shown)) : sd.segs.map(x => short(pageName(x))).join("·");
+  const v = varsOf([...en.sheet.inside.flat(), ...en.sheet.outside.flat()]);
+  const pos = en.unplaced ? (en.sheet.missing.every(Boolean) ? "lost, position unknown" : "set aside, not in the book") : en.type === "singulions" ? `singulion ${en.idx + 1} of ${en.count}` : `bifolium ${en.idx + 1} of ${en.count} from the outside`;
+  return { sides, names, v, pos, title: `Sheet ${en.id}`, sub: en.unplaced ? `Not placed · ${pos}` : `${qWord(en.quire)} · ${pos}` };
+}
+function tip(en, e) {
+  if (!en) { tipEl.hidden = true; return; }
+  const { sides, names, v, sub, title } = info(en);
+  tipEl.innerHTML = "";
+  tipEl.append(h("b", {}, title), h("div", {}, sub),
+    h("div", { class: "pages" }, `${names(sides[0])}, ${names(sides[1])} | ${names(sides[2])}, ${names(sides[3])}`),
+    v.is.length || v.hs.length ? h("div", { class: "muted" }, [v.is.join(", "), v.hs.map(x => SCRIBES[x]).join(" + ")].filter(Boolean).join(" · ")) : "",
+    en.moved ? h("div", { class: "moved" }, "• placed differently from the current binding") : "",
+    en.resewn ? h("div", { class: "moved" }, "○ sewn or folded differently from the current binding") : "");
+  const r = stage.getBoundingClientRect();
+  tipEl.hidden = false;
+  tipEl.style.left = Math.min(r.width - 280, e.clientX - r.left + 16) + "px";
+  tipEl.style.top = Math.max(8, Math.min(r.height - 120, e.clientY - r.top + 12)) + "px";
+}
+
+function readSheet(en) {
+  if (!en || en.unplaced) { toast(en?.sheet.missing.every(Boolean) ? "This sheet is lost and has no place in the order" : "This sheet is set aside: put it back in a gathering to read it in place"); return; }
+  setPos(sidesOf(en.sheet, en.opts)[0].shown.page, en.id, "three");
+  show("read");
+}
+function readOpening() {
+  const p = openingPage();
+  if (!p || p.lost) { readSheet(V.model.all[V.cur]); return; }
+  setPos(p.shown.page, p.sheet, "three");
+  show("read");
+}
+
+// ---------------------------------------------------------------- keeping in step with Read (POS in app.js)
+/* The page side on the right of the current opening (the left one at the back cover). */
+function openingPage(o = V.opening) {
+  const pages = linearize(V.order, { ghosts: true });
+  return pages[2 * o] || pages[2 * o - 1];
+}
+/* Tell Read where 3D is. In the block, a sheet that already holds the shared page keeps it, so looking at a sheet
+   in 3D does not move Read off the page it was on. */
+function report() {
+  const en = V.model?.all[V.cur];
+  if (!en || en.unplaced) return;
+  if (V.mode === "opening") { const p = openingPage(); if (p) setPos(p.shown.page, p.sheet, "three"); return; }
+  if (POS.sheet === en.id) return;
+  setPos(sidesOf(en.sheet, en.opts)[0].shown.page, en.id, "three");
+}
+/* Which opening shows a page: opening k shows page sides 2k-1 | 2k. */
+function openingOf(page) {
+  const pages = linearize(V.order, { ghosts: true });
+  const j = pages.findIndex(p => p.shown.page === page || p.segs.some(x => x.page === page));
+  return j < 0 ? -1 : Math.floor((j + 1) / 2);
+}
+/* Go to where Read is: its opening in Opening mode, its sheet in the block. */
+function sync(pos, { open = false } = {}) {
+  if (!V.model || !pos?.sheet) return;
+  if (open && V.mode !== "opening") {   // a bookmark: pull the sheet out, so its pages are listed
+    const j = V.model.all.findIndex(en => en.id === pos.sheet);
+    if (j >= 0) { if (isHidden(V.model.all[j])) setHidden(V.model.all[j].quire, false); selectSheet(j); }
+    return;
+  }
+  const i = V.model.all.findIndex(en => en.id === pos.sheet);
+  if (i < 0) return;
+  if (V.mode === "opening") {
+    const o = openingOf(pos.page);
+    if (o >= 0 && o !== V.opening) setOpening(o);
+  } else if (i !== V.cur) setCur(i);
+}
+
+// ---------------------------------------------------------------- moving through the book
+function setCur(i, { follow = true } = {}) {
+  const all = V.model.all;
+  i = clamp(i, 0, all.length - 1);
+  if (i === V.cur && V.layout) return;
+  if (V.hand.on) putBack({ silent: true });
+  V.cur = i;
+  if (isHidden(all[i])) setHidden(all[i].quire, false);   // asked for a sheet in a hidden quire: show the quire again
+  tint(); renderStrip(); renderInspector(); pushHash(); report(); Arrange.mark(curSheet(), true);
+  if (V.mode === "block") relayout(420);
+  if (follow) followCur();
+}
+/* In a wide (exploded) layout, keep the current sheet on screen. */
+function followCur() {
+  const an = sheetAnchor(V.model.all[V.cur]?.id); if (!an || !V.layout) return;
+  const lp = V.layout.poses.get(`${V.model.all[V.cur].id}:0`); if (!lp) return;
+  book.updateMatrixWorld();
+  const p = new THREE.Vector3(lp.x, H / 2, lp.z).applyMatrix4(V.layout.place.matrix);
+  const xy = project(new THREE.Vector3(lp.x, H / 2, lp.z), book);
+  if (xy && xy[0] > stage.clientWidth * .15 && xy[0] < stage.clientWidth * .85) return;
+  const t = CAM.goal.target.clone(); t.x = p.x; t.z = p.z;
+  setGoal({ target: t }, 5);
+}
+function step(d, byQuire = false) {
+  const all = V.model.all;
+  if (!byQuire) {
+    let i = V.cur + d;
+    while (i > 0 && i < all.length - 1 && isHidden(all[i])) i += d;   // hidden quires are skipped
+    if (!isHidden(all[i])) setCur(i);
+    return;
+  }
+  const q = all[V.cur].quire;
+  let i = V.cur;
+  if (d > 0) { while (i < all.length - 1 && all[i].quire === q) i++; }
+  else { while (i > 0 && all[i - 1].quire === q) i--; if (i === V.cur && i > 0) { const q2 = all[i - 1].quire; i--; while (i > 0 && all[i - 1].quire === q2) i--; } }
+  setCur(i);
+}
+function setOpening(o) {
+  const N = V.model.leaves.length;
+  V.opening = clamp(o, 0, N);
+  V.unfoldOpening = false;
+  const L = V.model.leaves[Math.min(N - 1, V.opening)] || V.model.leaves[V.opening - 1];
+  if (L) { V.cur = V.model.all.indexOf(L.e); tint(); renderStrip(); Arrange.mark(curSheet(), true); }
+  renderOpening(); pushHash(); report();
+  relayout(520);
+  if (V.preset === 5) setTimeout(() => preset(5), 0);
+}
+function setMode(m, { view = true } = {}) {
+  if (m === V.mode) return;
+  V.mode = m;
+  if (m === "opening") {   // open where Read is, if that is on this sheet; else the back of its first leaf faces the next page
+    const en = V.model.all[V.cur], o = POS.sheet === en?.id ? openingOf(POS.page) : -1;
+    const L0 = V.model.leaves.find(L => L.e === en && L.k === 0);
+    V.opening = o >= 0 ? o : L0 ? L0.n + 1 : 1;
+  }
+  renderBar(); renderOpening(); pushHash(); report();
+  relayout(800);
+  if (view) setTimeout(() => preset(m === "opening" ? 5 : (V.preset === 5 ? 1 : V.preset || 1)), 0);
+}
+function setPosture(p) {
+  if (p === V.posture) return;
+  V.posture = p; store.set("3d:posture", p); pushHash();
+  renderBar();
+  relayout(900);
+  setTimeout(() => preset(V.preset || 1), 0);
+}
+function setSpread(s, dur = 260) {
+  V.spread = clamp(s); store.set("3d:spread", V.spread); pushHash();
+  const r = $("#v3-spread"); if (r && +r.value !== Math.round(V.spread * 100)) r.value = Math.round(V.spread * 100);
+  $("#v3-spread-name") && ($("#v3-spread-name").textContent = spreadName(V.spread));
+  if (V.mode === "opening") { V.mode = "block"; renderBar(); renderOpening(); }
+  relayout(dur);
+}
+function setThick(x) {
+  V.thick = x; store.set("3d:thick", x); pushHash();
+  relayout(500);
+}
+
+// ---------------------------------------------------------------- input
+const DRAG = { on: false, id: null, x: 0, y: 0, moved: false, mode: "orbit", pts: new Map(), pinch: 0 };
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let live = [];   // the pickable meshes of the sheets in this order
+function pick(e) {
+  const r = stage.getBoundingClientRect();
+  ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera); ray.far = Infinity;
+  const hit = ray.intersectObjects(live.filter(shown), false)[0];
+  return hit ? { en: hit.object.userData.sheet.entry, point: hit.point } : null;
+}
+function isLive(m) { let o = m; while (o && o !== book) o = o.parent; return !!o; }
+function shown(m) { let o = m; while (o && o !== book) { if (!o.visible) return false; o = o.parent; } return !!o; }
+function pixelWorld() { return 2 * Math.tan(camera.fov / 2 * DEG) * CAM.dist / stage.clientHeight; }
+function orbitBy(dx, dy) { setGoal({ yaw: CAM.goal.yaw - dx * .32, pitch: CAM.goal.pitch + dy * .26 }, 14); V.preset = null; renderViews(); }
+function panBy(dx, dy) {
+  const f = camDir(CAM.yaw, CAM.pitch), right = new THREE.Vector3(0, 1, 0).cross(f).normalize(), up = f.clone().cross(right);
+  const k = pixelWorld();
+  const t = CAM.goal.target.clone().addScaledVector(right, -dx * k).addScaledVector(up, dy * k);
+  setGoal({ target: t }, 14); V.preset = null; renderViews();
+}
+function zoomBy(f, e) {
+  const nd = clamp(CAM.goal.dist * f, H * .35, H * 160);
+  let t = null;
+  if (e) {   // toward the point under the pointer
+    const hit = pick(e);
+    let p = hit?.point;
+    if (!p) { const pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), -CAM.goal.target.y); p = ray.ray.intersectPlane(pl, new THREE.Vector3()); }
+    if (p && p.distanceTo(CAM.goal.target) < CAM.goal.dist * 4) t = CAM.goal.target.clone().lerp(p, 1 - nd / CAM.goal.dist);
+  }
+  setGoal({ dist: nd, target: t }, 12);
+  if (V.preset) { V.preset = null; renderViews(); }
+}
+
+function wire() {
+  const cv = renderer.domElement;
+  cv.addEventListener("contextmenu", e => e.preventDefault());
+  cv.addEventListener("pointerdown", e => {
+    DRAG.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { cv.setPointerCapture(e.pointerId); } catch { /* gone */ }
+    if (DRAG.pts.size === 2) { DRAG.mode = "pinch"; DRAG.pinch = 0; return; }
+    DRAG.on = true; DRAG.moved = false; DRAG.x = e.clientX; DRAG.y = e.clientY; DRAG.downAt = { x: e.clientX, y: e.clientY };
+    DRAG.mode = e.button === 2 || e.button === 1 || e.shiftKey ? "pan" : "orbit";
+    tip(null);
+    stage.classList.add("dragging");
+  });
+  cv.addEventListener("pointermove", e => {
+    if (DRAG.pts.has(e.pointerId)) DRAG.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (DRAG.mode === "pinch" && DRAG.pts.size === 2) {
+      const [a, b] = [...DRAG.pts.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+      if (DRAG.pinch) { zoomBy(DRAG.pinch / d); panBy(cx - DRAG.cx, cy - DRAG.cy); }
+      DRAG.pinch = d; DRAG.cx = cx; DRAG.cy = cy; DRAG.moved = true;
+      return;
+    }
+    if (DRAG.on) {
+      const dx = e.clientX - DRAG.x, dy = e.clientY - DRAG.y;
+      DRAG.x = e.clientX; DRAG.y = e.clientY;
+      if (Math.hypot(e.clientX - DRAG.downAt.x, e.clientY - DRAG.downAt.y) > 4) DRAG.moved = true;
+      if (!DRAG.moved) return;
+      if (DRAG.mode === "pan") panBy(dx, dy); else orbitBy(dx, dy);
+      return;
+    }
+    const hit = pick(e);
+    const en = hit?.en || null;
+    if (en !== V.hover) { V.hover = en; tint(); stage.style.cursor = en ? "pointer" : ""; }
+    tip(en, e);
+  });
+  const up = e => {
+    DRAG.pts.delete(e.pointerId);
+    if (DRAG.mode === "pinch") { if (!DRAG.pts.size) DRAG.mode = "orbit"; DRAG.on = false; stage.classList.remove("dragging"); return; }
+    if (!DRAG.on) return;
+    DRAG.on = false; stage.classList.remove("dragging");
+    if (DRAG.moved) return;
+    const hit = pick(e);
+    if (!hit) return;
+    clearTimeout(DRAG.click);
+    const i = V.model.all.indexOf(hit.en);
+    DRAG.click = setTimeout(() => selectSheet(i), 230);
+  };
+  cv.addEventListener("pointerup", up);
+  cv.addEventListener("pointercancel", up);
+  cv.addEventListener("pointerleave", () => { if (!DRAG.on && V.hover) { V.hover = null; tint(); } tip(null); });
+  cv.addEventListener("dblclick", e => {
+    clearTimeout(DRAG.click);
+    const hit = pick(e);
+    if (hit) readSheet(hit.en);
+  });
+  cv.addEventListener("wheel", e => {
+    e.preventDefault();
+    const d = Math.max(-60, Math.min(60, e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY));
+    zoomBy(Math.exp(d * (e.ctrlKey ? .012 : .0022)), e);
+    tip(null);
+  }, { passive: false });
+  new ResizeObserver(resize).observe(stage);
+}
+
+// ---------------------------------------------------------------- page furniture
+function renderBar() {
+  const rp = $("#v3-replay"); if (rp) rp.disabled = !V.prevOrder;
+  $("#v3-contacts")?.classList.toggle("on", V.contact.on);
+  for (const b of $$("#v3-posture button")) b.classList.toggle("on", b.dataset.v === V.posture);
+  for (const b of $$("#v3-mode button")) b.classList.toggle("on", b.dataset.v === V.mode);
+  $("#v3-spread-wrap").classList.toggle("dim", V.mode === "opening");
+  $("#v3-opening").hidden = V.mode !== "opening";
+}
+function renderViews() {
+  for (const b of $$("#v3-views button[data-n]")) b.classList.toggle("on", +b.dataset.n === V.preset);
+}
+function renderNote() {
+  const n = $("#v3-note");
+  if (V.preset === 3) {
+    n.hidden = false; n.innerHTML = "";
+    n.append(V.posture === "stand" ? "Head edge: nested sheets read as nested chevrons, fold at the top. This is the quire diagram in 3D. "
+      : "Head edge, seen across the desk. ", h("button", { onclick: () => showFolios() }, "Open Folio order →"));
+  } else if (V.preset === 2) {
+    n.hidden = false; n.innerHTML = "";
+    n.append("Spine: one rounded fold per gathering. A nested quire wraps its sheets in one fold; each singulion has its own. The dashed red line marks where each gathering is sewn, through its centre fold (schematic: no sewing stations are recorded).");
+  } else n.hidden = true;
+  showThreads(V.preset === 2);
+}
+function renderOpening() {
+  const el = $("#v3-opening"); if (!el || V.mode !== "opening" || !V.order) return;
+  const pages = linearize(V.order, { ghosts: true });
+  const L = pages[2 * V.opening - 1], R = pages[2 * V.opening];
+  $("#v3-open-lbl").textContent = `${L ? short(sideLabel(L)) : "cover"} | ${R ? short(sideLabel(R)) : "cover"}`;
+}
+function renderStrip() {
+  const el = $("#v3-strip"); if (!el || !V.model) return;
+  if (el._order !== V.order.id) {
+    el._order = V.order.id; el.innerHTML = "";
+    let q = null, grp = null;
+    V.model.all.forEach((en, i) => {
+      const qk = en.unplaced ? "aside" : en.quire;
+      if (qk !== q) {
+        q = qk;
+        grp = h("div", { class: "v3-sq" }, h("button", { class: "v3-qb", "data-q": en.unplaced ? "" : String(en.quire), title: en.unplaced ? "Sheets this order leaves out of the book" : qWord(en.quire),
+          onclick: () => { if (V.mode === "opening") setMode("block", { view: false }); setCur(i); } }, en.unplaced ? (V.order.mine ? "aside" : "lost") : qTag(en.quire)));
+        el.append(grp);
+      }
+      const lost = en.sheet.missing.every(Boolean);
+      grp.append(h("button", { class: `v3-tick${lost ? " lost" : ""}${en.moved ? " moved" : ""}${en.resewn ? " resewn" : ""}`, "data-i": i,
+        title: `${en.id}${en.moved ? " • moved" : en.resewn ? " ○ re-sewn" : ""}${lost ? " (lost)" : ""}`, "aria-label": `Sheet ${en.id}`,
+        onclick: () => { if (V.mode === "opening") setMode("block", { view: false }); setCur(i); } }));
+    });
+  }
+  for (const b of $$(".v3-tick", el)) b.classList.toggle("cur", +b.dataset.i === V.cur);
+  const c = $(`.v3-tick[data-i="${V.cur}"]`, el);
+  c?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  $("#v3-title").textContent = V.order.title;
+  marks();
+}
+
+/* Where each gathering is sewn: through the fold of its innermost sheet, and out across the spine. The line runs
+   along the outermost fold (shapeFold keeps it on the apex). Schematic: no sewing stations are recorded. */
+function showThreads(on) {
+  V.threads = on;
+  // drawn on the outside of each gathering's outermost fold, where it shows from behind
+  const inner = new Set(on && V.model ? V.model.gathers.map(g => g.leaves[0].e.id) : []);
+  for (const o of V.cache.values()) {
+    const want = inner.has(o.id) && V.objs.get(o.id) === o;
+    if (want && !o.thread) {
+      o.thread = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, H, 0)]), M.thread);
+      o.thread.frustumCulled = false;
+      o.group.add(o.thread);
+    }
+    if (o.thread) o.thread.visible = want;
+    if (want) shapeFold(o, o.id);
+  }
+  wake();
+}
+
+function build() {
+  const v = $("#v-three");
+  v.innerHTML = "";
+  const seg = (id, label, items, on) => h("div", { class: "v3-seg", id, role: "group", "aria-label": label },
+    items.map(([val, text, title]) => h("button", { "data-v": val, title, onclick: () => on(val) }, text)));
+  v.append(
+    h("div", { class: "v3-bar" },
+      h("span", { class: "v3-title", id: "v3-title" }),
+      h("span", { class: "v3-morph" },
+        h("button", { id: "v3-replay", title: "Replay the change from the last order to this one (R)", onclick: () => replay() }, "↻ Replay"),
+        h("button", { id: "v3-slow", class: V.slow ? "on" : "", title: "Play order changes in slow motion",
+          onclick: e => { V.slow = !V.slow; store.set("3d:slow", V.slow); e.currentTarget.classList.toggle("on", V.slow); } }, "Slow")),
+      seg("v3-posture", "Posture", [["stand", "Standing", "The book stands on its tail, fore-edge toward you (P)"], ["lie", "Lying", "The book lies on the desk (P)"]], setPosture),
+      seg("v3-mode", "Mode", [["block", "Block", "The book block; use Spread to open it (M)"], ["opening", "Opening", "Open the book at an opening, as in the Reader (M)"]], m => setMode(m)),
+      h("label", { class: "v3-spread", id: "v3-spread-wrap", title: "Spread: from the closed book to every sheet pulled apart ([ ])" }, "Spread",
+        h("input", { type: "range", id: "v3-spread", min: 0, max: 100, step: 1, value: Math.round(V.spread * 100), "aria-label": "Spread",
+          oninput: e => setSpread(+e.target.value / 100) }),
+        h("span", { class: "v3-sn", id: "v3-spread-name" }, spreadName(V.spread))),
+      h("span", { class: "v3-opening", id: "v3-opening", hidden: true },
+        h("button", { "aria-label": "Previous opening", title: "Previous opening (←)", onclick: () => setOpening(V.opening - 1) }, "‹"),
+        h("span", { id: "v3-open-lbl" }),
+        h("button", { "aria-label": "Next opening", title: "Next opening (→)", onclick: () => setOpening(V.opening + 1) }, "›")),
+      h("label", { class: "v3-colour", title: "Colour the sheet edges and folds (V)" }, "Colour",
+        (() => { const s2 = h("select", { id: "v3-overlay", "aria-label": "Colour the edges by", onchange: e => setOverlay(e.target.value) },
+          OVERLAY_KEYS.map(k2 => h("option", { value: k2 }, OVERLAYS[k2].name))); s2.value = V.overlay; return s2; })()),
+      h("button", { id: "v3-contacts", title: "Faces that lay against each other when the book was closed (K)", onclick: () => setContactView(!V.contact.on) }, "Touching faces"),
+      h("button", { id: "v3-arr-btn", class: `v3-arr-btn${Arrange.on ? " on" : ""}`, title: "Put the sheets in your own order (A)", onclick: () => Arrange.toggle() }, "✎ Rearrange"),
+      h("label", { class: "v3-thick", title: "Sheet thickness. Real vellum is too thin to see the structure, so it is exaggerated." }, "Thickness",
+        (() => { const s = h("select", { "aria-label": "Sheet thickness", onchange: e => setThick(+e.target.value) },
+          [1, 2, 4, 8].map(x => h("option", { value: x }, x === 1 ? "true (×1)" : `×${x}`))); s.value = V.thick; return s; })()),
+      h("div", { class: "v3-views", id: "v3-views", role: "group", "aria-label": "Views" },
+        PRESETS.slice(1).map((p, i) => h("button", { "data-n": i + 1, title: `${p.name} (${p.key})`, onclick: () => preset(i + 1) }, h("kbd", {}, p.key), h("span", { class: "vn" }, " " + p.name))),
+        h("button", { title: "Reset view (0)", "aria-label": "Reset view", onclick: () => preset(1) }, "⟲"))),
+    h("div", { class: "v3-body" },
+    h("aside", { class: "v3-arrange", id: "v3-arrange", hidden: true, "aria-label": "Rearrange the sheets" }),
+    stage = h("div", { class: "v3-stage", id: "v3-stage" },
+      labelsEl = h("div", { class: "v3-labels", "aria-hidden": "true" }),
+      tipEl = h("div", { class: "v3-tip", hidden: true }),
+      h("div", { class: "v3-note", id: "v3-note", hidden: true }),
+      h("div", { class: "v3-legend", id: "v3-legend", hidden: true }),
+      h("div", { class: "v3-contact", id: "v3-contact", hidden: true, role: "group", "aria-label": "Touching faces" }),
+      store.get("3d:hinted", false) ? "" : h("div", { class: "v3-hint", id: "v3-hint" },
+        h("span", {}, "Drag to turn the book · ⇧-drag to pan · scroll to zoom · ", h("kbd", {}, "1"), "–", h("kbd", {}, "5"), " views · ", h("kbd", {}, "←"), h("kbd", {}, "→"), " thumb through · double-click to read"),
+        h("button", { onclick: () => { store.set("3d:hinted", true); $("#v3-hint").remove(); } }, "Got it"))),
+      h("aside", { class: "v3-insp", id: "v3-insp", hidden: true, "aria-label": "Sheet inspector" })),
+    h("div", { class: "v3-strip", id: "v3-strip", title: "Every sheet in reading order. Scroll here to thumb through the book.",
+      onwheel: e => { e.preventDefault(); const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; STRIP.acc += d;
+        if (Math.abs(STRIP.acc) > 40) { if (V.mode === "opening") setOpening(V.opening + Math.sign(STRIP.acc)); else step(Math.sign(STRIP.acc)); STRIP.acc = 0; } } }));
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+  } catch (err) {
+    V.gl = false;
+    stage.append(h("div", { class: "v3-nogl" }, "This browser cannot draw WebGL, which the 3D book needs. ",
+      h("button", { onclick: () => show("read") }, "Reader"), " and ", h("button", { onclick: () => showFolios() }, "Folio order (in Info)"), " show the same sheets."));
+    V.built = true;
+    return;
+  }
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+  ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  stage.prepend(renderer.domElement);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x221e1a);
+  scene.fog = new THREE.Fog(0x221e1a, 800, 4000);
+  camera = new THREE.PerspectiveCamera(32, 1, 1, 10000);
+  // light intensities are physical (a Lambert face lit at intensity π shows its full colour)
+  scene.add(new THREE.HemisphereLight(0xfff3df, 0x4a3c30, 2.7));
+  const sun = new THREE.DirectionalLight(0xfff1e0, 2.3); sun.position.set(-0.5, 1.4, 1.1); scene.add(sun);
+  const back = new THREE.DirectionalLight(0xe8e0ff, .8); back.position.set(.6, .4, -1); scene.add(back);
+  table = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000), new THREE.MeshLambertMaterial({ color: 0x3a3129 }));
+  table.rotation.x = -Math.PI / 2; scene.add(table);
+  // a soft contact shadow under the book
+  const cv = document.createElement("canvas"); cv.width = cv.height = 128;
+  const cx = cv.getContext("2d"), gr = cx.createRadialGradient(64, 64, 8, 64, 64, 64);
+  gr.addColorStop(0, "rgba(0,0,0,.55)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+  cx.fillStyle = gr; cx.fillRect(0, 0, 128, 128);
+  shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
+  book = new THREE.Group(); scene.add(book);
+  makeMaterials();
+  wire();
+  V.built = true;
+  resize();
+}
+const STRIP = { acc: 0 };
+
+// ---------------------------------------------------------------- the view in the URL
+/* #three/<order>/s=77-82&m=o&o=34&v=3&sp=32&c=scribe&p=l&th=8&i=1&k=1, so a view can be bookmarked or sent. */
+function state() {
+  if (!V.model) return "";
+  const en = V.model.all[V.cur], q = new URLSearchParams();
+  if (en) q.set("s", en.id.replace("|", "-"));
+  if (V.mode === "opening") { q.set("m", "o"); q.set("o", V.opening); }
+  if (V.preset) q.set("v", V.preset);
+  q.set("sp", Math.round(V.spread * 100));
+  if (V.overlay !== "none") q.set("c", V.overlay);
+  if (V.posture === "lie") q.set("p", "l");
+  if (V.thick !== 4) q.set("th", V.thick);
+  if (V.inspect) q.set("i", 1);
+  if (V.contact.on) q.set("k", 1);
+  return q.toString();
+}
+let hashTimer;
+function pushHash() { clearTimeout(hashTimer); hashTimer = setTimeout(() => { if (S.view === "three") setHash(); }, 250); }
+function restore(str) {
+  if (!V.model || !str) return;
+  const q = new URLSearchParams(str);
+  if (q.has("sp")) V.spread = clamp(+q.get("sp") / 100 || 0);
+  if (q.has("th") && [1, 2, 4, 8].includes(+q.get("th"))) V.thick = +q.get("th");
+  if (q.has("p")) V.posture = q.get("p") === "l" ? "lie" : "stand";
+  if (q.has("c") && OVERLAYS[q.get("c")]) V.overlay = q.get("c");
+  if (q.has("s")) { const i = V.model.all.findIndex(e => e.id === q.get("s").replace("-", "|")); if (i >= 0) V.cur = i; }
+  V.mode = q.get("m") === "o" ? "opening" : "block";
+  if (q.has("o")) V.opening = clamp(+q.get("o") || 0, 0, V.model.leaves.length);
+  V.inspect = q.get("i") === "1";
+  if (q.has("v")) V.preset = clamp(+q.get("v") || 1, 1, 5);
+  const r = $("#v3-spread"); if (r) r.value = Math.round(V.spread * 100);
+  $("#v3-spread-name").textContent = spreadName(V.spread);
+  $("#v3-overlay").value = V.overlay;
+  $(".v3-thick select").value = V.thick;
+  renderBar(); renderOpening(); renderStrip(); renderInspector(); renderLegend();
+  relayout(0);
+  preset(V.preset || 1, { instant: true });
+  tint();
+  if (q.get("k") === "1") setContactView(true); else if (V.contact.on) setContactView(false);
+  report();
+}
+
+// ---------------------------------------------------------------- order morph
+/* When the order changes, every sheet goes from its old slot to its new one. Sheets that change slot lift, travel
+   over the block and drop in, in the reading order of where they land. Sheets whose leaves only regroup (nested
+   quire to singulions) rise a little, quire by quire. A sheet sewn or folded differently rises, changes its folding
+   at the top and settles. */
+/* `focus` (a rearranging step): only the sheets named lift and travel; every other sheet slides into its new place. */
+function morphFrom(prev, focus) {
+  const F = focus ? new Set(focus) : null;
+  return (tw, L) => {
+    const model = V.model;
+    const oldN = new Map(prev.model.leaves.map(x => [x.key, x.n])), newN = new Map(model.leaves.map(x => [x.key, x.n]));
+    const was = new Map(prev.model.all.map(e => [e.id, e]));
+    const slot = en => { const p = was.get(en.id); return !p || !!p.unplaced !== !!en.unplaced || p.quire !== en.quire || p.idx !== en.idx; };
+    const movers = F ? model.all.filter(en => F.has(en.id)) : model.all.filter(slot);
+    const Q = Math.max(1, model.quires.length - 1);
+    book.updateMatrixWorld();
+    for (const en of model.all) {
+      const keys = [`${en.id}:0`, `${en.id}:1`];
+      const oldObj = prev.objs.get(en.id), newObj = V.objs.get(en.id);
+      if (oldObj && oldObj !== newObj) {
+        /* The same sheet sewn or folded another way. It rises a little, still folded, takes its new folding at the top
+           and settles into its place. (Opening it flat in the air first looked chaotic for the big foldouts.) */
+        const a0 = CUR.poses.get(keys[0]), a1 = CUR.poses.get(keys[1]);
+        const b0 = L.poses.get(keys[0]), b1 = L.poses.get(keys[1]);
+        if (!a0 || !a1 || !b0 || !b1) continue;
+        const up = p => ({ ...p, lift: p.lift + .45 * H });
+        const sg0 = CUR.sg.get(en.id) || IDENT, sg1 = L.sg.get(en.id) || IDENT;
+        tw.poses.set("old:" + keys[0], [[0, a0], [.42, up(a0)], [1, up(a0)]]);
+        tw.poses.set("old:" + keys[1], [[0, a1], [.42, up(a1)], [1, up(a1)]]);
+        tw.sgs.set("old:" + en.id, [[0, sg0], [1, sg0]]);
+        tw.poses.set(keys[0], [[0, up(b0)], [.5, up(b0)], [1, b0]]);
+        tw.poses.set(keys[1], [[0, up(b1)], [.5, up(b1)], [1, b1]]);
+        tw.sgs.set(en.id, [[0, sg1], [1, sg1]]);
+        tw.swaps.push({ k: .46, hide: oldObj, show: newObj });
+        tw.leaving.push({ o: oldObj, id: en.id });
+        book.add(oldObj.group);
+        continue;
+      }
+      const rank = movers.indexOf(en);
+      const dn = Math.max(...keys.map(k => Math.abs((oldN.get(k) ?? newN.get(k) ?? 0) - (newN.get(k) ?? oldN.get(k) ?? 0))));
+      let st = 0, w = 1, lift = 0;
+      if (rank >= 0) { st = .32 * rank / Math.max(1, movers.length - 1); w = .62; lift = (F ? .8 : 1.15) * H; }
+      else if (dn > 0 && !F) { st = .3 * en.qi / Q; w = .64; lift = (.22 + .5 * clamp(dn / 10)) * H; }
+      if (!lift) continue;
+      for (const k of keys) {
+        const tr = tw.poses.get(k); if (!tr) continue;
+        const a = tr[0][1], b = tr[1][1], up = p => ({ ...p, lift: p.lift + lift });
+        tw.poses.set(k, [[0, a], [st, a], [st + w * .25, up(a)], [st + w * .75, up(b)], [st + w, b], [1, b]]);
+      }
+      const sgt = tw.sgs.get(en.id);
+      tw.sgs.set(en.id, [[0, sgt[0][1]], [st + w * .25, sgt[0][1]], [st + w * .75, sgt[1][1]], [1, sgt[1][1]]]);
+    }
+  };
+}
+const morphMs = () => (V.slow ? 7000 : 2200);
+function replay() {
+  if (!V.prevOrder || !ORDERS.has(V.prevOrder)) { toast("Change the order first; Replay shows that change again"); return; }
+  const to = V.order;
+  open(ORDERS.get(V.prevOrder), { instant: true });
+  open(to);
+}
+
+// ---------------------------------------------------------------- opening an order
+/* Show an order. A different order, or a new version of the same one (your own order after a change), moves every
+   sheet from its old place to its new one, over `ms` milliseconds. */
+function open(order, { instant = false, ms, moved } = {}) {
+  if (!V.built) build();
+  if (!V.gl) return;
+  const keep = V.model?.all[V.cur]?.id;
+  const first = !V.model;
+  const prev = !first && V.order !== order ? { model: V.model, objs: V.objs } : null;
+  if (prev && V.order.id !== order.id) V.prevOrder = V.order.id;
+  if (ms === 0) instant = true;
+  if (V.hand.on) Object.assign(V.hand, { on: false, turned: false, folded: true, flat: false });
+  V.order = order;
+  V.model = modelOf(order);
+  const used = new Set();
+  V.objs = new Map();
+  for (const en of V.model.all) { const o = objFor(en); V.objs.set(en.id, o); used.add(o); if (o.group.parent !== book) book.add(o.group); o.group.visible = !isHidden(en); }
+  for (const o of V.cache.values()) if (!used.has(o) && o.group.parent) o.group.parent.remove(o.group);
+  live = pickables.filter(isLive);
+  const k = keep ? V.model.all.findIndex(en => en.id === keep) : -1;
+  V.cur = k >= 0 ? k : 0;
+  if (k < 0) V.inspect = false;
+  if (V.mode === "opening") V.opening = clamp(V.opening, 0, V.model.leaves.length);
+  renderBar(); renderStrip(); renderOpening(); renderInspector();
+  relayout(first || instant ? 0 : ms ?? morphMs(), prev && !instant ? morphFrom(prev, moved) : null);
+  if (first) preset(V.preset || 1, { instant: true });
+  if (prev && !instant && REDUCED) {   // no motion: flash what moved instead
+    V.flash = new Set(V.model.all.filter(en => en.moved || en.resewn || prev.objs.get(en.id) !== V.objs.get(en.id)).map(en => en.id));
+    setTimeout(() => { V.flash = null; tint(); }, 2000);
+  }
+  tint(); renderLegend();
+  if (V.contact.on) { V.contact.list = contactsOf(order); V.contact.i = 0; renderContact(); }
+  if (V.preset === 2) setTimeout(() => showThreads(true), first ? 0 : morphMs() + 50);
+  Arrange.mark(curSheet());
+  marks();
+}
+
+// ---------------------------------------------------------------- quires hidden like layers (3D only; the order is not changed)
+const HID = store.get("3d:hidden", {});   // order id -> names of the quires hidden in 3D
+const hiddenQuires = () => new Set((V.order && HID[V.order.id]) || []);
+const isHidden = en => !!en && !en.unplaced && hiddenQuires().has(String(en.quire));
+const hiddenObj = o => !!o?.entry && V.objs.get(o.entry.id) === o && isHidden(o.entry);
+function setHidden(quire, hide, { quiet = false } = {}) {
+  if (!V.order) return;
+  const set = hiddenQuires(), key = String(quire);
+  if (hide) set.add(key); else set.delete(key);
+  if (set.size) HID[V.order.id] = [...set]; else delete HID[V.order.id];
+  store.set("3d:hidden", HID);
+  for (const en of V.model.all) { const o = V.objs.get(en.id); if (o) o.group.visible = !isHidden(en); }
+  if (hide && isHidden(V.model.all[V.cur])) {   // the current sheet went with it: move to the nearest one still shown
+    const vis = V.model.all.map((en, i) => [en, i]).filter(([en]) => !isHidden(en)).sort((a, b) => Math.abs(a[1] - V.cur) - Math.abs(b[1] - V.cur));
+    if (vis.length) { if (V.inspect) closeInspector(); V.cur = vis[0][1]; renderInspector(); pushHash(); }
+  }
+  if (!quiet) toast(hide ? `${qWord(quire)} hidden in 3D` : `${qWord(quire)} shown again`);
+  tint(); marks(); wake(); Arrange.render();
+}
+function showAllQuires() { for (const q of hiddenQuires()) setHidden(q, false, { quiet: true }); toast("Every quire is shown"); }
+/* Strip ticks: the current sheet, hidden quires, bookmarked sheets. */
+function marks() {
+  const el = $("#v3-strip"); if (!el || !V.model) return;
+  const hid = hiddenQuires();
+  for (const b of $$(".v3-tick", el)) {
+    const en = V.model.all[+b.dataset.i];
+    if (!en) continue;
+    b.classList.toggle("hid", !en.unplaced && hid.has(String(en.quire)));
+    b.classList.toggle("bm", Bookmarks.onSheet(en.id));
+  }
+  for (const b of $$(".v3-qb", el)) b.classList.toggle("hid", hid.has(b.dataset.q));
+  if (V.inspect) renderInspector();
+}
+
+// ---------------------------------------------------------------- your own orders and crops (arrange.js, work.js)
+const NARROW = () => matchMedia("(max-width: 760px)").matches;   // phones: the rearrange panel and the inspector take turns
+function setPanel(on) {
+  if (on && NARROW() && V.inspect) closeInspector();
+  $("#v3-arr-btn")?.classList.toggle("on", on);
+  setTimeout(resize, 0);
+}
+const curSheet = () => V.model?.all[V.cur]?.id || null;
+/* the pages in view that can be bookmarked: the opening shown, or the four pages of the picked sheet */
+function herePages() {
+  if (!V.model) return [];
+  if (V.mode === "opening") {
+    const pages = linearize(V.order, { ghosts: true });
+    return [pages[2 * V.opening - 1], pages[2 * V.opening]].filter(p => p && !p.lost).map(p => p.shown.page);
+  }
+  const en = V.model.all[V.cur];
+  return en ? sidesOf(en.sheet, en.opts).filter(sd => !sd.lost).map(sd => sd.shown.page) : [];
+}
+function focusSheet(id) {
+  const i = V.model ? V.model.all.findIndex(en => en.id === id) : -1;
+  if (i < 0) return;
+  if (V.mode === "opening") setMode("block", { view: false });
+  setCur(i);
+}
+/* Pages re-cut in the crop editor: rebuild their sheets, which take the new image and shape. */
+function refresh(ids) {
+  if (!V.built || !V.gl || !V.model) return;
+  for (const [k, o] of [...V.cache]) if (ids.includes(o.id)) { o.group.parent?.remove(o.group); DETAIL.delete(o); V.cache.delete(k); }
+  open(V.order, { instant: true });
+}
+
+// ---------------------------------------------------------------- what touched what
+/* Faces that lay against each other in the closed book. Between leaves they are Read's openings: pages that face
+   each other, across quire boundaries too, with the first and last pages on the covers. Inside a folded foldout they
+   come from the hinge chain at the closed state (which panel faces lie on which), so they rest on the fold direction
+   and are inferred. */
+const pairKey = (a, b) => [a, b].sort().join(" ↔ ");
+const pageLbl = p => short(sideLabel(p)).replace("[f", "[");
+function facingPairs(order) {
+  const pages = linearize(order, { ghosts: true }), out = [];
+  for (let i = 0; i <= pages.length / 2; i++) {
+    const a = pages[2 * i - 1] || null, b = pages[2 * i] || null;
+    if (!a && !b) continue;
+    out.push({ kind: "facing", opening: i, pa: a, pb: b, a: a ? pageLbl(a) : "front cover", b: b ? pageLbl(b) : "back cover", pos: i });
+  }
+  return out;
+}
+/* A face's name; panels that share a label (the Rosettes' "Ros 86r top" is two panels) add their image id. */
+const segLabel = (seg, part, shared) => seg.missing ? `[${short(seg.page)}]`
+  : short(pageName(seg)) + (shared?.has(pageName(seg)) && seg.img ? ` [${seg.img.replace(/^f?Ros-/, "")}]` : "") + (part ? " (part)" : "");
+function foldContacts(o) {
+  const out = [], seen = new Map();
+  for (const m of o.panels) for (const x of [m.userData.front, m.userData.back]) if (!x.missing) seen.set(pageName(x), (seen.get(pageName(x)) || new Set()).add(x.img));
+  const shared = new Set([...seen].filter(([, imgs]) => imgs.size > 1).map(([k]) => k));
+  for (const L of o.leaves) {
+    const ps = o.panels.filter(m => m.userData.leaf === L);
+    if (ps.length < 2) continue;
+    // closed: every hinge of the leaf at 180 degrees
+    const saved = L.hinges.map(hg => [hg.outer.rotation.x, hg.outer.rotation.y]);
+    for (const hg of L.hinges) { if (hg.axis === "y") hg.outer.rotation.y = hg.sign * Math.PI; else hg.outer.rotation.x = Math.PI; }
+    L.group.updateMatrixWorld(true);
+    const inv = L.group.matrixWorld.clone().invert();
+    const lay = ps.map(m => {
+      const mm = inv.clone().multiply(m.matrixWorld), c = new THREE.Vector3().setFromMatrixPosition(mm);
+      const up = new THREE.Vector3(0, 0, 1).transformDirection(mm).z > 0, half = m.scale.x / 2;
+      return { m, z: c.z, up, x0: c.x - half, x1: c.x + half, y0: c.y - H / 2, y1: c.y + H / 2 };
+    });
+    L.hinges.forEach((hg, i) => { hg.outer.rotation.x = saved[i][0]; hg.outer.rotation.y = saved[i][1]; });
+    L.group.updateMatrixWorld(true);
+    const over = (a, b) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 1 && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > 1;
+    for (const a of lay) {
+      // the nearest layer above it that it lies against
+      const b = lay.filter(x => x.z > a.z + 1e-4 && over(a, x)).sort((x, y) => x.z - y.z)[0];
+      if (!b) continue;
+      const fa = a.up ? a.m.userData.front : a.m.userData.back, fb = b.up ? b.m.userData.back : b.m.userData.front;
+      out.push({ kind: "fold", sheet: o.id, k: L.k, ma: a.m, mb: b.m, faceA: a.up ? 1 : -1, faceB: b.up ? -1 : 1,
+                 a: segLabel(fa, a.m.userData.part, shared), b: segLabel(fb, b.m.userData.part, shared) });
+    }
+  }
+  return out;
+}
+/* Every contact of the order, front to back, each marked new if the current binding does not have it. */
+function contactsOf(order) {
+  const base = ORDERS.get("beinecke");
+  const baseFacing = new Set(facingPairs(base).map(c => pairKey(c.a, c.b)));
+  const list = facingPairs(order).map(c => ({ ...c, isNew: !baseFacing.has(pairKey(c.a, c.b)) }));
+  for (const L of V.model.leaves.filter(x => x.k === 0)) {
+    const en = L.e, o = V.objs.get(en.id);
+    if (!o.leaves.some(lf => lf.hinges.length)) continue;
+    const was = bindingOf(en.id);
+    const baseObj = was ? objFor({ ...en, opts: was.opts }, false) : null;
+    const baseSet = new Set(baseObj ? foldContacts(baseObj).map(c => pairKey(c.a, c.b)) : []);
+    for (const c of foldContacts(o)) {
+      const n = V.model.leaves.find(x => x.e === en && x.k === c.k).n;
+      list.push({ ...c, pos: n + .5, isNew: !baseSet.has(pairKey(c.a, c.b)) });
+    }
+  }
+  return list.sort((a, b) => a.pos - b.pos);
+}
+let outlines = [];
+const OUTLINE = new THREE.LineBasicMaterial({ color: GOLD });
+function outline(meshes) {
+  for (const l of outlines) l.parent?.remove(l);
+  outlines = meshes.map(([m, face]) => {
+    const l = new THREE.Line(RECT, OUTLINE);
+    l.position.z = face * .56; l.scale.set(1.01, 1.01, 1);
+    m.add(l);
+    return l;
+  });
+  wake();
+}
+/* The panel meshes showing one page side of a leaf, and which face of each. */
+function meshesFor(side) {
+  if (!side) return [];
+  const o = V.objs.get(side.sheet); if (!o) return [];
+  const want = new Set(side.segs.map(x => x.page));
+  const shown = side.shown?.page;
+  const out = [];
+  for (const m of o.panels) {
+    const { front, back } = m.userData;
+    if (front.page === shown || back.page === shown) out.push([m, front.page === shown ? 1 : -1]);
+  }
+  return out.length ? out : o.panels.filter(m => want.has(m.userData.front.page)).map(m => [m, 1]);
+}
+function showContact(i) {
+  const C = V.contact;
+  const list = C.newOnly ? C.list.filter(c => c.isNew) : C.list;
+  if (!list.length) { renderContact(); toast(C.newOnly ? "This order creates no new contacts" : "No contacts"); return; }
+  C.i = (i + list.length) % list.length;
+  const c = list[C.i];
+  if (c.kind === "facing") {
+    if (V.hand.on) putBack({ silent: true });
+    if (V.mode !== "opening") { V.mode = "opening"; renderBar(); }
+    setOpening(c.opening);
+    preset(5);
+    outline([...meshesFor(c.pa), ...meshesFor(c.pb)]);
+  } else {
+    selectSheet(V.model.all.findIndex(en => en.id === c.sheet));
+    enterHand(); V.hand.folded = false; V.hand.flat = true;
+    relayout(900); frameHand(); renderInspector();
+    outline([[c.ma, c.faceA], [c.mb, c.faceB]]);
+  }
+  renderContact();
+}
+function setContactView(on) {
+  const C = V.contact;
+  C.on = on;
+  if (on) {   // start at the opening in view, if it is one
+    C.list = contactsOf(V.order);
+    const list = C.newOnly ? C.list.filter(c => c.isNew) : C.list;
+    const here = V.mode === "opening" ? list.findIndex(c => c.kind === "facing" && c.opening === V.opening) : -1;
+    showContact(here >= 0 ? here : C.i || 0);
+  }
+  else { outline([]); renderContact(); }
+  pushHash();
+}
+function renderContact() {
+  const el = $("#v3-contact"); if (!el) return;
+  const C = V.contact;
+  if (!C.on) { el.hidden = true; return; }
+  const list = C.newOnly ? C.list.filter(c => c.isNew) : C.list, c = list[C.i];
+  el.hidden = false; el.innerHTML = "";
+  el.append(
+    h("b", {}, "Touching faces"),
+    h("button", { "aria-label": "Previous contact", title: "Previous contact (←)", onclick: () => showContact(C.i - 1) }, "‹"),
+    h("span", { class: "pair" }, c ? `${c.a} ↔ ${c.b}` : "none"),
+    h("button", { "aria-label": "Next contact", title: "Next contact (→)", onclick: () => showContact(C.i + 1) }, "›"),
+    h("span", { class: "n" }, c ? `${C.i + 1} of ${list.length}` : ""),
+    c ? h("span", { class: "kind" }, c.kind === "facing" ? "facing pages" : `inside the fold of ${c.sheet}`) : "",
+    c?.kind === "fold" ? h("span", { class: "inferred", title: "Rests on the fold direction, which is inferred" }, "inferred") : "",
+    c?.isNew ? h("span", { class: "new", title: "These faces do not touch in the current binding" }, "new") : "",
+    h("label", { class: "only" }, h("input", { type: "checkbox", checked: C.newOnly || null,
+      onchange: e => { C.newOnly = e.target.checked; C.i = 0; showContact(0); } }), " new only"),
+    h("button", { class: "x", "aria-label": "Close the contact view", title: "Close (K)", onclick: () => setContactView(false) }, "✕"));
+}
+
+// ---------------------------------------------------------------- the inspector
+const bindingOf = id => {
+  for (const g of ORDERS.get("beinecke").gatherings) {
+    const i = g.bifolia.indexOf(id);
+    if (i >= 0) return { quire: g.quire, idx: i, count: g.bifolia.length, type: g.type, opts: (g.sheets || {})[id] || {} };
+  }
+  return null;
+};
+const posText = (type, idx, count) => type === "singulions" ? `singulion ${idx + 1} of ${count}` : `bifolium ${idx + 1} of ${count} from the outside`;
+const spineText = (sheet, opts) => {
+  const v = handled(sheet, opts), row = v.inside[v.proper];
+  return row[v.spine - 1] && row[v.spine] ? `${short(pageName(row[v.spine - 1]))} and ${short(pageName(row[v.spine]))}` : "the edge";
+};
+function readPage(page, sheet) { setPos(page, sheet, "three"); show("read"); }
+const cropSegs = sh => [...sh.inside.flat(), ...sh.outside.flat()].filter(s => s.img && !s.missing);
+function toFolios(id) { showFolios(id); }
+
+function renderInspector() {
+  const el = $("#v3-insp");
+  if (!el) return;
+  const en = V.model?.all[V.cur];
+  if (!V.inspect || !en) { el.hidden = true; el.innerHTML = ""; return; }
+  const o = V.objs.get(en.id), { sides, names, v, sub, title } = info(en);
+  const ev = (D.orders.evidence || {})[en.id] || [], src = D.orders.sources || {};
+  const was = bindingOf(en.id), foldable = o.leaves.some(L => L.hinges.length);
+  const cite = k => src[k] ? h("a", { href: src[k].url, target: "_blank", rel: "noopener" }, src[k].cite) : k;
+  const star = pg => { const b = Bookmarks.of(pg);
+    return h("button", { class: `bm-star${b ? " on" : ""}`, title: b ? `Bookmarked as “${b.name}”: click to remove` : `Bookmark ${short(pg)}`,
+      "aria-label": b ? `Remove the bookmark on ${short(pg)}` : `Bookmark ${short(pg)}`, onclick: () => Bookmarks.toggle(pg) }, b ? "★" : "☆"); };
+  const page = (sd, label) => sd.lost ? h("span", { class: "muted" }, label + " (lost)")
+    : h("span", { class: "pg" }, h("button", { class: "linkish", title: "Read this page", onclick: () => readPage(sd.shown.page, en.id) }, label), star(sd.shown.page));
+  const hd = V.hand;
+  el.hidden = false; el.innerHTML = "";
+  const parts = [
+    h("div", { class: "fx-nav" },
+      h("button", { title: "Previous sheet (←)", "aria-label": "Previous sheet", onclick: () => stepSel(-1), disabled: V.cur === 0 || null }, "‹"),
+      h("b", {}, title),
+      h("button", { title: "Next sheet (→)", "aria-label": "Next sheet", onclick: () => stepSel(1), disabled: V.cur === V.model.all.length - 1 || null }, "›"),
+      h("button", { class: "fx-close", title: "Put it back (Esc)", "aria-label": "Close the inspector", onclick: () => closeInspector() }, "✕")),
+    h("div", { class: "muted" }, sub),
+    en.moved && was ? h("div", { class: "where" }, `• Moved. In the current binding it is in quire ${was.quire}, ${posText(was.type, was.idx, was.count)}.`) : "",
+    en.resewn && was ? h("div", { class: "where" }, `○ Sewn on another fold: today between ${spineText(en.sheet, was.opts)}, in this order between ${spineText(en.sheet, en.opts)}.`) : "",
+    en.unplaced ? h("div", { class: "where" }, en.sheet.missing.every(Boolean) ? "Lost, and this order gives it no place, so it lies on the table in front of its quire."
+      : "Set aside: this order leaves it out of the book, so it lies on the table in front of its quire.") : "",
+    h("div", { class: "fx-acts" },
+      h("button", { onclick: () => act("turn") }, hd.on && hd.turned ? "Turn back" : "Turn over", " ", h("kbd", {}, "T")),
+      foldable ? h("button", { onclick: () => act("unfold") }, hd.on && !hd.folded ? "Fold up" : "Unfold", " ", h("kbd", {}, "U")) : "",
+      h("button", { onclick: () => act("flat") }, hd.on && hd.flat ? "Half-open" : "Open flat", " ", h("kbd", {}, "O")),
+      hd.on ? h("button", { onclick: () => putBack() }, "Put back ", h("kbd", {}, "Esc")) : "",
+      h("button", { class: "primary", onclick: () => readSheet(en) }, "Read from here ", h("kbd", {}, "↵"))),
+    h("div", { class: "links" }, "Same sheet in ",
+      h("button", { class: "linkish", onclick: () => readSheet(en) }, "Reader"), " · ",
+      h("button", { class: "linkish", onclick: () => toFolios(en.id) }, "Folio order")),
+    h("div", { class: "fx-arr" },
+      h("span", { class: "muted" }, "Move it: "),
+      en.unplaced ? "" : h("button", { title: "One place earlier in the list (in a quire: further out)", onclick: () => Arrange.step(en.id, -1) }, "‹ Earlier"),
+      en.unplaced ? "" : h("button", { title: "One place later in the list (in a quire: further in)", onclick: () => Arrange.step(en.id, 1) }, "Later ›"),
+      h("button", { title: "Move it anywhere, fold it another way (A)", onclick: () => { Arrange.sel = en.id; Arrange.open(); } }, "More…")),
+    cropSegs(en.sheet).length ? h("div", { class: "links" }, "✂ Crop a page: ",
+      cropSegs(en.sheet).flatMap((sg, i) => [i ? " · " : "", h("button", { class: "linkish", title: `Re-cut ${pageName(sg)} from Yale's photograph`, onclick: () => CropEditor.open(sg.img) }, short(pageName(sg)))])) : "",
+    h("h4", {}, "Pages, as read"),
+    h("div", { class: "faces" }, ["1st leaf, front", "1st leaf, back", "2nd leaf, front", "2nd leaf, back"].flatMap((t, i) => [h("span", {}, t), page(sides[i], names(sides[i]))])),
+    ...touchesOf(en),
+    v.is.length || v.hs.length || v.ls.length ? [h("h4", {}, "Section · hands · language"),
+      h("div", { class: "hands" }, v.is.join(", "), v.hs.map(n => h("span", { class: "chip", style: { "--c": `var(--h${n})` } }, SCRIBES[n])), v.ls.map(x => LANG[x]).join(", "))] : "",
+    foldable || o.rows > 1 ? [h("h4", {}, "Folds ", h("span", { class: "inferred", title: "Not documented: worked out from the evidence" }, "inferred")),
+      o.rows > 1 ? h("p", { class: "small" }, "The top row folds down over the bottom row, and the sheet is sewn at its first crease in the lower half only (", cite("VN"), ").") : "",
+      foldable ? h("p", { class: "small" }, "Extra panels roll-fold onto the inside of the sheet, so folded you see the back of the second panel. voynich.nu infers this from where the folio numbers were written.") : "",
+      o.creases.length ? h("p", { class: "small" }, o.creases.map(c => short(c.page)).join(", "), o.creases.length > 1 ? " are" : " is",
+        " wider than the leaf it folds onto, so it is drawn with one more crease (at ", o.creases.map(c => Math.round(c.at * 100) + "%").join(", "),
+        " of its width) to stay inside the book.") : ""] : "",
+    en.note ? [h("h4", {}, "In this order"), h("div", { class: "ev" }, en.note)] : "",
+    ev.length ? [h("h4", {}, "Evidence"), ...ev.map(e => h("div", { class: "ev" }, e.text, src[e.src] ? h("span", { class: "src" }, cite(e.src)) : ""))] : ""];
+  el.append(...parts.flat(2).filter(x => x !== "" && x != null));
+}
+
+/* The inspector's list of what this sheet's faces lay against in this order. */
+function touchesOf(en) {
+  if (en.unplaced) return [];
+  const all = contactsOf(V.order);
+  const L0 = V.model.leaves.find(x => x.e === en && x.k === 0), L1 = V.model.leaves.find(x => x.e === en && x.k === 1);
+  const openings = new Set([L0.n, L0.n + 1, L1.n, L1.n + 1]);
+  const mine = all.filter(c => c.kind === "facing" ? openings.has(c.opening) : c.sheet === en.id);
+  const go = c => { const C = V.contact; C.list = all; C.on = true; C.newOnly = false; showContact(all.indexOf(c)); pushHash(); };
+  return [h("h4", {}, "Touches when closed"),
+    h("div", { class: "touch" }, mine.map(c => h("button", { class: "linkish", title: "Show these two faces", onclick: () => go(c) },
+      `${c.a} ↔ ${c.b}`, c.kind === "fold" ? h("span", { class: "inferred" }, "fold · inferred") : "", c.isNew ? h("span", { class: "new" }, "new") : "")))];
+}
+function openInspector() { if (V.inspect) return; if (NARROW() && Arrange.on) Arrange.close(); V.inspect = true; relayout(520); renderInspector(); pushHash(); }
+function closeInspector() {
+  if (!V.inspect) return;
+  if (V.hand.on) putBack({ silent: true });
+  V.inspect = false; relayout(520); renderInspector(); pushHash();
+}
+function enterHand() {
+  if (V.hand.on) return;
+  const g = CAM.goal;
+  Object.assign(V.hand, { on: true, yaw: g.yaw, pitch: g.pitch, cam: { target: g.target.clone(), yaw: g.yaw, pitch: g.pitch, dist: g.dist, fov: g.fov } });
+}
+/* Turn over, unfold or open flat: the sheet rises clear of the block first. */
+function act(kind) {
+  if (!V.model) return;
+  if (!V.inspect) { V.inspect = true; }
+  enterHand();
+  if (kind === "turn") V.hand.turned = !V.hand.turned;
+  if (kind === "unfold") V.hand.folded = !V.hand.folded;
+  if (kind === "flat") V.hand.flat = !V.hand.flat;
+  relayout(kind === "turn" ? 1000 : 900);
+  frameHand();
+  renderInspector(); tint();
+}
+function putBack({ silent = false } = {}) {
+  if (!V.hand.on) return;
+  const cam = V.hand.cam;
+  Object.assign(V.hand, { on: false, turned: false, folded: true, flat: false });
+  if (!silent) relayout(900);
+  if (cam) setGoal(cam, 4.5);
+  renderInspector(); tint();
+}
+/* Frame the sheet in hand, opened out as it will be. */
+function frameHand() {
+  const en = V.model.all[V.cur], o = V.objs.get(en.id), L = V.layout, g = L.sg.get(en.id);
+  if (!g) return;
+  const m = L.place.matrix.clone().multiply(new THREE.Matrix4().compose(g.p, g.q, new THREE.Vector3(1, 1, 1)));
+  const pts = [];
+  for (const lf of o.leaves) {
+    const p = L.poses.get(`${en.id}:${lf.k}`), reach = p.f < .5 ? lf.full : lf.w, [dx, dz] = dirOf(p.a), top = p.f < .5 ? o.rows * H : H;
+    for (const y of [0, top]) pts.push(new THREE.Vector3(0, y, 0).applyMatrix4(m), new THREE.Vector3(dx * reach, y, dz * reach).applyMatrix4(m));
+  }
+  const c = new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3());
+  const yaw = V.hand.yaw, pitch = clamp(V.hand.pitch, 4, 40);
+  setGoal({ target: c, yaw: nearestYaw(yaw), pitch, fov: 32, dist: fitDist(pts, c, yaw, pitch, 1.18, 32) }, 4.5);
+  V.preset = null; renderViews();
+}
+function selectSheet(i) {
+  if (V.mode === "opening") setMode("block", { view: false });
+  if (V.hand.on) putBack({ silent: true });
+  V.cur = clamp(i, 0, V.model.all.length - 1);
+  if (NARROW() && Arrange.on) Arrange.close();
+  V.inspect = true;
+  tint(); renderStrip(); renderInspector(); pushHash(); report(); Arrange.mark(curSheet(), true);
+  relayout(520);
+}
+function stepSel(d) {
+  if (V.hand.on) putBack({ silent: true });
+  setCur(V.cur + d);
+  renderInspector();
+}
+
+function key(e) {
+  const k = e.key;
+  if (!V.model) return;
+  if (e.altKey) {
+    const big = e.shiftKey;
+    if (k === "ArrowLeft") big ? panBy(60, 0) : orbitBy(-30, 0);
+    else if (k === "ArrowRight") big ? panBy(-60, 0) : orbitBy(30, 0);
+    else if (k === "ArrowUp") big ? panBy(0, 60) : orbitBy(0, 30);
+    else if (k === "ArrowDown") big ? panBy(0, -60) : orbitBy(0, -30);
+    else return;
+    e.preventDefault(); return;
+  }
+  if ((k === "ArrowRight" || k === "ArrowLeft") && V.contact.on) { showContact(V.contact.i + (k === "ArrowRight" ? 1 : -1)); e.preventDefault(); }
+  else if (k === "ArrowRight" || k === "ArrowLeft") {
+    const d = k === "ArrowRight" ? 1 : -1;
+    if (V.mode === "opening") setOpening(V.opening + d); else step(d, e.shiftKey);
+    e.preventDefault();
+  }
+  else if (k === "k" || k === "K") setContactView(!V.contact.on);
+  else if (k === "a" || k === "A") Arrange.toggle();
+  else if (k === "b" || k === "B") Bookmarks.here();
+  else if (k === "v" || k === "V") setOverlay(OVERLAY_KEYS[(OVERLAY_KEYS.indexOf(V.overlay) + (e.shiftKey ? -1 : 1) + OVERLAY_KEYS.length) % OVERLAY_KEYS.length]);
+  else if (k === " ") { V.inspect ? closeInspector() : (V.mode === "opening" ? selectSheet(V.cur) : openInspector()); e.preventDefault(); }
+  else if (k === "t" || k === "T") act("turn");
+  else if (k === "u" || k === "U") {
+    if (V.mode === "opening" && !V.inspect) { V.unfoldOpening = !V.unfoldOpening; relayout(800); if (V.preset === 5) preset(5); }
+    else act("unfold");
+  }
+  else if (k === "o" || k === "O") act("flat");
+  else if (k === "r" || k === "R") replay();
+  else if (k === "Home") V.mode === "opening" ? setOpening(0) : setCur(0);
+  else if (k === "End") V.mode === "opening" ? setOpening(V.model.leaves.length) : setCur(V.model.all.length - 1);
+  else if (k >= "1" && k <= "5") preset(+k);
+  else if (k === "0") preset(1);
+  else if (k === "[") setSpread(V.spread - .08, 400);
+  else if (k === "]") setSpread(V.spread + .08, 400);
+  else if (k === "+" || k === "=") zoomBy(1 / 1.25);
+  else if (k === "-" || k === "_") zoomBy(1.25);
+  else if (k === "p" || k === "P") setPosture(V.posture === "stand" ? "lie" : "stand");
+  else if (k === "m" || k === "M") setMode(V.mode === "block" ? "opening" : "block");
+  else if (k === "Enter") { V.mode === "opening" && !V.inspect ? readOpening() : readSheet(V.model.all[V.cur]); e.preventDefault(); }
+  else if (k === "Escape") {
+    if (V.contact.on) setContactView(false);
+    else if (V.hand.on) putBack();
+    else if (V.inspect) closeInspector();
+    else if (V.mode === "opening") setMode("block");
+  }
+}
+
+/* Milliseconds per frame, GPU included (readPixels waits for it), while orbiting and while the spread changes
+   (a full re-layout of every leaf each frame). Independent of requestAnimationFrame, which a hidden tab throttles. */
+function cost(n = 60) {
+  const gl = renderer.getContext(), px = new Uint8Array(4);
+  const run = fn => {
+    fn(0); renderer.render(scene, camera); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const t0 = performance.now();
+    for (let i = 1; i <= n; i++) { fn(i); renderer.render(scene, camera); drawLabels(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
+    return +((performance.now() - t0) / n).toFixed(2);
+  };
+  const y0 = CAM.yaw, s0 = V.spread;
+  const orbit = run(i => { CAM.yaw = y0 + i * 3; placeCamera(); });
+  CAM.yaw = y0; placeCamera();
+  const spread = run(i => {
+    V.spread = .05 + .9 * i / n;
+    const L = V.layout = computeLayout();
+    Object.assign(CUR, { poses: L.poses, sg: L.sg, t: L.t, lie: L.lie, beta: L.beta });
+    applyAll();
+  });
+  V.spread = s0; relayout(0);
+  return { orbitMs: orbit, spreadMs: spread, drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+           canvas: [renderer.domElement.width, renderer.domElement.height] };
+}
+
+export default {
+  mount(order, st) { open(order || ORDERS.get(S.order)); if (st) restore(st); resize(); },
+  open,
+  key,
+  state,
+  restore,
+  sync,
+  marks,
+  herePages,
+  setHidden,
+  showAllQuires,
+  hiddenQuires,
+  curSheet,
+  focusSheet,
+  setPanel,
+  refresh,
+  // for checking in the browser: (await import("./assets/view3d.js")).default.debug
+  debug: {
+    V, CUR, CAM, cost, preset, setSpread, setPosture, setMode, setOpening, setCur, setGoal, wake,
+    selectSheet, act, putBack, closeInspector, replay, setOverlay, setContactView, showContact, contactsOf,
+    seek(k) { if (!TW.on) return; TW.t0 = performance.now() - k * TW.dur; tweenStep(performance.now()); renderer.render(scene, camera); drawLabels(); },
+    get renderer() { return renderer; },
+  },
+};

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voynich Viewer</title>
+<meta name="description" content="Read the Voynich Manuscript (Beinecke MS 408) page by page, unfold its foldouts, and see it as a book in 3D, in its current binding or with Lisa Fagin Davis's corrections.">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/privacy.js" defer></script>   <!-- cookie notice; loads Microsoft Clarity only after "Accept" -->
+</head>
+<body>
+<header id="cx-top">
+  <a class="brand" href="./" title="Voynich Viewer">Voynich Viewer</a><span class="ver" title="Voynich Viewer version 1.0">v1.0</span>
+  <nav id="cx-tabs" role="tablist">
+    <button role="tab" data-view="three">3D</button>
+    <button role="tab" data-view="read">Reader</button>
+    <button role="tab" data-view="info">Info</button>
+  </nav>
+  <label class="order-pick"><span class="op-l">Order</span>
+    <select id="cx-order" aria-label="Reading order"></select>
+  </label>
+  <button id="cx-bm" class="ghost" title="Bookmarks (B bookmarks the page you are on)" aria-label="Bookmarks" aria-haspopup="dialog" aria-expanded="false">★</button>
+  <button id="cx-work" title="Save, export or import your crops, orders and bookmarks">Your work</button>
+  <button id="cx-help" class="ghost" title="Keyboard shortcuts (?)">?</button>
+  <button id="cx-bug" class="ghost" title="Report a bug or suggest a feature" aria-label="Report a bug or suggest a feature">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M9 7.5a3 3 0 0 1 6 0"/><rect x="7" y="7.5" width="10" height="12.5" rx="5"/><path d="M12 11v9M3 13.5h4M17 13.5h4M4.5 8l2.8 2M19.5 8l-2.8 2M4.5 19.5l2.8-2M19.5 19.5l-2.8-2"/>
+    </svg>
+  </button>
+</header>
+<main id="cx-main">
+  <section id="v-read" class="view" hidden></section>
+  <section id="v-three" class="view" hidden></section>
+  <section id="v-info" class="view" hidden></section>
+</main>
+<div id="cx-toast" role="status" aria-live="polite"></div>
+<dialog id="cx-bug-dlg" class="bug-dlg" aria-labelledby="cx-bug-h">
+  <h3 id="cx-bug-h">Report a bug or suggest a feature</h3>
+  <p>Hi, my name is Alina, and I'm a product designer and UX researcher. If you want to report a bug or suggest a feature, you can write me an email at <a href="mailto:alinajafri4@gmail.com?subject=Voynich%20Viewer">alinajafri4@gmail.com</a>.</p>
+  <p class="muted small"><a href="#info/beinecke/privacy" onclick="this.href = Privacy.privacyHref(); this.closest('dialog').close()">Cookie settings and privacy</a></p>
+  <form method="dialog" class="bug-acts">
+    <button type="button" id="cx-bug-copy">Copy email address</button>
+    <button class="primary">Close</button>
+  </form>
+</dialog>
+<dialog id="cx-help-dlg">
+  <h3>Keyboard</h3>
+  <div class="keys">
+    <h4>Reader</h4>
+    <p><kbd>←</kbd> <kbd>→</kbd> turn the page · <kbd>U</kbd> unfold / fold this opening · <kbd>Home</kbd> <kbd>End</kbd> first / last · <kbd>G</kbd> go to a folio · <kbd>O</kbd> grid of every page · <kbd>B</kbd> bookmark the page · <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> zoom · <kbd>C</kbd> crop the page (or hover a page and click ✂ Crop)</p>
+    <h4>3D</h4>
+    <p>Drag to turn the book · <kbd>Shift</kbd>-drag or right-drag to pan · scroll or pinch to zoom · <kbd>⌥</kbd> + arrows turn it from the keyboard (<kbd>⌥ Shift</kbd> + arrows pan) · <kbd>+</kbd> <kbd>−</kbd> zoom</p>
+    <p><kbd>1</kbd> front ¾ · <kbd>2</kbd> spine · <kbd>3</kbd> head · <kbd>4</kbd> fore-edge · <kbd>5</kbd> reader's eye · <kbd>0</kbd> reset view · <kbd>[</kbd> <kbd>]</kbd> spread · <kbd>P</kbd> standing / lying · <kbd>M</kbd> block / opening</p>
+    <p><kbd>←</kbd> <kbd>→</kbd> next sheet, or next opening (<kbd>Shift</kbd> by quire) · <kbd>Home</kbd> <kbd>End</kbd> · click a sheet or <kbd>Space</kbd> to pull it out · <kbd>T</kbd> turn over · <kbd>U</kbd> unfold · <kbd>O</kbd> open flat · <kbd>Esc</kbd> put it back · <kbd>Enter</kbd> read from here · double-click to read</p>
+    <p><kbd>V</kbd> colour the edges by scribe, section, illustration, language, moved or quire · <kbd>K</kbd> touching faces (<kbd>←</kbd> <kbd>→</kbd> step through them) · <kbd>R</kbd> replay the last change of order · <kbd>B</kbd> bookmark the page</p>
+    <h4>Rearrange (in 3D)</h4>
+    <p><kbd>A</kbd> open or close the Rearrange panel · drag a sheet or a whole quire by ⠿ to move it · the eye hides a quire in 3D, like a layer · click a sheet for more · <kbd>⌘Z</kbd> undo · <kbd>⇧⌘Z</kbd> redo</p>
+    <h4>Crop editor</h4>
+    <p>Drag the four corners onto the page's edges (a magnifier shows while you drag). <kbd>Shift</kbd> keeps a rectangle. Arrow keys nudge the selected corner (<kbd>Shift</kbd> ×10). <kbd>Enter</kbd> save and go to the next page · <kbd>[</kbd> <kbd>]</kbd> previous / next · <kbd>R</kbd> turn · <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> <kbd>Z</kbd> zoom · <kbd>Esc</kbd> close</p>
+    <h4>Reader and 3D together</h4>
+    <p>Both views follow the same place: the page you are on in the Reader is the sheet picked out in 3D, and the sheet or opening you pick in 3D is where the Reader opens.</p>
+  </div>
+  <p class="muted small"><a href="#info/beinecke/privacy" onclick="this.href = Privacy.privacyHref(); this.closest('dialog').close()">Cookie settings and privacy</a></p>
+  <form method="dialog"><button>Close</button></form>
+</dialog>
+<script src="assets/app.js"></script>
+<script src="assets/work.js"></script>
+<script src="assets/arrange.js"></script>
+</body>
+</html>
