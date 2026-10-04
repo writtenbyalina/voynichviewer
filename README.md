@@ -1,4 +1,4 @@
-# Voynich Viewer 1.0
+# Voynich Viewer
 
 Read the Voynich Manuscript (Beinecke MS 408) page by page, unfold its foldouts, and see the whole book as a block of
 sheets in 3D: in its current binding, in the orders Lisa Fagin Davis has proposed, or in any order you make yourself.
@@ -66,10 +66,24 @@ assets/vendor/          three.js r184 (MIT)
 data/codex.json         the physical model: sheets, quires, panels, scribes, sections, page variables, and for each
                         panel its Yale photograph (IIIF id) and the corners it is cut from
 data/orders.json        reading orders, sources and per-sheet evidence notes; edited by hand
+data/changelog.json     what changed and when, newest first; shown under the version number (top left)
 data/panels/            two JPEGs per panel face: _l (1400 px tall) and _s (300 px)
 tools/import_from_scout.py   refreshes data/codex.json and data/panels/ from a local Voynich Scout checkout
 CNAME                   the custom domain for GitHub Pages
 ```
+
+## What's new: logging changes and fixes
+
+Every change people can see, and every bug fix, gets an entry in `data/changelog.json`, in the same commit as the
+change. Releases are newest first, each with its `version`, the `date` it went live (YYYY-MM-DD) and its `changes`,
+each with a `kind` (`new`, `improved` or `fixed`) and a sentence written for readers, not developers. The site reads
+this file: the badge at the top left shows the latest version, clicking it opens the list, and someone who has been
+here before sees a dot on the badge until they have opened the newest notes.
+
+Versions: the second number goes up with each release (1.1, 1.2, …), the first with a redesign. Change the fallback
+version in `index.html` (`#cx-ver`) at the same time, for the moment before the list loads.
+
+Credit people who report bugs by name only if they have said that is all right; otherwise "Reported by a reader".
 
 ## Editing the orders
 

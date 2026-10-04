@@ -1538,6 +1538,45 @@ document.addEventListener("close", e => {   // a dialog closed: keep the message
   if (t) document.body.append(t);
 }, true);
 
+/* What's new: data/changelog.json, shown under the version number. The badge takes the latest version from it, and
+   carries a dot for someone who has been here before until they have seen that version's notes. */
+const Changes = {
+  rel: [],
+  async init() {
+    const btn = $("#cx-ver"), dlg = $("#cx-new-dlg");
+    btn.addEventListener("click", () => this.open());
+    dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });   // a click outside the box closes it
+    try {
+      const r = await fetch("data/changelog.json", { cache: "no-cache" });
+      if (!r.ok) return;
+      this.rel = (await r.json()).releases || [];
+    } catch { return; }   // the badge keeps the version written in the page
+    const latest = this.rel[0];
+    if (!latest) return;
+    btn.textContent = "v" + latest.version;
+    btn.title = `Voynich Viewer ${latest.version}: what's new`;
+    let seen = store.get("seenVersion", null);
+    if (seen == null) {   // a first visit has nothing to catch up on; a returning visitor has settings stored already
+      let returning = false;
+      try { returning = Object.keys(localStorage).some(k => k.startsWith("vv:")); } catch { /* storage blocked */ }
+      if (!returning) { store.set("seenVersion", latest.version); seen = latest.version; }
+    }
+    btn.classList.toggle("dot", seen !== latest.version);
+  },
+  date: iso => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(iso + "T00:00:00Z")),
+  KINDS: { new: "New", improved: "Improved", fixed: "Fixed" },
+  open() {
+    const list = $("#cx-new-list"), dlg = $("#cx-new-dlg");
+    list.replaceChildren(...(this.rel.length ? this.rel.map(r => h("section", { class: "rel" },
+      h("h4", {}, h("span", { class: "rel-v" }, "v" + r.version), h("time", { datetime: r.date }, this.date(r.date))),
+      h("ul", {}, ...r.changes.map(c => h("li", {}, h("span", { class: `kind ${c.kind}` }, this.KINDS[c.kind] || c.kind), " ", c.text)))))
+      : [h("p", { class: "muted" }, "The list of changes could not be loaded.")]));
+    if (!dlg.open) dlg.showModal();
+    list.scrollTop = 0;
+    if (this.rel[0]) { store.set("seenVersion", this.rel[0].version); $("#cx-ver").classList.remove("dot"); }
+  },
+};
+
 async function boot() {
   try {
     const [codex, orders] = await Promise.all(["data/codex.json", "data/orders.json"].map(async u => {
@@ -1566,6 +1605,7 @@ async function boot() {
   $("#cx-order").title = ORDERS.get(S.order).subtitle || "";
   for (const b of $$("#cx-tabs button")) b.addEventListener("click", () => show(b.dataset.view));
   $("#cx-help").addEventListener("click", () => $("#cx-help-dlg").showModal());
+  Changes.init();   // not awaited: the page doesn't wait for the list of changes
   $("#cx-work").addEventListener("click", () => Work.open());
   $("#cx-bm").addEventListener("click", () => (Bookmarks.pop && !Bookmarks.pop.hidden ? Bookmarks.close() : Bookmarks.open()));
   Bookmarks.render();
