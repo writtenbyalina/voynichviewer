@@ -110,7 +110,7 @@ dialog p { margin: 4px 0; }
 .rd-zoomer { position: absolute; inset: 0; transform-origin: 0 0; }
 .rd-stage.zoomed { cursor: grab; }
 .rd-stage.zoomed.panning { cursor: grabbing; }
-.rd-stage.zoomed .rd-zoomer { will-change: transform; }
+.rd-stage.zoomed.moving .rd-zoomer { will-change: transform; }   /* only while it moves: see Reader.applyZoom */
 /* under the pages, one slim row of fixed height: zoom | flags and note, two lines at most | more. The side columns
    match so the note stays centred under the gutter. */
 .rd-foot { position: relative; display: grid; grid-template-columns: minmax(136px, 1fr) minmax(0, 880px) minmax(136px, 1fr);
@@ -122,6 +122,23 @@ dialog p { margin: 4px 0; }
 @media (max-width: 760px) {
   .rd-foot { grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 10px; padding: 0 12px; }
   .rd-note { text-align: left; }
+}
+/* zoomed in: whether the pages on screen are at full size yet (Sharp.say), over the corner of the pages just above the
+   zoom buttons; it shows while a page loads, and a moment after, then goes */
+.rd-sharp { position: absolute; left: 12px; bottom: 10px; z-index: 6; max-width: calc(100% - 24px); color: var(--table-ink);
+  font-size: 11px; background: rgba(45, 41, 37, .85); padding: 3px 8px; border-radius: 99px; pointer-events: none; }
+.rd-stage:not(.zoomed) .rd-sharp, .rd-sharp:empty { display: none; }
+/* a full-size page on screen is loading: a spinner in that note, and a bar moving along the top of the pages */
+.spin { display: inline-block; width: 9px; height: 9px; margin-right: 6px; vertical-align: -1px; border-radius: 50%;
+  border: 1.5px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.rd-stage.sharpening::after, .sv-stage.sharpening::after { content: ""; position: absolute; left: 0; right: 0; top: 0;
+  height: 3px; z-index: 7; pointer-events: none; background: linear-gradient(90deg, transparent, #f3c35c, transparent) no-repeat;
+  background-size: 40% 100%; animation: sharp-bar 1.4s ease-in-out infinite; }
+@keyframes sharp-bar { from { background-position: -70% 0; } to { background-position: 170% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+  .rd-stage.sharpening::after, .sv-stage.sharpening::after { animation: none; background: rgba(243, 195, 92, .6); }
 }
 .rd-page { display: flex; align-items: flex-start; position: relative; }
 .rd-page.left { justify-content: flex-end; }
@@ -256,6 +273,7 @@ dialog #cx-toast { bottom: 22px; }
 .sv-stage.panning { cursor: grabbing; }
 .sv-zoom { display: inline-flex; gap: 4px; }
 .sv-zoom button { min-width: 34px; }
+.sv-sharp { align-self: center; margin-left: 4px; color: #a69d8f; font-size: 11px; }
 
 /* ---------- 3D view (view3d.js) ---------- */
 #v-three { display: flex; flex-direction: column; color: var(--table-ink); background: #221e1a; }

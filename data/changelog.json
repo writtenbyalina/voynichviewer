@@ -2,6 +2,13 @@
  "about": "What changed on the site, newest first. Shown under the version number (top left). Add an entry for every change people can see and every fix, in the same commit, with the date it went live. kind: new | improved | fixed. The second number of the version goes up with each release; the first with a redesign.",
  "releases": [
   {
+   "version": "1.2",
+   "date": "2026-10-04",
+   "changes": [
+    {"kind": "improved", "text": "Pages are sharp when you zoom in: they now load at full size from Yale's photographs."}
+   ]
+  },
+  {
    "version": "1.1",
    "date": "2026-10-04",
    "changes": [
