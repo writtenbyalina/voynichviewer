@@ -2,6 +2,15 @@
  "about": "What changed on the site, newest first. Shown under the version number (top left). Add an entry for every change people can see and every fix, in the same commit, with the date it went live. kind: new | improved | fixed. The second number of the version goes up with each release; the first with a redesign.",
  "releases": [
   {
+   "version": "1.3",
+   "date": "2026-10-04",
+   "changes": [
+    {"kind": "fixed", "text": "Every page you go to turns a leaf, including from Go to, the strip and an unfolded foldout, and the book stays in the same place and size as you turn."},
+    {"kind": "improved", "text": "A folded foldout is one leaf like any other: you see its spine panel, and the rest of it appears when you unfold it."},
+    {"kind": "fixed", "text": "Opened-out foldouts no longer show the edges of the book's pages in the middle of the sheet."}
+   ]
+  },
+  {
    "version": "1.2",
    "date": "2026-10-04",
    "changes": [

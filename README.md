@@ -72,7 +72,10 @@ data/orders.json        reading orders, sources and per-sheet evidence notes; ed
 data/changelog.json     what changed and when, newest first; shown under the version number (top left)
 data/panels/            two JPEGs per panel face: _l (1400 px tall) and _s (300 px); zoomed in, the Reader loads the
                         page at full size from Yale instead
+data/seams.json         where the paper starts on a foldout's hinge panel: its photograph shows the stacked edges of the
+                        book on the side the flaps hang, and the unfolded Reader lets the flap overlap them
 tools/import_from_scout.py   refreshes data/codex.json and data/panels/ from a local Voynich Scout checkout
+tools/seams.py          measures those bands from data/panels/ and rewrites data/seams.json (run it after an import)
 CNAME                   the custom domain for GitHub Pages
 ```
 

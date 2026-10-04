@@ -69,7 +69,7 @@ dialog p { margin: 4px 0; }
   display: grid; place-items: center; text-align: center; font-size: 12px; padding: 6px; }
 .seg.blank { background: #e6dcc6; }
 .seg .lbl {
-  position: absolute; left: 4px; bottom: 4px; font: 600 11px/1 ui-monospace, Menlo, monospace;
+  position: absolute; left: calc(4px + var(--covered, 0px)); bottom: 4px; font: 600 11px/1 ui-monospace, Menlo, monospace;
   background: rgba(31, 35, 40, .72); color: #fff; padding: 2px 4px; border-radius: 3px; pointer-events: none;
 }
 .seg .scribe { position: absolute; left: 0; right: 0; top: 0; height: 5px; pointer-events: none; }
@@ -144,8 +144,9 @@ dialog p { margin: 4px 0; }
 .rd-page.left { justify-content: flex-end; }
 .rd-page .gridface { display: grid; gap: 0; }
 .rd-page.empty { visibility: hidden; }
-.rd-gutter { width: 2px; align-self: stretch; background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(0,0,0,.05)); }
+.rd-gutter { width: 2px; align-self: stretch; background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(0,0,0,.05)); position: relative; z-index: 4; }
 .rd-page .seg { box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.rd-page .seg.over { z-index: 1; }   /* an unfolded flap over the strip of page edges on its hinge panel (seamOf) */
 /* folding (setUnfold): the hinge panel stays put; the others are stacked over or under it by inline z-index; a panel
    facing away shows its back (the folded page, pre-mirrored, or plain vellum); tabs and stars wait until it's done */
 .rd-page.folding { perspective: 2400px; }
@@ -167,8 +168,16 @@ dialog p { margin: 4px 0; }
 .rd-page.right .foldtab { left: 100%; }
 .rd-page.left .foldtab { right: 100%; border-radius: 6px 0 0 6px; transform: translateY(-50%) rotate(180deg); }
 .foldtab:hover { background: #e2cfa6; }
-.turn { position: absolute; top: 0; transform-style: preserve-3d; transition: transform .5s ease-in-out; z-index: 3; }
-.turn > .side { position: absolute; inset: 0; backface-visibility: hidden; }
+/* the leaf of a page turn (Reader.turn): hinged at the gutter, a face for each page, each as wide as its own page; the
+   gutter line stays over it, the page tabs and stars wait until it has landed */
+.spread.turning { perspective: 5000px; }
+.spread.turning .rd-star, .spread.turning .foldtab { opacity: 0 !important; transition: none; }
+.turn { position: absolute; top: 0; transform-style: preserve-3d; z-index: 3; will-change: transform; }
+.turn.fwd { transform-origin: left center; }
+.turn.rev { transform-origin: right center; }
+.turn > .side { position: absolute; top: 0; bottom: 0; backface-visibility: hidden; }
+.turn.fwd > .side { left: 0; }
+.turn.rev > .side { right: 0; }
 .turn > .side.back { transform: rotateY(180deg); }
 .rd-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 5; width: 44px; height: 88px;
   background: rgba(45, 41, 37, .6); color: var(--table-ink); border: 1px solid var(--table-line); font-size: 22px; }
