@@ -96,12 +96,13 @@ dialog p { margin: 4px 0; }
 .rd-stage.zoomed { cursor: grab; }
 .rd-stage.zoomed.panning { cursor: grabbing; }
 .rd-stage.zoomed .rd-zoomer { will-change: transform; }
-.rd-zoombar { position: absolute; left: 12px; bottom: 10px; z-index: 6; display: flex; gap: 4px; align-items: center; }
+.rd-zoombar { position: absolute; left: 12px; bottom: 10px; z-index: 6; display: flex; gap: 4px; align-items: center;
+  max-width: calc(100% - 24px); }
 .rd-zoombar button { background: rgba(45, 41, 37, .85); color: var(--table-ink); border-color: var(--table-line); min-width: 34px; }
 .rd-zoombar #rd-zoomlvl { min-width: 58px; font-variant-numeric: tabular-nums; }
-.rd-zoomhint { color: var(--table-ink); font-size: 11px; margin-left: 6px; background: rgba(45, 41, 37, .85);
+.rd-zoomhint, .rd-sharp { color: var(--table-ink); font-size: 11px; margin-left: 6px; background: rgba(45, 41, 37, .85);
   padding: 3px 8px; border-radius: 99px; }
-.rd-stage.zoomed .rd-zoomhint { display: none; }
+.rd-stage.zoomed .rd-zoomhint, .rd-stage:not(.zoomed) .rd-sharp, .rd-sharp:empty { display: none; }
 @media (max-width: 760px) { .rd-zoomhint { display: none; } }
 .rd-page { display: flex; align-items: flex-start; position: relative; }
 .rd-page.left { justify-content: flex-end; }
@@ -217,6 +218,7 @@ dialog #cx-toast { bottom: 22px; }
 .sv-stage.panning { cursor: grabbing; }
 .sv-zoom { display: inline-flex; gap: 4px; }
 .sv-zoom button { min-width: 34px; }
+.sv-sharp { align-self: center; margin-left: 4px; color: #a69d8f; font-size: 11px; }
 
 /* ---------- 3D view (view3d.js) ---------- */
 #v-three { display: flex; flex-direction: column; color: var(--table-ink); background: #221e1a; }

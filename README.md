@@ -15,8 +15,9 @@ Site: [voynichviewer.com](https://voynichviewer.com).
   new gatherings, set sheets aside, read a gathering as separate sheets, turn a sheet inside out or upside down, sew a
   foldout at another fold. Only the sheet you move lifts in the animation. The eye next to a gathering hides it in 3D,
   like a layer, without changing the order.
-- **Reader**: turn the pages two at a time, unfold the foldouts, zoom, jump to a folio. **▦ Grid** (key O) shows every
-  page at once, quire by quire, with buttons for each section and for your bookmarks.
+- **Reader**: turn the pages two at a time, unfold the foldouts, zoom, jump to a folio. Zoomed in, a page is loaded
+  again at full size (about 3,600 px tall) from Yale's IIIF image server, and swapped in when it arrives. **▦ Grid**
+  (key O) shows every page at once, quire by quire, with buttons for each section and for your bookmarks.
 - **Bookmarks**: the ☆ in a page's corner (Reader), next to a page (3D), or key B; ★ at the top lists them. Name them,
   and go to one: 3D and the Reader both follow.
 - **Info**: credits, a plain-language guide, Davis's research (her 2025 post in brief, the Folio order tables built
@@ -66,7 +67,8 @@ assets/vendor/          three.js r184 (MIT)
 data/codex.json         the physical model: sheets, quires, panels, scribes, sections, page variables, and for each
                         panel its Yale photograph (IIIF id) and the corners it is cut from
 data/orders.json        reading orders, sources and per-sheet evidence notes; edited by hand
-data/panels/            two JPEGs per panel face: _l (1400 px tall) and _s (300 px)
+data/panels/            two JPEGs per panel face: _l (1400 px tall) and _s (300 px); zoomed in, the Reader loads the
+                        page at full size from Yale instead
 tools/import_from_scout.py   refreshes data/codex.json and data/panels/ from a local Voynich Scout checkout
 CNAME                   the custom domain for GitHub Pages
 ```
