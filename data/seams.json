@@ -1,0 +1,116 @@
+{
+ "about": "Where the paper starts on a foldout's hinge panel (tools/seams.py): the picture shows the stacked edges of the bound book as a band this wide on the side the flaps hang, as a fraction of the panel's width. The unfolded Reader lets the flap overlap it. `q` is the crop it was measured on; the Reader ignores the entry if the page is re-cropped.",
+ "version": 1,
+ "panels": {
+  "f70v1": {
+   "side": "L",
+   "band": 0.144,
+   "q": [
+    [
+     64,
+     64
+    ],
+    [
+     2979,
+     64
+    ],
+    [
+     2979,
+     3648
+    ],
+    [
+     64,
+     3648
+    ]
+   ]
+  },
+  "f72v1": {
+   "side": "L",
+   "band": 0.136,
+   "q": [
+    [
+     72,
+     64
+    ],
+    [
+     2979,
+     64
+    ],
+    [
+     2979,
+     3648
+    ],
+    [
+     72,
+     3648
+    ]
+   ]
+  },
+  "f90v1": {
+   "side": "L",
+   "band": 0.087,
+   "q": [
+    [
+     88,
+     72
+    ],
+    [
+     2838,
+     72
+    ],
+    [
+     2838,
+     3624
+    ],
+    [
+     88,
+     3624
+    ]
+   ]
+  },
+  "f95v1": {
+   "side": "L",
+   "band": 0.074,
+   "q": [
+    [
+     80,
+     80
+    ],
+    [
+     2838,
+     80
+    ],
+    [
+     2838,
+     3640
+    ],
+    [
+     80,
+     3640
+    ]
+   ]
+  },
+  "f102v1": {
+   "side": "L",
+   "band": 0.075,
+   "q": [
+    [
+     96,
+     72
+    ],
+    [
+     2838,
+     72
+    ],
+    [
+     2838,
+     3600
+    ],
+    [
+     96,
+     3600
+    ]
+   ]
+  }
+ }
+}

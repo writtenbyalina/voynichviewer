@@ -15,8 +15,11 @@ Site: [voynichviewer.com](https://voynichviewer.com).
   new gatherings, set sheets aside, read a gathering as separate sheets, turn a sheet inside out or upside down, sew a
   foldout at another fold. Only the sheet you move lifts in the animation. The eye next to a gathering hides it in 3D,
   like a layer, without changing the order.
-- **Reader**: turn the pages two at a time, unfold the foldouts, zoom, jump to a folio. **▦ Grid** (key O) shows every
-  page at once, quire by quire, with buttons for each section and for your bookmarks.
+- **Reader**: turn the pages two at a time, unfold the foldouts, zoom, jump to a folio. Zoomed in, a page is shown at
+  full size (about 3,600 px tall), loaded from Yale's IIIF image server. The Reader loads these ahead as you read (the
+  opening you are on, the next two and the one behind), so zooming in is sharp at once; not where zooming in gains
+  little, as on many phones, nor when the browser asks to save data. **▦ Grid** (key O) shows every page at once,
+  quire by quire, with buttons for each section and for your bookmarks.
 - **Bookmarks**: the ☆ in a page's corner (Reader), next to a page (3D), or key B; ★ at the top lists them. Name them,
   and go to one: 3D and the Reader both follow.
 - **Info**: credits, a plain-language guide, Davis's research (her 2025 post in brief, the Folio order tables built
@@ -67,8 +70,12 @@ data/codex.json         the physical model: sheets, quires, panels, scribes, sec
                         panel its Yale photograph (IIIF id) and the corners it is cut from
 data/orders.json        reading orders, sources and per-sheet evidence notes; edited by hand
 data/changelog.json     what changed and when, newest first; shown under the version number (top left)
-data/panels/            two JPEGs per panel face: _l (1400 px tall) and _s (300 px)
+data/panels/            two JPEGs per panel face: _l (1400 px tall) and _s (300 px); zoomed in, the Reader loads the
+                        page at full size from Yale instead
+data/seams.json         where the paper starts on a foldout's hinge panel: its photograph shows the stacked edges of the
+                        book on the side the flaps hang, and the unfolded Reader lets the flap overlap them
 tools/import_from_scout.py   refreshes data/codex.json and data/panels/ from a local Voynich Scout checkout
+tools/seams.py          measures those bands from data/panels/ and rewrites data/seams.json (run it after an import)
 CNAME                   the custom domain for GitHub Pages
 ```
 
@@ -118,6 +125,13 @@ Microsoft Clarity (visitor analytics, project `ys2r2nospw`) is loaded by `assets
 clicks **Accept** in the thin strip at the bottom of the page. **Reject**, or closing the strip, means no: Clarity is
 never loaded. A Global Privacy Control signal also counts as no. The choice is kept for 6 months and can be changed in
 Info > Privacy and cookies, which is the site's privacy notice. Clarity never runs on `localhost` or `127.0.0.1`.
+
+A separate, cookieless visit counter (Cloudflare Web Analytics) runs whatever the visitor chose, because it sets no
+cookies and keeps nothing in the browser; **Reject** only turns off Clarity. It is the one request made before a choice.
+It is off with a Global Privacy Control signal, on a local copy, and while `CF_TOKEN` in `assets/privacy.js` is empty. The
+token is the site's Cloudflare Web Analytics token (Cloudflare dashboard > Analytics & Logs > Web Analytics > Manage site;
+the `token` inside `data-cf-beacon`). It is public, so it is fine in the repository. The privacy notice has its "visit
+counter" section only while the token is set, so to switch the counter off, empty `CF_TOKEN`.
 
 `CONTACT` in `assets/privacy.js` is the address the notice gives for questions about data; change `HOST` there if the
 site is not hosted on GitHub Pages. In Clarity's project settings

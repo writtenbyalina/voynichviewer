@@ -4,15 +4,19 @@
    same and sit side by side; nothing is pre-selected and the page is never blocked. The choice is kept in this browser
    for 6 months (or until the notice changes, VERSION) and can be changed in Info > Privacy and cookies, from the "?"
    help and from the bug report box. A Global Privacy Control signal counts as no.
+   Separately, a visit counter (Cloudflare Web Analytics) runs whatever the visitor chose: it sets no cookies and keeps nothing
+   in the browser, so it needs no consent, and "Reject" only turns off Clarity. It is the one thing that loads before a choice,
+   and it is off with a Global Privacy Control signal, on a local copy, and while CF_TOKEN below is empty.
    Nothing is tracked on a local copy (localhost), so testing stays out of the statistics.
    Edit the settings below if the site's contact or host changes; the privacy notice (app.js, Info) reads them. */
 "use strict";
 
 const Privacy = {
   CLARITY_ID: "ys2r2nospw",
+  CF_TOKEN: "d433494d7d804d3193ab34d59ade832e",   // Cloudflare Web Analytics site token (public, not a secret). Empty = no counter
   CONTACT: "alinajafri4@gmail.com",   // where visitors can ask about their data (an e-mail address or a URL)
   HOST: { name: "GitHub Pages", privacy: "https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" },
-  UPDATED: "3 October 2026",
+  UPDATED: "4 October 2026",
   KEY: "vv:consent",
   MONTHS: 6,     // ask again after this long (the CNIL's recommendation; the ICO and EDPB allow longer)
   VERSION: 1,    // raise when the privacy notice changes in a way that needs a new choice
@@ -31,6 +35,7 @@ const Privacy = {
   },
 
   start() {
+    this.countVisit();
     const c = this.choice();
     if (c === "granted") this.loadClarity();
     else if (c === null) this.showStrip();
@@ -47,6 +52,16 @@ const Privacy = {
       setTimeout(() => location.reload(), 300);
     }
     document.dispatchEvent(new CustomEvent("vv:privacy", { detail: choice }));
+  },
+
+  /* The cookieless visit counter. Needs no choice from the visitor; see the note at the top. */
+  countVisit() {
+    if (this.local || this.gpc() || !this.CF_TOKEN || document.querySelector("script[data-cf-beacon]")) return;
+    const el = document.createElement("script");
+    el.type = "module";   // as in the snippet Cloudflare gives
+    el.src = "https://static.cloudflareinsights.com/beacon.min.js";
+    el.dataset.cfBeacon = JSON.stringify({ token: this.CF_TOKEN });
+    document.head.append(el);
   },
 
   loadClarity() {
