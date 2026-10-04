@@ -1,0 +1,37 @@
+{
+ "about": "What changed on the site, newest first. Shown under the version number (top left). Add an entry for every change people can see and every fix, in the same commit, with the date it went live. kind: new | improved | fixed. The second number of the version goes up with each release; the first with a redesign.",
+ "releases": [
+  {
+   "version": "1.2",
+   "date": "2026-10-04",
+   "changes": [
+    {"kind": "new", "text": "Sharper pages when you zoom in: the Reader now shows each page at full size from Yale's photographs, about 3,600 pixels tall instead of 1,400, so you can see the pen strokes and the grain of the parchment."},
+    {"kind": "improved", "text": "The pages around the one you are reading load at full size in the background, so zooming in is sharp at once. While a page is still loading, a bar runs along the top of the pages."},
+    {"kind": "fixed", "text": "Zoomed-in pages could look blurrier than they should, because they stayed drawn at the size they had when you started zooming."}
+   ]
+  },
+  {
+   "version": "1.1",
+   "date": "2026-10-04",
+   "changes": [
+    {"kind": "new", "text": "What's new: click the version number at the top left to see what changed, and when."},
+    {"kind": "improved", "text": "Unfolding and folding: the panels open one after another, like a map, and the book eases to its new size instead of jumping."},
+    {"kind": "improved", "text": "More room for the pages: zoom, the opening's tags and its note share one slim row under the pages, and the bar above stays on one line in narrower windows."},
+    {"kind": "fixed", "text": "Zoom could not go below 100%. It now goes out to 30%, and stays zoomed out as you turn the pages. (Reported by a reader.)"},
+    {"kind": "fixed", "text": "Notes under the pages were cut off with no way to read the rest. Long notes now have a \"more\" link that shows the whole note. (Reported by a reader.)"},
+    {"kind": "fixed", "text": "The zoom buttons and their hint covered the bottom of the pages and the page labels."},
+    {"kind": "fixed", "text": "The pages changed size from one opening to the next, when the bar above them wrapped or a note was longer."},
+    {"kind": "fixed", "text": "f70r2 was cut off at the right, through the middle of its paragraph. It now shows the whole panel."},
+    {"kind": "fixed", "text": "f70v2 (Pisces) was far wider than the other pages: its photograph shows the panel opened flat across an extra crease. The crease is now a fold, so folded, f70v2 is a page of normal width, and the flap opens with Unfold."},
+    {"kind": "fixed", "text": "Links and Go to for 70v2 and 101v opened the following opening. They now open the one where the page shows."}
+   ]
+  },
+  {
+   "version": "1.0",
+   "date": "2026-10-03",
+   "changes": [
+    {"kind": "new", "text": "First release: the book in 3D, the Reader with its foldouts, the Info pages on Lisa Fagin Davis's research, bookmarks, a crop tool for re-cutting pages from Yale's photographs, and your own orders of the sheets."}
+   ]
+  }
+ ]
+}

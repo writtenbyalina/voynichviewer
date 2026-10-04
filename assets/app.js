@@ -349,31 +349,41 @@ const Reader = {
         h("button", { id: "rd-next", title: "Next opening (→)", onclick: () => Reader.go(R.at + 1, 1) }, "›"),
         h("span", { class: "rd-where", id: "rd-where" }),
         h("span", { class: "rd-meta", id: "rd-meta" }),
-        h("div", { class: "rd-flags" },
-          h("span", { id: "rd-flags" }),
+        h("div", { class: "rd-tools" },
           h("button", { id: "rd-unfold", title: "Unfold / fold this opening (U)", onclick: () => Reader.toggleUnfold() }, "Unfold"),
           h("button", { id: "rd-labels", class: S.labels ? "on" : "", onclick: e => { S.labels = !S.labels; store.set("labels", S.labels); e.target.classList.toggle("on", S.labels); Reader.render(); } }, "Labels"),
           h("button", { id: "rd-scribes", class: S.scribes ? "on" : "", title: "Colour bar = Davis's scribe", onclick: e => { S.scribes = !S.scribes; store.set("scribes", S.scribes); e.target.classList.toggle("on", S.scribes); Reader.render(); } }, "Scribes"),
           h("button", { id: "rd-ghosts", class: S.ghosts ? "on" : "", title: "Show lost leaves as blank pages", onclick: e => { S.ghosts = !S.ghosts; store.set("ghosts", S.ghosts); e.target.classList.toggle("on", S.ghosts); Reader.open(R.order, Reader.nearestKept()); } }, "Lost leaves"),
           h("button", { title: "Go to a folio (G)", onclick: () => Reader.ask() }, "Go to…"),
-          h("button", { id: "rd-bm", title: "Bookmark a page of this opening (B)", onclick: () => Bookmarks.here() }, "☆ Bookmark"),
-          h("button", { id: "rd-gridbtn", title: "See every page at once, to jump anywhere (O)", onclick: () => Reader.toggleGrid() }, "▦ Grid"),
+          h("button", { id: "rd-bm", title: "Bookmark a page of this opening (B)", onclick: () => Bookmarks.here() }, "☆", h("span", { class: "txt" }, " Bookmark")),
+          h("button", { id: "rd-gridbtn", title: "See every page at once, to jump anywhere (O)", onclick: () => Reader.toggleGrid() }, h("span", { class: "ico" }, "▦ "), "Grid"),
         )),
       h("div", { class: "rd-stage", id: "rd-stage" },
         h("div", { class: "rd-zoomer", id: "rd-zoomer" }),
-        h("div", { class: "rd-zoombar" },
-          h("button", { title: "Zoom out (−)", "aria-label": "Zoom out", onclick: () => Reader.zoomBy(1 / 1.5) }, "−"),
-          h("button", { id: "rd-zoomlvl", title: "Back to the whole opening (0)", onclick: () => Reader.resetZoom() }, "100%"),
-          h("button", { title: "Zoom in (+)", "aria-label": "Zoom in", onclick: () => Reader.zoomBy(1.5) }, "+"),
-          h("span", { class: "rd-zoomhint" }, "pinch or ⌘-scroll to zoom · drag to move · double-click a spot"),
-          h("span", { class: "rd-sharp", id: "rd-sharp", role: "status" })),
+        // zoomed in: whether the pages on screen are at full size yet (Sharp), over the corner of the pages, so the row
+        // under them keeps still
+        h("span", { class: "rd-sharp", id: "rd-sharp", role: "status" }),
         h("button", { class: "rd-nav prev", "aria-label": "Previous opening", onclick: () => Reader.go(R.at - 1, -1) }, "‹"),
         h("button", { class: "rd-nav next", "aria-label": "Next opening", onclick: () => Reader.go(R.at + 1, 1) }, "›")),
-      h("div", { class: "rd-note", id: "rd-note" }),
+      // one slim row under the pages, the same height on every opening: zoom, then this opening's flags and note (two
+      // lines at most; "more" opens the whole note in a panel over the foot of the stage, so nothing moves)
+      h("div", { class: "rd-foot", id: "rd-foot" },
+        h("div", { class: "rd-zoombar", title: "Pinch or ⌘-scroll to zoom · drag to move · double-click a spot" },
+          h("button", { title: "Zoom out (−)", "aria-label": "Zoom out", onclick: () => Reader.zoomBy(1 / 1.5) }, "−"),
+          h("button", { id: "rd-zoomlvl", title: "Back to the whole opening (0)", onclick: () => Reader.resetZoom() }, "100%"),
+          h("button", { title: "Zoom in (+)", "aria-label": "Zoom in", onclick: () => Reader.zoomBy(1.5) }, "+")),
+        h("div", { class: "rd-note", id: "rd-note" }),
+        h("button", { class: "rd-more", id: "rd-more", hidden: true, "aria-expanded": "false", "aria-controls": "rd-notepop",
+          onclick: () => Reader.toggleNote() }, "more"),
+        h("div", { class: "rd-notepop", id: "rd-notepop", hidden: true, role: "region", "aria-label": "Note on this opening" })),
       h("div", { class: "strip", id: "rd-strip" }),
       h("div", { class: "rd-grid", id: "rd-grid", hidden: true }),
     );
-    new ResizeObserver(() => Reader.render(true)).observe($("#rd-stage"));
+    new ResizeObserver(() => { if (R.folding) R.folding.resized = true; else Reader.render(true); }).observe($("#rd-stage"));
+    new ResizeObserver(() => Reader.toggleNote(R.noteOpen)).observe($("#rd-note"));   // a new width may cut the note, or not
+    document.addEventListener("pointerdown", e => {
+      if (R.noteOpen && !e.target.closest("#rd-notepop, #rd-more")) Reader.toggleNote(false);
+    });
     this.wireZoom();
     this.built = true;
   },
@@ -421,15 +431,20 @@ const Reader = {
     return null;
   },
 
-  /* does page side p answer to this name ("78v", "f78v", "68r2", "[59r]" for the lost leaf 59r)? */
-  match(p, name) {
+  /* does page side p answer to this name ("78v", "f78v", "68r2", "[59r]" for the lost leaf 59r)? By the page it shows
+     (a page cut in panels, like "f70v2 (1)", still answers to "70v2"), or, unless `shownOnly`, by a panel it unfolds to. */
+  match(p, name, shownOnly = false) {
     const want = String(name).toLowerCase().replace(/[[\]]/g, "").replace(/^f?/, "f");
-    return sideLabel(p).toLowerCase() === want || p.segs.some(s => s.page.toLowerCase() === want || pageName(s).toLowerCase() === want);
+    if (sideLabel(p).toLowerCase() === want || p.shown.page.toLowerCase() === want) return true;
+    return !shownOnly && p.segs.some(s => s.page.toLowerCase() === want || pageName(s).toLowerCase() === want);
   },
 
   find(name) {
-    const idx = R.spreads.findIndex(sp => sp.some(p => p && this.match(p, name)));
-    if (idx >= 0) return idx;
+    // the opening that shows the page, before one where it only appears when a foldout is opened
+    for (const shownOnly of [true, false]) {
+      const idx = R.spreads.findIndex(sp => sp.some(p => p && this.match(p, name, shownOnly)));
+      if (idx >= 0) return idx;
+    }
     const want = String(name).toLowerCase().replace(/[[\]]/g, "").replace(/^f?/, "f");
     // a bare folio number ("78") -> first page of that leaf
     const n = parseInt(want.slice(1), 10);
@@ -450,8 +465,8 @@ const Reader = {
     R.at = k;
     R.focus = focus;
     if (k !== from) R.dir = k > from ? 1 : -1;
-    const plainTurn = !REDUCED && Math.abs(dir) === 1 && !R.unfold.L && !R.unfold.R && R.zoom === 1;
-    if (R.zoom !== 1) { R.zoom = 1; R.zx = 0; R.zy = 0; }
+    const plainTurn = !REDUCED && Math.abs(dir) === 1 && !R.unfold.L && !R.unfold.R && R.zoom <= 1;
+    if (R.zoom > 1) { R.zoom = 1; R.zx = 0; R.zy = 0; }   // zoomed in on a spot: start the new opening whole; zoomed out stays out
     R.unfold = { L: false, R: false };
     if (plainTurn) this.turn(from, k, dir); else this.render();
     this.markStrip();
@@ -465,8 +480,110 @@ const Reader = {
     if (!can(l) && !can(r)) { toast("Nothing folded in this opening"); return; }
     if ((l && l.grid) || (r && r.grid)) { SheetView.open((l && l.grid ? l : r).sheet); return; }
     const on = !(R.unfold.L || R.unfold.R);
-    R.unfold = { L: on && can(l), R: on && can(r) };
+    this.setUnfold({ L: on && can(l), R: on && can(r) });
+  },
+
+  /* Fold or unfold. The opening shrinks or grows to its new size about the gutter, so the pages you were looking at
+     never jump, while the panels open one after another about their hinges, like a map (closing runs it backwards).
+     Where the folded page is the hinge panel itself, the others are tucked behind it and come out from behind its
+     edge. Where it isn't, the folded page lies over the front: it turns outward like a page, starting exactly where
+     the folded view had it, and lands as the first panel (the photographs of the two states differ in size, so it
+     shifts to the panel's size while it is edge-on). A panel folded more than square to the one it hangs from is
+     inside the fold and not drawn. The book is drawn once, in the state with more panels; the motion is transforms. */
+  setUnfold(next) {
+    const prev = R.unfold;
+    if (R.busy) return;
+    if (prev.L === next.L && prev.R === next.R) return;
+    if (REDUCED || document.hidden) { R.unfold = next; this.render(); return; }
+    const a = this.layout(prev), b = this.layout(next);
+    R.unfold = { L: prev.L || next.L, R: prev.R || next.R };
     this.render();
+    const stage = $("#rd-stage"), sp = $(".spread", stage), gutter = $(".rd-gutter", sp);
+    const ph = parseFloat($(".rd-page", sp).style.height) || this.layout().ph, lw = gutter.offsetLeft;
+    // the spread's transform that puts the drawn gutter where state s has it, at state s's size
+    const at = st => { const k = st.k * st.ph / ph; return { k, x: st.x + st.k * st.lw - k * lw, y: st.y }; };
+    const A = at(a), B = at(b);
+    const sides = [["L", -1], ["R", 1]].map(([side, dir]) => {
+      if (prev[side] === next[side]) return null;
+      const p = R.spreads[R.at][side === "L" ? 0 : 1];
+      const page = $(`.rd-page.${side === "L" ? "left" : "right"}`, sp);
+      const segs = [...page.children].filter(e => e.classList.contains("seg"));
+      const m = segs.findIndex(e => !e.classList.contains("ext"));
+      const panels = (dir > 0 ? segs.slice(m + 1) : segs.slice(0, m).reverse()).map(el => ({ el, w: el.offsetWidth }));
+      const front = p.shown !== p.segs[p.hinge === "left" ? 0 : p.segs.length - 1];
+      const hinge = segs[m], wh = hinge.offsetWidth, ws = Math.round(ph * aspect(p.shown));
+      // stacking: hinge panel 10; over it the first panel when it lies in front, the rest beneath that; else all behind
+      panels.forEach(({ el }, i) => { el.style.zIndex = front ? (i ? 11 + i : 20) : 9 - i; });
+      if (front && panels.length) panels[0].el.append(segEl(p.shown, ph, { labels: false, scribes: false, lazy: false, cls: "backface" }));
+      page.classList.add("folding");
+      return { page, panels, dir, front, hinge, wh, ws, opening: next[side] };
+    }).filter(Boolean);
+    const n = Math.max(1, ...sides.map(sd => sd.panels.length));
+    const STAGGER = 0.45, span = 1 - (n - 1) * STAGGER;
+    const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const clamp = v => Math.max(0, Math.min(1, v));
+    const prog = (T, i) => ease(clamp((T - i * STAGGER) / span));   // panel i's own progress, 0 folded .. 1 open
+    const totalW = sides.reduce((a, sd) => a + sd.panels.reduce((c, q) => c + q.w, 0), 0) || 1;
+    sp.classList.add("folding");
+    const frame = t => {
+      // the opening's size follows how much paper is actually open, so it never outgrows the stage mid-way
+      let open = 0;
+      for (const sd of sides) sd.panels.forEach((q, i) => { open += q.w * prog(sd.opening ? t : 1 - t, i); });
+      const f = sides[0].opening ? open / totalW : 1 - open / totalW, k = A.k + (B.k - A.k) * f;   // f: 0 at prev, 1 at next
+      sp.style.transform = `translate(${A.x + (B.x - A.x) * f}px, ${A.y + (B.y - A.y) * f}px) scale(${k})`;
+      for (const { panels, dir, front, hinge, wh, ws, opening } of sides) {
+        const T = opening ? t : 1 - t;   // how open the side is: closing replays opening backwards
+        let M = null, off = 0, turn = 0, hidden = false;
+        panels.forEach(({ el, w }, i) => {
+          const u = prog(T, i);
+          const fold = 180 * (1 - u);                            // how far it is folded onto the one before
+          const d = (i % 2 ? -1 : 1) * (front ? -1 : 1) * dir * fold;   // zig-zag; the first turns toward you if it lies in front
+          let sx = 1;
+          if (i === 0) {
+            // the front page starts where (and as wide as) the folded view shows it, then becomes the panel by 90°
+            const g = front ? 1 - clamp(u * 2) : 0;
+            M = new DOMMatrix().translate(dir * (ws - wh) * g, 0);
+            if (front && fold > 90) sx = ws / w;
+            if (front) hinge.style.clipPath = wh > ws && g > 0
+              ? (dir > 0 ? `inset(0 ${(wh - ws) * g}px 0 0)` : `inset(0 0 0 ${(wh - ws) * g}px)`) : "";
+          }
+          M = M.rotate(0, d, 0); turn += d;
+          hidden = hidden || (fold > 90 && !(front && i === 0));   // inside the fold
+          // the panel's own box sits `off` from the hinge; place it where the chain of folds has carried it
+          const E = dir > 0 ? new DOMMatrix().translate(-off, 0).multiply(M).scale(sx, 1)
+                            : new DOMMatrix().translate(off + w, 0).multiply(M).scale(sx, 1).translate(-w, 0);
+          el.style.transform = E.toString();
+          el.style.visibility = hidden ? "hidden" : "";
+          const c = Math.cos(turn * Math.PI / 180);
+          el.classList.toggle("back", c < 0);       // facing away: the folded page (or plain vellum)
+          el.style.filter = c > .999 ? "" : `brightness(${(.6 + .4 * Math.abs(c)).toFixed(3)})`;
+          M = M.translate(dir * w, 0); off += w;
+        });
+      }
+    };
+    const DUR = 560 + 300 * (n - 1), t0 = performance.now();
+    R.busy = true; R.folding = {};
+    frame(0);
+    const tick = now => {
+      const t = Math.min(1, (now - t0) / DUR);
+      frame(t);
+      if (t < 1) { requestAnimationFrame(tick); return; }
+      const resized = R.folding.resized;
+      R.busy = false; R.folding = null; R.unfold = next;
+      // folded away (or the window changed meanwhile): draw the new state; opened: what's drawn already is it
+      if (resized || sides.some(sd => !sd.opening)) { this.render(true); return; }
+      sp.classList.remove("folding");
+      for (const { page, panels, hinge } of sides) {
+        page.classList.remove("folding");
+        hinge.style.clipPath = "";
+        for (const { el } of panels) {
+          el.style.transform = el.style.filter = el.style.zIndex = el.style.visibility = ""; el.classList.remove("back");
+          el.querySelector(":scope > .backface")?.remove();
+        }
+      }
+      sp.style.transform = `translate(${b.x}px, ${b.y}px)` + (b.k < 1 ? ` scale(${b.k})` : "");
+    };
+    requestAnimationFrame(tick);
   },
 
   /* natural size of one page side at height 1 */
@@ -477,27 +594,37 @@ const Reader = {
     return { segs, w };
   },
 
-  layout() {
+  /* page height and where the spread goes for an unfold state: translate (x, y) from the stage centre, scale k, and
+     the width of the left page (lw), which puts the gutter at x + k·lw */
+  layout(unfold = R.unfold) {
     const stage = $("#rd-stage");
     const [l, r] = R.spreads[R.at];
-    const L = this.pageParts(l, "L", R.unfold.L), Rr = this.pageParts(r, "R", R.unfold.R);
+    const L = this.pageParts(l, "L", unfold.L), Rr = this.pageParts(r, "R", unfold.R);
     const half = Math.max(L.w || 0.68, Rr.w || 0.68);
     const W = stage.clientWidth - 130, H = stage.clientHeight - 28;
     const ph = Math.max(80, Math.min(H, W / (2 * half + 0.02)));
-    return { l, r, L, Rr, ph, half };
+    // drawn widths, rounded per panel as segEl rounds them
+    const pw = (p, parts) => p ? parts.segs.reduce((a, s) => a + Math.round(ph * (s.missing ? 0.68 : aspect(s))), 0) : Math.round(ph * 0.68);
+    const lw = pw(l, L), rw = pw(r, Rr);
+    // centre on the gutter (half-widths differ when one side is unfolded); too wide for that: centre the whole thing, scaled to fit
+    const total = lw + rw + 2, avail = stage.clientWidth - 110;
+    const k = total > avail ? avail / total : 1;
+    const x = k < 1 ? -total * k / 2 : Math.max(-avail / 2, Math.min(-lw - 1, avail / 2 - total));
+    return { l, r, L, Rr, ph, half, lw, k, x, y: -ph * k / 2 };
   },
 
   render(resizeOnly) {
     if (!R.spreads) return;
     const stage = $("#rd-stage");
     $$(".spread, .turn", stage).forEach(e => e.remove());
-    const { l, r, L, Rr, ph } = this.layout();
+    const { l, r, L, Rr, ph, k, x, y } = this.layout();
     const mk = (p, parts, side, unfolded) => {
       const el = h("div", { class: `rd-page ${side === "L" ? "left" : "right"}${p ? "" : " empty"}` });
       if (!p) { el.style.width = Math.round(ph * 0.68) + "px"; el.style.height = ph + "px"; return el; }
+      el.style.height = ph + "px";
       parts.segs.forEach(seg => {
         const isExt = unfolded && seg !== (p.hinge === "left" ? p.segs[0] : p.segs[p.segs.length - 1]);
-        el.append(segEl(seg, ph, { labels: S.labels, scribes: S.scribes, cls: isExt && !resizeOnly ? "ext" : "", crop: !seg.missing }));
+        el.append(segEl(seg, ph, { labels: S.labels, scribes: S.scribes, cls: isExt ? "ext" : "", crop: !seg.missing, lazy: !unfolded }));
       });
       if (!p.lost) {   // a star in the corner bookmarks exactly this page
         const pg = p.shown.page, b = Bookmarks.of(pg);
@@ -510,7 +637,7 @@ const Reader = {
         el.append(h("button", { class: "foldtab", title: p.grid ? "Open the whole sheet" : (unfolded ? "Fold" : "Unfold"),
           onclick: () => {
             if (p.grid) { SheetView.open(p.sheet); return; }
-            R.unfold[side] = !R.unfold[side]; this.render();
+            this.setUnfold({ ...R.unfold, [side]: !R.unfold[side] });
           } }, p.grid ? "open sheet" : unfolded ? "fold" : `unfold +${n}`));
       }
       return el;
@@ -518,27 +645,34 @@ const Reader = {
     const sp = h("div", { class: "spread" },
       mk(l, L, "L", R.unfold.L), h("div", { class: "rd-gutter" }), mk(r, Rr, "R", R.unfold.R));
     $("#rd-zoomer").append(sp);
-    // centre on the gutter: half-widths differ when one side is unfolded
-    const lw = l ? L.w * ph : 0.68 * ph, rw = r ? Rr.w * ph : 0.68 * ph;
-    const total = lw + rw + 2, avail = stage.clientWidth - 110;
-    let x = -lw - 1;
-    if (total > avail) x = -total / 2;       // too wide to centre on the gutter: centre the whole thing
-    else x = Math.max(-avail / 2, Math.min(x, avail / 2 - total));
-    sp.style.transform = `translate(${x}px, ${-ph / 2}px)`;
-    if (total > avail) {
-      const k = avail / total;
-      sp.style.transform = `translate(${-total * k / 2}px, ${-ph * k / 2}px) scale(${k})`;
-    }
+    sp.style.transform = `translate(${x}px, ${y}px)` + (k < 1 ? ` scale(${k})` : "");
     this.applyZoom();
     this.renderInfo();
   },
 
-  // ---- zoom: a layer over the opening, scaled about the pointer ----
+  /* The note row is two lines; when the note needs more, "more" shows all of it in a panel over the foot of the stage.
+     Called with no argument it toggles; with false it closes and checks again whether the note is cut. */
+  toggleNote(open = !R.noteOpen) {
+    const n = $("#rd-note"), more = $("#rd-more"), pop = $("#rd-notepop");
+    if (!n || !more) return;
+    const t = n.firstElementChild, cut = !!t && t.scrollHeight > t.clientHeight + 1;
+    R.noteOpen = !!open && (cut || R.noteOpen);
+    pop.hidden = !R.noteOpen;
+    if (R.noteOpen) pop.replaceChildren(t.cloneNode(true));
+    more.hidden = !cut && !R.noteOpen;
+    more.textContent = R.noteOpen ? "less" : "more";
+    more.setAttribute("aria-expanded", String(R.noteOpen));
+  },
+
+  // ---- zoom: a layer over the opening, scaled about the pointer (in) or the centre of the stage (out) ----
   applyZoom() {
     const z = $("#rd-zoomer");
     if (!z) return;
-    z.style.transform = R.zoom > 1 ? `translate(${R.zx}px, ${R.zy}px) scale(${R.zoom})` : "";
     const st = $("#rd-stage");
+    if (R.zoom < 1) {   // zoomed out: always centred, so it stays put when the window resizes
+      R.zx = st.clientWidth / 2 * (1 - R.zoom); R.zy = st.clientHeight / 2 * (1 - R.zoom);
+    }
+    z.style.transform = R.zoom !== 1 ? `translate(${R.zx}px, ${R.zy}px) scale(${R.zoom})` : "";
     st.classList.toggle("zoomed", R.zoom > 1);
     // While you zoom or pan, the layer moves as one picture (will-change, in the CSS), drawn at the size it had when
     // you began; once you stop, it is drawn again at the size it has now, or zoomed pages would stay as blurry as at
@@ -576,8 +710,10 @@ const Reader = {
   zoomAt(f, cx, cy) {
     const r = $("#rd-stage").getBoundingClientRect();
     cx = cx ?? r.width / 2; cy = cy ?? r.height / 2;
-    const z0 = R.zoom, z1 = Math.max(1, Math.min(MAX_ZOOM, z0 * f));
+    let z1 = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, R.zoom * f));
+    if (Math.abs(z1 - 1) < 0.03 || (R.zoom > 1) !== (z1 > 1) && R.zoom !== 1) z1 = 1;   // stop at 100% on the way through
     if (z1 === 1) { this.resetZoom(); return; }
+    const z0 = R.zoom;
     R.zx = cx - (cx - R.zx) * (z1 / z0);
     R.zy = cy - (cy - R.zy) * (z1 / z0);
     R.zoom = z1;
@@ -605,7 +741,7 @@ const Reader = {
     stage.addEventListener("dblclick", e => {
       if (e.target.closest("button")) return;
       const r = stage.getBoundingClientRect();
-      if (R.zoom > 1) this.resetZoom(); else this.zoomAt(2.5, e.clientX - r.left, e.clientY - r.top);
+      if (R.zoom !== 1) this.resetZoom(); else this.zoomAt(2.5, e.clientX - r.left, e.clientY - r.top);
     });
     stage.addEventListener("pointerdown", e => {
       if (R.zoom <= 1 || e.button !== 0 || e.target.closest("button")) return;
@@ -677,28 +813,27 @@ const Reader = {
     if (v.is.length) bits.push(v.is.join(", "));
     if (v.hs.length) bits.push(v.hs.map(x => SCRIBES[x]).join(" + "));
     if (v.ls.length) bits.push(v.ls.map(x => LANG[x]).join(" / "));
-    $("#rd-meta").textContent = bits.join(" · ") + `  ·  opening ${R.at + 1} of ${R.spreads.length}`;
-    const flags = $("#rd-flags");
-    flags.innerHTML = "";
+    $("#rd-meta").textContent = $("#rd-meta").title = bits.join(" · ") + `  ·  opening ${R.at + 1} of ${R.spreads.length}`;
+    const flags = [];
     if (l && r && R.newSet.has(sideLabel(l) + "|" + sideLabel(r)))
-      flags.append(h("span", { class: "flag new", title: "These two pages don't face each other in the book as it is bound today" }, "new pair"));
+      flags.push(h("span", { class: "flag new", title: "These two pages don't face each other in the book as it is bound today" }, "new pair"));
     if (l && r && l.sheet === r.sheet && l.face === r.face)
-      flags.append(h("span", { class: "flag", title: `Both pages are halves of the same folded sheet, ${l.sheet}, facing each other across its fold` }, `two halves of sheet ${l.sheet}`));
-    if ((l && l.lost) || (r && r.lost)) flags.append(h("span", { class: "flag lost" }, "lost leaf"));
+      flags.push(h("span", { class: "flag", title: `Both pages are halves of the same folded sheet, ${l.sheet}, facing each other across its fold` }, `two halves of sheet ${l.sheet}`));
+    if ((l && l.lost) || (r && r.lost)) flags.push(h("span", { class: "flag lost" }, "lost leaf"));
     const foldable = [l, r].some(x => x && !x.lost && (x.segs.length > 1 || x.grid));
     $("#rd-unfold").disabled = !foldable;
     $("#rd-unfold").textContent = (R.unfold.L || R.unfold.R) ? "Fold" : "Unfold";
     $("#rd-prev").disabled = R.at === 0;
     $("#rd-next").disabled = R.at === R.spreads.length - 1;
     const marked = [l, r].filter(p => p && !p.lost).map(p => Bookmarks.of(p.shown.page)).filter(Boolean);
-    $("#rd-bm").textContent = marked.length ? `★ Bookmarked${marked.length > 1 ? " (2)" : ""}` : "☆ Bookmark";
+    $("#rd-bm").replaceChildren(marked.length ? "★" : "☆", h("span", { class: "txt" }, marked.length ? ` Bookmarked${marked.length > 1 ? " (2)" : ""}` : " Bookmark"));
     $("#rd-bm").classList.toggle("on", marked.length > 0);
     $("#rd-bm").title = marked.length ? `Bookmarked: ${marked.map(b => `${short(b.page)} “${b.name}”`).join(", ")}. Click to change (B)` : "Bookmark a page of this opening (B)";
     const note = g.note || "";
     const ev = (D.orders.evidence || {})[p.bif];
     const nt = note || (ev ? ev[0].text : "");
-    $("#rd-note").textContent = nt;
-    $("#rd-note").title = nt;
+    $("#rd-note").replaceChildren(h("span", { class: "rd-note-text" }, ...flags.flatMap(f => [f, " "]), nt));
+    this.toggleNote(false);
   },
 
   renderStrip() {
@@ -729,7 +864,7 @@ const Reader = {
   toggleGrid(on = !R.grid) {
     R.grid = on;
     $("#rd-grid").hidden = !on;
-    for (const id of ["#rd-stage", "#rd-note", "#rd-strip"]) $(id).hidden = on;
+    for (const id of ["#rd-stage", "#rd-foot", "#rd-strip"]) $(id).hidden = on;
     $("#rd-gridbtn").classList.toggle("on", on);
     if (on) this.renderGrid(true); else this.render(true);
   },
@@ -789,6 +924,7 @@ const Reader = {
     if (e.key === "o" || e.key === "O") { this.toggleGrid(); return; }
     if (e.key === "b" || e.key === "B") { Bookmarks.here(); return; }
     if (R.grid) { if (e.key === "Escape") this.toggleGrid(false); return; }
+    if (e.key === "Escape" && R.noteOpen) { this.toggleNote(false); return; }
     if (e.key === "ArrowRight" || e.key === "PageDown") { this.go(R.at + 1, 1); e.preventDefault(); }
     else if (e.key === "ArrowLeft" || e.key === "PageUp") { this.go(R.at - 1, -1); e.preventDefault(); }
     else if (e.key === "Home") this.go(0, 0);
@@ -806,7 +942,7 @@ const Reader = {
   },
 };
 
-const MAX_ZOOM = 5;   // zoomed in, pages are reloaded at full size from Yale (sharp below), about 3,600 px tall
+const MIN_ZOOM = 1 / 1.5 ** 3, MAX_ZOOM = 5;   // out: three 1.5x steps (30%); in: pages at full size from Yale (Sharp)
 
 /* Sharper pages when zoomed in. The page images here are 1400 px tall; Yale's photographs give about 3,600 px for a
    page. When a page on screen is drawn bigger than its image, it is loaded at full size from Yale's image server and
@@ -870,6 +1006,7 @@ const Sharp = {
   needed: new Set(),      // crops a page on screen is waiting for: never cancelled
   bytes: new Map(),       // crop -> bytes arrived so far (once loaded, its size)
   boxes: new Map(),       // box -> where it says how its pages are doing, while zoomed in
+  said: new WeakMap(),    // where it says it -> [what it said last, the timer that clears it]
   tickT: null,
 
   crop(seg) { return `${seg.iiif}/${seg.quad.flat().map(Math.round).join(",")}/${seg.rotate || 0}`; },
@@ -877,7 +1014,11 @@ const Sharp = {
   /* The pages in `box` are drawn at zoom z: look again soon, and say in `out` how the full-size images are doing. */
   check(box, z, out) {
     cancelAnimationFrame(this.timer.get(box));
-    if (z <= 1) { out.textContent = ""; box.classList.remove("sharpening"); this.boxes.delete(box); return; }
+    if (z <= 1) {
+      out.textContent = ""; box.classList.remove("sharpening"); this.boxes.delete(box);
+      clearTimeout(this.said.get(out)?.[1]); this.said.delete(out);
+      return;
+    }
     this.boxes.set(box, out);
     this.timer.set(box, requestAnimationFrame(() => this.scan(box, out)));
   },
@@ -910,12 +1051,22 @@ const Sharp = {
   },
 
   /* Say how the pages on screen are doing: while one is loading, a spinner, how much of the pages you had to wait for
-     has arrived, and a bar moving along the top of `box` (CSS .sharpening). */
+     has arrived, and a bar moving along the top of `box` (CSS .sharpening); then, once per zoom, that they are at full
+     size (or could not be), for a moment, so nothing stays over the pages. */
   say(box, out) {
     const imgs = $$("img[data-sharp]", box), s = imgs.map(i => i.dataset.sharp);
     const now = ["wait", "fail", "done"].find(x => s.includes(x));
     box.classList.toggle("sharpening", now === "wait");
-    if (now !== "wait") { out.textContent = SHARP_SAY[now] || ""; return; }
+    const [was, t] = this.said.get(out) || [];
+    if (now !== "wait") {
+      if (now === was) return;   // said already, and perhaps gone again: not on every pan
+      clearTimeout(t);
+      out.textContent = SHARP_SAY[now] || "";
+      this.said.set(out, [now, now && setTimeout(() => { out.textContent = ""; }, now === "fail" ? 5000 : 2500)]);
+      return;
+    }
+    clearTimeout(t);
+    this.said.set(out, ["wait"]);
     const waited = imgs.filter(i => i.dataset.waited);
     const mb = waited.reduce((a, i) => a + (this.bytes.get(this.crop(this.seg.get(i))) || 0), 0) / 1e6;
     out.replaceChildren(h("i", { class: "spin", "aria-hidden": "true" }),
@@ -1313,15 +1464,15 @@ const Info = {
     requestAnimationFrame(() => this.go(this.at));
   },
 
-  /* The privacy notice. Settings (contact, host, Clarity id) live in privacy.js. */
+  /* The privacy notice. Settings (contact, host, Clarity id, Cloudflare token) live in privacy.js. */
   privacySec() {
     const P = Privacy, ext = (href, text) => h("a", { href, target: "_blank", rel: "noopener" }, text);
     const status = h("p", { class: "pv-status" });
     const update = () => {
       const c = P.choice();
       status.replaceChildren(h("b", {}, "Your choice: "),
-        P.gpc() ? "your browser sends a Global Privacy Control signal, so analytics stay off." :
-        c === "granted" ? "analytics allowed." : c === "denied" ? "analytics off." : "not made yet; analytics stay off until you allow them.",
+        P.gpc() ? "your browser sends a Global Privacy Control signal, so analytics, including the visit counter, stay off." :
+        c === "granted" ? "detailed analytics allowed." : c === "denied" ? "detailed analytics off." : "not made yet; detailed analytics stay off until you allow them.",
         P.local ? " (Analytics never run on a local copy of the site.)" : "");
     };
     update();
@@ -1330,12 +1481,17 @@ const Info = {
       h("p", { class: "small muted" }, `Last updated ${P.UPDATED}.`),
       h("p", {}, h("b", {}, "Who runs this site. "), "Voynich Viewer (voynichviewer.com) is an independent, non-commercial project. There are no accounts and no advertising, and no data is sold.",
         P.CONTACT ? [" Questions about your data: ", /^https?:/.test(P.CONTACT) ? ext(P.CONTACT, P.CONTACT) : h("a", { href: "mailto:" + P.CONTACT }, P.CONTACT), "."] : ""),
-      h("h3", {}, "Analytics, only if you say yes"),
+      h("h3", {}, "Detailed analytics, only if you say yes"),
       h("p", {}, "If you click ", h("b", {}, "Accept"), " in the strip at the bottom of the page, the site loads ", h("b", {}, "Microsoft Clarity"),
         ". Clarity records how the viewer is used: clicks, scrolling and mouse movement, which views you open, your device, browser and screen size, and your approximate location from your IP address. It can replay a visit as a recording. It sets cookies (such as _clck and _clsk) to recognise a returning browser. Microsoft processes this data for the site and may store it outside your country, including in the United States (",
         ext("https://privacy.microsoft.com/privacystatement", "Microsoft privacy statement"), ", ", ext("https://clarity.microsoft.com/terms", "Clarity terms"),
         "). The site uses it only to see which parts of the viewer people use and to find problems."),
       h("p", {}, "The legal basis is your consent. If you click ", h("b", {}, "Reject"), " or close the strip, Clarity is never loaded and sets no cookies. If your browser sends a Global Privacy Control signal, that counts as no."),
+      !!P.CF_TOKEN && h("h3", {}, "A visit counter, without cookies"),
+      !!P.CF_TOKEN && h("p", {}, "To know roughly how many people use the site, it also counts visits with ", h("b", {}, "Cloudflare Web Analytics"),
+        ", whatever you choose above. It sets no cookies and stores nothing in your browser. It records that a page was loaded, with timing figures and coarse details such as your country, browser and device type, and the page that sent you here. According to Cloudflare it does not track individual visitors across sites (",
+        ext("https://developers.cloudflare.com/web-analytics/data-metrics/data-origin-and-collection/", "how it collects data"), ", ", ext("https://www.cloudflare.com/privacypolicy/", "Cloudflare privacy policy"),
+        "). The legal basis is the site's legitimate interest in knowing how many people use it. If your browser sends a Global Privacy Control signal, the counter is switched off."),
       h("h3", {}, "Changing your mind"),
       h("p", {}, `Your choice is remembered in this browser for ${P.MONTHS} months, or until this notice changes; then you are asked again. You can change it here at any time, and from the “?” and 🐞 buttons at the top:`),
       status,
@@ -1349,7 +1505,7 @@ const Info = {
       h("p", {}, "The site is hosted on ", P.HOST.name, ", which may log visitors' IP addresses for security and to run the service (", ext(P.HOST.privacy, `${P.HOST.name} privacy`),
         "). The crop editor, and the Reader (which loads the pages around the one you are reading at full size, so that zooming in is sharp at once), load photographs straight from Yale University's image server, which sees your IP address like any website you visit."),
       h("h3", {}, "Your rights"),
-      h("p", {}, "Depending on where you live (for example under the GDPR in the EU and UK), you can ask to see, correct or delete data about you, object to its use, withdraw your consent, and complain to your data protection authority. Analytics data is held by Microsoft for the site; it can be deleted on request",
+      h("p", {}, "Depending on where you live (for example under the GDPR in the EU and UK), you can ask to see, correct or delete data about you, object to its use, withdraw your consent, and complain to your data protection authority. Detailed analytics data is held by Microsoft for the site; it can be deleted on request",
         P.CONTACT ? " (see the contact above)." : "."));
   },
 
@@ -1622,6 +1778,45 @@ document.addEventListener("close", e => {   // a dialog closed: keep the message
   if (t) document.body.append(t);
 }, true);
 
+/* What's new: data/changelog.json, shown under the version number. The badge takes the latest version from it, and
+   carries a dot for someone who has been here before until they have seen that version's notes. */
+const Changes = {
+  rel: [],
+  async init() {
+    const btn = $("#cx-ver"), dlg = $("#cx-new-dlg");
+    btn.addEventListener("click", () => this.open());
+    dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });   // a click outside the box closes it
+    try {
+      const r = await fetch("data/changelog.json", { cache: "no-cache" });
+      if (!r.ok) return;
+      this.rel = (await r.json()).releases || [];
+    } catch { return; }   // the badge keeps the version written in the page
+    const latest = this.rel[0];
+    if (!latest) return;
+    btn.textContent = "v" + latest.version;
+    btn.title = `Voynich Viewer ${latest.version}: what's new`;
+    let seen = store.get("seenVersion", null);
+    if (seen == null) {   // a first visit has nothing to catch up on; a returning visitor has settings stored already
+      let returning = false;
+      try { returning = Object.keys(localStorage).some(k => k.startsWith("vv:")); } catch { /* storage blocked */ }
+      if (!returning) { store.set("seenVersion", latest.version); seen = latest.version; }
+    }
+    btn.classList.toggle("dot", seen !== latest.version);
+  },
+  date: iso => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(iso + "T00:00:00Z")),
+  KINDS: { new: "New", improved: "Improved", fixed: "Fixed" },
+  open() {
+    const list = $("#cx-new-list"), dlg = $("#cx-new-dlg");
+    list.replaceChildren(...(this.rel.length ? this.rel.map(r => h("section", { class: "rel" },
+      h("h4", {}, h("span", { class: "rel-v" }, "v" + r.version), h("time", { datetime: r.date }, this.date(r.date))),
+      h("ul", {}, ...r.changes.map(c => h("li", {}, h("span", { class: `kind ${c.kind}` }, this.KINDS[c.kind] || c.kind), " ", c.text)))))
+      : [h("p", { class: "muted" }, "The list of changes could not be loaded.")]));
+    if (!dlg.open) dlg.showModal();
+    list.scrollTop = 0;
+    if (this.rel[0]) { store.set("seenVersion", this.rel[0].version); $("#cx-ver").classList.remove("dot"); }
+  },
+};
+
 async function boot() {
   try {
     const [codex, orders] = await Promise.all(["data/codex.json", "data/orders.json"].map(async u => {
@@ -1650,6 +1845,7 @@ async function boot() {
   $("#cx-order").title = ORDERS.get(S.order).subtitle || "";
   for (const b of $$("#cx-tabs button")) b.addEventListener("click", () => show(b.dataset.view));
   $("#cx-help").addEventListener("click", () => $("#cx-help-dlg").showModal());
+  Changes.init();   // not awaited: the page doesn't wait for the list of changes
   $("#cx-work").addEventListener("click", () => Work.open());
   $("#cx-bm").addEventListener("click", () => (Bookmarks.pop && !Bookmarks.pop.hidden ? Bookmarks.close() : Bookmarks.open()));
   Bookmarks.render();

@@ -78,15 +78,30 @@ dialog p { margin: 4px 0; }
 
 /* ---------- Read ---------- */
 #v-read { display: flex; flex-direction: column; background: var(--table); color: var(--table-ink); }
-.rd-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; flex-wrap: wrap;
+/* one row down to 700 px, two below that, whatever the opening: the meta line gives way (cut short, full text on
+   hover) so the bar is always the same height and the pages under it don't jump. Under 1000 px the buttons tighten
+   (Bookmark shows only its star, Grid only its word). */
+.rd-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; flex-wrap: nowrap;
   border-bottom: 1px solid var(--table-line); }
 .rd-bar button { background: transparent; color: var(--table-ink); border-color: var(--table-line); }
 .rd-bar button:hover { border-color: var(--table-muted); }
 .rd-bar button.on { background: var(--table-ink); color: var(--table); }
-.rd-where { font-weight: 600; }
-.rd-meta { color: var(--table-muted); font-size: 13px; }
-.rd-flags { display: flex; gap: 6px; margin-left: auto; align-items: center; flex-wrap: wrap; }
-.flag { font-size: 12px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--table-line); color: var(--table-muted); }
+.rd-where { font-weight: 600; white-space: nowrap; flex: none; }
+.rd-meta { color: var(--table-muted); font-size: 13px; flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; }
+.rd-tools { display: flex; gap: 6px; align-items: center; flex: none; }
+@media (max-width: 1000px) {
+  .rd-bar { gap: 8px; }
+  .rd-tools { gap: 4px; }
+  .rd-tools button { padding: 4px 8px; font-size: 13px; }
+  .rd-tools .txt, .rd-tools .ico { display: none; }
+}
+@media (max-width: 700px) {
+  .rd-bar { flex-wrap: wrap; row-gap: 6px; }
+  .rd-tools { flex-basis: 100%; overflow-x: auto; scrollbar-width: none; }
+  .rd-tools button { flex: none; }
+}
+.flag { font-size: 12px; padding: 1px 8px; white-space: nowrap; border-radius: 99px; border: 1px solid var(--table-line); color: var(--table-muted); }
 .flag.new { border-color: #e0a526; color: #f3c35c; }
 .flag.lost { border-style: dashed; }
 .rd-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; perspective: 2400px; }
@@ -96,14 +111,24 @@ dialog p { margin: 4px 0; }
 .rd-stage.zoomed { cursor: grab; }
 .rd-stage.zoomed.panning { cursor: grabbing; }
 .rd-stage.zoomed.moving .rd-zoomer { will-change: transform; }   /* only while it moves: see Reader.applyZoom */
-.rd-zoombar { position: absolute; left: 12px; bottom: 10px; z-index: 6; display: flex; gap: 4px; align-items: center;
-  max-width: calc(100% - 24px); }
-.rd-zoombar button { background: rgba(45, 41, 37, .85); color: var(--table-ink); border-color: var(--table-line); min-width: 34px; }
+/* under the pages, one slim row of fixed height: zoom | flags and note, two lines at most | more. The side columns
+   match so the note stays centred under the gutter. */
+.rd-foot { position: relative; display: grid; grid-template-columns: minmax(136px, 1fr) minmax(0, 880px) minmax(136px, 1fr);
+  column-gap: 14px; align-items: center; height: 48px; padding: 0 16px; flex: none; }
+.rd-zoombar { display: flex; gap: 4px; align-items: center; justify-self: start; }
+.rd-zoombar button { background: transparent; color: var(--table-ink); border-color: var(--table-line); min-width: 34px; }
+.rd-zoombar button:hover { border-color: var(--table-muted); }
 .rd-zoombar #rd-zoomlvl { min-width: 58px; font-variant-numeric: tabular-nums; }
-.rd-zoomhint, .rd-sharp { color: var(--table-ink); font-size: 11px; margin-left: 6px; background: rgba(45, 41, 37, .85);
-  padding: 3px 8px; border-radius: 99px; }
-.rd-stage.zoomed .rd-zoomhint, .rd-stage:not(.zoomed) .rd-sharp, .rd-sharp:empty { display: none; }
-/* a full-size page on screen is loading (Sharp.say): a spinner by the zoom, a bar moving along the top of the pages */
+@media (max-width: 760px) {
+  .rd-foot { grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 10px; padding: 0 12px; }
+  .rd-note { text-align: left; }
+}
+/* zoomed in: whether the pages on screen are at full size yet (Sharp.say), over the corner of the pages just above the
+   zoom buttons; it shows while a page loads, and a moment after, then goes */
+.rd-sharp { position: absolute; left: 12px; bottom: 10px; z-index: 6; max-width: calc(100% - 24px); color: var(--table-ink);
+  font-size: 11px; background: rgba(45, 41, 37, .85); padding: 3px 8px; border-radius: 99px; pointer-events: none; }
+.rd-stage:not(.zoomed) .rd-sharp, .rd-sharp:empty { display: none; }
+/* a full-size page on screen is loading: a spinner in that note, and a bar moving along the top of the pages */
 .spin { display: inline-block; width: 9px; height: 9px; margin-right: 6px; vertical-align: -1px; border-radius: 50%;
   border: 1.5px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -115,17 +140,25 @@ dialog p { margin: 4px 0; }
   .spin { animation: none; }
   .rd-stage.sharpening::after, .sv-stage.sharpening::after { animation: none; background: rgba(243, 195, 92, .6); }
 }
-@media (max-width: 760px) { .rd-zoomhint { display: none; } }
 .rd-page { display: flex; align-items: flex-start; position: relative; }
 .rd-page.left { justify-content: flex-end; }
 .rd-page .gridface { display: grid; gap: 0; }
 .rd-page.empty { visibility: hidden; }
 .rd-gutter { width: 2px; align-self: stretch; background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(0,0,0,.05)); }
 .rd-page .seg { box-shadow: 0 1px 0 rgba(0,0,0,.25); }
-.rd-page .seg.ext { transform-origin: var(--hinge, left) center; animation: unfold .45s ease-out both; }
-.rd-page.left .seg.ext { --hinge: right; }
-@keyframes unfold { from { transform: perspective(1600px) rotateY(var(--from, -100deg)); opacity: .2; } to { transform: none; opacity: 1; } }
-.rd-page.left .seg.ext { --from: 100deg; }
+/* folding (setUnfold): the hinge panel stays put; the others are stacked over or under it by inline z-index; a panel
+   facing away shows its back (the folded page, pre-mirrored, or plain vellum); tabs and stars wait until it's done */
+.rd-page.folding { perspective: 2400px; }
+.rd-page.folding .seg { z-index: 10; }
+.rd-page.folding .seg.ext { transform-origin: 0 0; will-change: transform; }
+.rd-page.folding .seg.back { background: #d9ccb1; }
+.rd-page.folding .seg.back > * { visibility: hidden; }
+.seg > .backface { position: absolute; inset: 0; width: 100% !important; height: 100% !important; transform: scaleX(-1);
+  visibility: hidden; }
+.rd-page.folding .seg.back > .backface { visibility: visible; }
+/* while it moves the opening is scaled, so its labels, stars and tabs would swell and shrink: they step out instead */
+.spread.folding .lbl, .spread.folding .rd-star, .spread.folding .foldtab, .spread.folding .seg-crop,
+.spread.folding .scribe { opacity: 0 !important; transition: none; }
 .foldtab {
   position: absolute; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; font-size: 12px;
   background: #c9b48c; color: #2d2925; border: none; border-radius: 0 6px 6px 0; padding: 10px 3px; cursor: pointer;
@@ -140,8 +173,18 @@ dialog p { margin: 4px 0; }
 .rd-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 5; width: 44px; height: 88px;
   background: rgba(45, 41, 37, .6); color: var(--table-ink); border: 1px solid var(--table-line); font-size: 22px; }
 .rd-nav.prev { left: 10px; } .rd-nav.next { right: 10px; }
-.rd-note { padding: 3px 70px 0; height: 38px; overflow: hidden; color: var(--table-muted); font-size: 12px;
-  line-height: 1.45; text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rd-note { color: var(--table-muted); font-size: 12px; line-height: 1.45; text-align: center; min-width: 0; }
+.rd-note-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.rd-notepop .rd-note-text { display: block; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; }
+.rd-note .flag, .rd-notepop .flag { font-size: 11px; padding: 0 7px; }
+.rd-more { justify-self: start; background: transparent; border: none; padding: 2px 4px; color: #f3c35c; font-size: 12px;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.rd-more:hover { color: #ffd98a; }
+/* the whole note, over the foot of the stage */
+.rd-notepop { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 8;
+  width: min(880px, calc(100% - 32px)); max-height: 45vh; overflow-y: auto; padding: 10px 14px; border-radius: 8px;
+  background: var(--table); border: 1px solid var(--table-line); box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  color: var(--table-ink); font-size: 13px; line-height: 1.5; }
 
 /* quire strip */
 .strip { display: flex; gap: 3px; padding: 8px 16px 10px; overflow-x: auto; border-top: 1px solid var(--table-line);
@@ -617,7 +660,28 @@ dialog.bug-dlg p { margin: 0 0 14px; line-height: 1.5; color: var(--ink); }
 
 /* ---------- version, bookmarks ---------- */
 .ver { font: 600 10.5px/1 ui-monospace, Menlo, monospace; color: var(--muted); background: #f1ece2; border: 1px solid var(--line);
-  border-radius: 99px; padding: 2px 6px; margin-left: -6px; align-self: center; }
+  border-radius: 99px; padding: 2px 6px; margin-left: -6px; align-self: center; position: relative; cursor: pointer; }
+.ver:hover { color: var(--ink); background: #e9dbbf; border-color: #c9b48a; }
+.ver.dot::after { content: ""; position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; border-radius: 50%;
+  background: #d99a00; border: 1.5px solid var(--bg); }   /* a release this visitor hasn't opened yet */
+/* What's new (Changes in app.js, data/changelog.json) */
+dialog.new-dlg { width: min(560px, 94vw); max-height: 84vh; padding: 18px 20px 16px; display: none; flex-direction: column; }
+dialog.new-dlg[open] { display: flex; }
+dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
+#cx-new-list { overflow-y: auto; min-height: 0; margin: 0 -20px 12px; padding: 0 20px; }
+.new-dlg .rel { padding: 10px 0 4px; border-top: 1px solid var(--line); }
+.new-dlg .rel:first-child { border-top: none; }
+.new-dlg .rel h4 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; font-size: 14px; }
+.new-dlg .rel-v { font: 600 12px/1 ui-monospace, Menlo, monospace; }
+.new-dlg .rel time { color: var(--muted); font-weight: 400; font-size: 13px; }
+.new-dlg ul { list-style: none; margin: 0; padding: 0; }
+.new-dlg li { display: grid; grid-template-columns: 74px 1fr; gap: 8px; align-items: baseline; padding: 4px 0;
+  font-size: 13.5px; line-height: 1.45; }
+.new-dlg .kind { justify-self: start; font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 1px 7px; border-radius: 99px;
+  border: 1px solid var(--line); color: var(--muted); }
+.new-dlg .kind.new { color: #1f5bb5; border-color: #b7cdf0; background: #eef3fd; }
+.new-dlg .kind.improved { color: #6b4e12; border-color: #e4cf9f; background: #faf3e2; }
+.new-dlg .kind.fixed { color: #2e6b3a; border-color: #b9dcbf; background: #eef8f0; }
 #cx-bm { font-size: 16px; line-height: 1; padding: 4px 8px; color: var(--muted); }
 #cx-bm.has { color: #b07d00; }
 #cx-bm[aria-expanded="true"] { background: #f1ece2; }
