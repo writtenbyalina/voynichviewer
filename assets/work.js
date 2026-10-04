@@ -101,8 +101,9 @@ function perspective(dst, src) {
   return x;
 }
 /* Cut `quad` (TL, TR, BR, BL in the full photograph's pixels) out of a loaded photograph, straighten it, scale it to at
-   most outH tall and turn it `rotate` degrees clockwise. Returns a canvas. */
-function warp(photo, quad, outH, rotate = 0) {
+   most outH tall and turn it `rotate` degrees clockwise. `mask` (a panel's polygons, also in the photograph's pixels)
+   is painted over in the black of Yale's backdrop: another page that shows past a torn edge. Returns a canvas. */
+function warp(photo, quad, outH, rotate = 0, mask = null) {
   const px = Photo.pixels(photo), k = photo.k;
   const q = quad.map(([x, y]) => [x * k, y * k]);
   const [w, hh] = quadSize(q);
@@ -126,6 +127,16 @@ function warp(photo, quad, outH, rotate = 0) {
     }
   }
   cx.putImageData(out, 0, 0);
+  if (mask?.length) {
+    const [A, B, C, D, E, F, G, I] = perspective(q, [[0, 0], [ow, 0], [ow, oh], [0, oh]]);   // photograph -> cut
+    cx.fillStyle = "#080609";
+    cx.beginPath();
+    for (const poly of mask) poly.forEach(([x, y], n) => {
+      const X = x * k, Y = y * k, den = G * X + I * Y + 1;
+      cx[n ? "lineTo" : "moveTo"]((A * X + B * Y + C) / den, (D * X + E * Y + F) / den);
+    });
+    cx.fill();
+  }
   rotate = ((rotate % 360) + 360) % 360;
   if (!rotate) return cv;
   const r = document.createElement("canvas");
@@ -260,7 +271,7 @@ const Crops = {
   async cut(key, quad, rotate) {
     const sg = this.segs(key)[0];
     const photo = await Photo.load(sg);
-    const big = warp(photo, quad, 1400, rotate);
+    const big = warp(photo, quad, 1400, rotate, sg.mask);
     const [l, s] = await Promise.all([toJpeg(big, .86), toJpeg(shrink(big, 300), .82)]);
     let [w, hh] = quadSize(quad);
     if (rotate % 180) [w, hh] = [hh, w];
@@ -556,7 +567,7 @@ const CropEditor = {
     CE.previewT = setTimeout(() => {
       if (!CE.photo) return;
       const box = $("#ce-prev", this.dlg);
-      box.replaceChildren(warp(CE.photo, CE.quad, Math.min(560, Math.max(240, box.clientHeight * (devicePixelRatio || 1))), CE.rotate));
+      box.replaceChildren(warp(CE.photo, CE.quad, Math.min(560, Math.max(240, box.clientHeight * (devicePixelRatio || 1))), CE.rotate, CE.seg.mask));
     }, 90);
   },
   fit() {

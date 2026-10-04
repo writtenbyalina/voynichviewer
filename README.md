@@ -67,7 +67,8 @@ assets/privacy.js       the cookie strip and consent; loads Microsoft Clarity on
 assets/style.css
 assets/vendor/          three.js r184 (MIT)
 data/codex.json         the physical model: sheets, quires, panels, scribes, sections, page variables, and for each
-                        panel its Yale photograph (IIIF id) and the corners it is cut from
+                        panel its Yale photograph (IIIF id) and the corners it is cut from; `mask` (f89v2) is
+                        the part of the photograph blacked out, another page showing past a torn edge
 data/orders.json        reading orders, sources and per-sheet evidence notes; edited by hand
 data/changelog.json     what changed and when, newest first; shown under the version number (top left)
 data/panels/            two JPEGs per panel face: _l (1400 px tall) and _s (300 px); zoomed in, the Reader loads the
