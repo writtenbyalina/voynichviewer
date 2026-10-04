@@ -119,6 +119,13 @@ clicks **Accept** in the thin strip at the bottom of the page. **Reject**, or cl
 never loaded. A Global Privacy Control signal also counts as no. The choice is kept for 6 months and can be changed in
 Info > Privacy and cookies, which is the site's privacy notice. Clarity never runs on `localhost` or `127.0.0.1`.
 
+A separate, cookieless visit counter (Cloudflare Web Analytics) runs whatever the visitor chose, because it sets no
+cookies and keeps nothing in the browser; **Reject** only turns off Clarity. It is the one request made before a choice.
+It is off with a Global Privacy Control signal, on a local copy, and while `CF_TOKEN` in `assets/privacy.js` is empty. The
+token is the site's Cloudflare Web Analytics token (Cloudflare dashboard > Analytics & Logs > Web Analytics > Manage site;
+the `token` inside `data-cf-beacon`). It is public, so it is fine in the repository. The privacy notice has its "visit
+counter" section only while the token is set, so to switch the counter off, empty `CF_TOKEN`.
+
 `CONTACT` in `assets/privacy.js` is the address the notice gives for questions about data; change `HOST` there if the
 site is not hosted on GitHub Pages. In Clarity's project settings
 you can also turn on "Cookie consent", so that Clarity itself waits for the consent signal the site sends.
