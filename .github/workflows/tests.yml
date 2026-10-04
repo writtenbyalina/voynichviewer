@@ -1,0 +1,57 @@
+# Runs the Voynich Viewer tests on GitHub, on every push to main and on every pull request.
+# What the tests are and how to read a failure: tests/README.md.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:          # also lets you run them by hand: Actions tab > Tests > Run workflow
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true    # a newer push replaces a run that is still going
+
+permissions:
+  contents: read
+
+jobs:
+  # Seconds, no browser: the data files, the page images, index.html and that every script parses.
+  data-and-files:
+    name: Data and files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run test:fast
+
+  # A few minutes: the real site in a real browser (Chromium), on a desktop and on a phone.
+  browser:
+    name: Site in a browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # the "old data" tests read earlier releases from git history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - name: Keep the report (screenshots and step-by-step traces of anything that failed)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

@@ -1,0 +1,25 @@
+{
+  "app": "voynich-viewer",
+  "version": 1,
+  "exported": "2026-10-03T22:00:00.000Z",
+  "viewer": "1.0",
+  "orders": [
+    {
+      "id": "my-legacyaaa1",
+      "title": "Every kind of change",
+      "from": "Davis: complete proposed order",
+      "updated": "2026-10-03T21:59:00.000Z",
+      "gatherings": [
+        { "quire": 1, "type": "nested", "bifolia": ["2|7", "1|8", "3|6", "4|5"] },
+        { "quire": "Herbal A", "type": "singulions", "bifolia": ["9|16", "10|15"],
+          "sheets": { "9|16": { "inside_out": true }, "10|15": { "rot180": true, "inside_out": true } } },
+        { "quire": 9, "type": "nested", "bifolia": ["67|68"], "sheets": { "67|68": { "spine": 2 } } },
+        { "quire": 13, "type": "singulions", "bifolia": ["77|82", "78|81", "76|83"] },
+        { "quire": "New 1", "type": "nested", "bifolia": ["33|40"] }
+      ],
+      "unplaced": ["105|114", "103|116"]
+    }
+  ],
+  "bookmarks": [ { "id": "bm-x", "page": "f67v1", "name": "In the foldout", "at": "2026-10-03T21:00:00.000Z" } ],
+  "crops": {}
+}
