@@ -219,6 +219,23 @@ function fitParchment(photo, quad, src) {
 }
 
 // ================================================================ your crops
+/* Panels a release has retired, so that crops people saved under their old key can be carried to the panels that replaced them
+   (Crops.carry). A crop is four corners on Yale's photograph, saved under the panel's key; when a release splits a panel in two,
+   that key stops existing and the crop would silently stop applying.
+   `quad` and `rotate` are the panel's published crop in the release that retired it. `into` names each new panel and which of
+   the old crop's edges ("L" left, "R" right) it still sits on: only the corners of the person's crop that they moved, on those
+   edges, are carried, because a new panel is not the same piece of the photograph as the old one, and everything else about it is
+   fitted by the published data.
+   To retire another panel, add it here in the same release (and see tests/legacy/README.md). */
+const RETIRED_PANELS = {
+  // 1.1 split these two panels along the crease. f70r2's old crop ended mid-paragraph at x = 7775, inside f70r2-2, which now runs
+  // to the page edge (x = 8752), so only its left edge is shared, with f70r2-1. f70v2 was cut in two, left half f70v2-2 (shares
+  // the old left edge, x = 157) and right half f70v2-1 (shares the old right edge: 3550 then, 3522 now).
+  f70r2: { quad: [[5331, 184], [7775, 184], [7775, 3704], [5331, 3704]], rotate: 0, into: { "f70r2-1": ["L"], "f70r2-2": [] } },
+  f70v2: { quad: [[157, 96], [3550, 96], [3550, 3672], [157, 3672]], rotate: 0, into: { "f70v2-2": ["L"], "f70v2-1": ["R"] } },
+};
+const EDGE_CORNERS = { L: [0, 3], R: [1, 2] };   // corner order is TL, TR, BR, BL
+
 const Crops = {
   base: new Map(),    // panel key -> the published crop { quad, rotate, w, h, v }
   mine: new Map(),    // panel key -> your crop { quad, rotate, w, h, v, updated }
@@ -237,7 +254,62 @@ const Crops = {
     await IDB.open();
     let recs = [];
     try { recs = await IDB.entries("crops"); } catch { /* storage refused: start empty */ }
+    recs = await this.carryRetired(recs);
     for (const [key, rec] of recs) if (this.base.has(key)) await this.use(key, rec, { quiet: true });
+  },
+
+  /* The crop a person saved for a retired panel (RETIRED_PANELS), as crops for the panels that replaced it: { newKey: record }.
+     Only what is theirs is kept: a new panel gets the corners the person moved, on the edges it shares with the old crop, and its
+     published corners for the rest; the turn they gave the page is added to the published turn. A panel where that leaves nothing different
+     from the published crop gets no record, so it simply shows the published picture. Returns null, doing nothing, when the crop is
+     malformed or the data no longer has the panels the table names (nothing is guessed). */
+  carry(oldKey, rec) {
+    const old = RETIRED_PANELS[oldKey];
+    const quad = rec && rec.quad;
+    if (!old || !Array.isArray(quad) || quad.length !== 4 || !quad.every(p => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite))) return null;
+    if (!Object.keys(old.into).every(k => this.base.has(k) && this.segs(k).length)) return null;
+    const turn = ((((rec.rotate || 0) - old.rotate) % 360) + 360) % 360;
+    const out = {};
+    for (const [key, edges] of Object.entries(old.into)) {
+      const pub = this.base.get(key), [W, H] = this.segs(key)[0].src_size;
+      const q = pub.quad.map(p => [...p]);
+      for (const e of edges) for (const i of EDGE_CORNERS[e]) {
+        if (quad[i][0] === old.quad[i][0] && quad[i][1] === old.quad[i][1]) continue;   // not moved: the new published corner is the better one
+        q[i] = [Math.min(W, Math.max(0, quad[i][0])), Math.min(H, Math.max(0, quad[i][1]))];
+      }
+      const rotate = ((pub.rotate || 0) + turn) % 360;
+      if (rotate === (pub.rotate || 0) && q.every((p, i) => p[0] === pub.quad[i][0] && p[1] === pub.quad[i][1])) continue;   // nothing of theirs to keep
+      let [w, h] = quadSize(q);
+      if (rotate % 180) [w, h] = [h, w];
+      out[key] = { quad: q, rotate, w: Math.round(w), h: Math.round(h), v: Date.now(), updated: rec.updated || new Date().toISOString() };
+    }
+    return out;
+  },
+
+  /* At start-up: carry each saved crop of a retired panel across, once. The old record is kept, marked with the panels it went to
+     (`migratedTo`), so nothing is deleted, it is not carried again, and a crop the person later throws away does not come back.
+     A panel the person has already cropped since is left as it is. Returns the records, with the new ones added. */
+  async carryRetired(recs) {
+    const have = new Set(recs.map(([k]) => k)), out = [...recs], done = [];
+    for (const [key, rec] of recs) {
+      if (this.base.has(key) || !RETIRED_PANELS[key] || !rec || rec.migratedTo) continue;
+      const next = this.carry(key, rec);
+      if (!next) continue;   // damaged, or the data has changed again: leave it exactly as it is
+      const fresh = Object.entries(next).filter(([k]) => !have.has(k));
+      try {
+        for (const [k, r] of fresh) await IDB.put("crops", k, r);
+        await IDB.put("crops", key, { ...rec, migratedTo: fresh.map(([k]) => k), migrated: new Date().toISOString() });
+      } catch { continue; }   // could not save: leave everything as it was, and try again next time
+      for (const [k, r] of fresh) { have.add(k); out.push([k, r]); }
+      if (fresh.length) done.push([key, fresh.map(([k]) => k)]);
+    }
+    if (done.length) {
+      const first = done[0][1][0];
+      // a moment later, so it is not replaced by "could not cut ... again" when the photograph cannot be fetched right away
+      setTimeout(() => toast(`Your crop of ${done.map(d => d[0]).join(" and ")} was carried over to the panel${done.some(d => d[1].length > 1) ? "s" : ""} it was split into in version 1.1: ${done.flatMap(d => d[1]).join(", ")}. Please check the edges.`,
+        { label: "Check", fn: () => CropEditor.open(first) }), 1500);
+    }
+    return out;
   },
 
   /* Make a saved crop the one every view shows; cut its images again if they are not stored. */
@@ -925,7 +997,12 @@ const Work = {
       if (c) { MyOrders.put(c, { show: false }); nOrders++; }
     }
     const keys = [];
-    for (const [key, r] of Object.entries(data.crops || {})) {
+    const crops = { ...(data.crops || {}) };
+    for (const [oldKey, r] of Object.entries(data.crops || {})) {   // a file from before a panel was split: carry its crop to the new panels
+      if (Crops.base.has(oldKey) || !RETIRED_PANELS[oldKey]) continue;
+      for (const [k, rec] of Object.entries(Crops.carry(oldKey, r) || {})) if (!(k in crops)) crops[k] = { quad: rec.quad, rotate: rec.rotate };
+    }
+    for (const [key, r] of Object.entries(crops)) {
       if (!Crops.base.has(key) || !Array.isArray(r?.quad) || r.quad.length !== 4) continue;
       const sg = Crops.segs(key)[0], [W, H] = sg.src_size;
       const quad = r.quad.map(p => [Math.min(W, Math.max(0, +p[0] || 0)), Math.min(H, Math.max(0, +p[1] || 0))]);
