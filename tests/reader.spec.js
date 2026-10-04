@@ -217,15 +217,19 @@ test.describe("Go to a folio", () => {
     await expect(page.locator("#rd-where")).toContainText("f78v");
   });
 
-  test("1.1 fix: Go to and links for 70v2 and 101v open the opening where that page shows", async ({ page }) => {
+  // 1.1 fixed Go to and links for 70v2 and 101v opening the FOLLOWING opening. Since 1.3 a page inside a fold (70v2) is shown by
+  // unfolding the page it folds into, so what must hold is that the page is on show, not what the label says.
+  test("1.1 fix: Go to and links for 70v2 and 101v open an opening where that page is on show", async ({ page }) => {
+    const onShow = label => page.evaluate(l => [...document.querySelectorAll("#rd-zoomer .seg")].some(el => el.title.startsWith(l)), label);
     for (const [name, label] of [["70v2", "f70v2"], ["101v", "f101v"]]) {
       await openReader(page, name);
-      await expect(page.locator("#rd-where"), `#read/beinecke/${name}`).toContainText(label);
+      await readerPicturesLoaded(page);
+      expect(await onShow(label), `#read/beinecke/${name}`).toBe(true);
       await page.keyboard.press("Home");
       await ask(page);
       await page.keyboard.type(name);
       await page.keyboard.press("Enter");
-      await expect(page.locator("#rd-where"), `Go to ${name}`).toContainText(label);
+      await expect.poll(() => onShow(label), { message: `Go to ${name}` }).toBe(true);
     }
   });
 });
@@ -261,16 +265,18 @@ test.describe("foldouts", () => {
     await expect.poll(async () => (await readerState(page)).unfolded).toBe(false);
   });
 
-  test("1.1 fix: f70v2 (Pisces) is a page of normal width, and its flap opens with Unfold", async ({ page }) => {
-    await openReader(page, "70v2");
+  test("1.1 fix: f70v2 (Pisces) is never a wide strip: folded it is a page of normal width, and the flap opens with Unfold", async ({ page }) => {
+    const shapes = () => page.evaluate(() => [...document.querySelectorAll("#rd-zoomer .seg")].map(el => { const r = el.getBoundingClientRect(); return { title: el.title, ratio: r.width / r.height }; }));
+    await openReader(page, "70v1");   // the page the flap folds into, as it lies folded
     await readerPicturesLoaded(page);
-    const width = await page.evaluate(() => {
-      const segs = [...document.querySelectorAll("#rd-zoomer .seg")].map(el => ({ title: el.title, w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height }));
-      return segs;
-    });
-    for (const s of width) expect(s.w / s.h, `${s.title} should be about page-shaped, not a wide strip`).toBeLessThan(1.1);
+    expect((await readerState(page)).unfolded).toBe(false);
+    for (const s of await shapes()) expect(s.ratio, `${s.title} folded should be page-shaped, not a wide strip`).toBeLessThan(1.1);
     await page.keyboard.press("u");
     await expect.poll(async () => (await readerState(page)).unfolded).toBe(true);
+    await readerPicturesLoaded(page);
+    const open = await shapes();
+    expect(open.map(s => s.title), "the flap's panels are on show").toEqual(expect.arrayContaining(["f70v2 (1)", "f70v2 (2)"]));
+    for (const s of open) expect(s.ratio, `${s.title} unfolded should be page-shaped too`).toBeLessThan(1.1);
   });
 
   test("an opening with a folded sheet shows the sheet viewer on U, and Escape closes it", async ({ page }) => {

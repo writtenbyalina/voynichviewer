@@ -52,7 +52,7 @@ npx playwright test --ui                            # a window to step through t
 npm run test:report                                 # open the report of the last run
 ```
 
-The tests start their own web server on port 4173. They do not use the internet: Yale's image server and Microsoft
+The tests start their own web server, on a port that is the same every time for your folder (`VV_PORT` sets it). They do not use the internet: Yale's image server and Microsoft
 Clarity are blocked on purpose, so the tests never depend on them and never send anything to them.
 
 ## What is covered
@@ -66,7 +66,7 @@ Clarity are blocked on purpose, so the tests never depend on them and never send
 | `three.spec.js` | the 3D book is really drawn (not blank); every order; every key in the help; the five camera views; stepping through sheets; the controls; 3D and the Reader following each other; odd addresses; the message when WebGL is missing |
 | `routing.spec.js` | every kind of address, old links, nonsense links; stale or damaged saved data; a browser that will not store anything |
 | `work.spec.js` | bookmarks; the progress file (export, import into a fresh browser, hostile files); your own orders (Rearrange, undo, reload, delete); the crop tool (against a stand-in for Yale's photograph) |
-| `privacy.spec.js` | no request leaves the site before consent; Accept, Reject, close and Global Privacy Control; the 6-month and version rules; changing the choice later; the cookieless visit counter (loads whatever the choice, off for local copy, no token and Global Privacy Control) and the notice describing it |
+| `privacy.spec.js`, `privacy-live.spec.js` | on a local copy nothing is tracked (the visit counter's switches are tested by hand there); on a real host (a `vv.localhost` name) Clarity loads only after Accept, the cookieless visit counter loads whatever was chosen, and both are off with Global Privacy Control; Accept, Reject, close; the 6-month and version rules; changing the choice later; the notice describes the counter |
 | `info.spec.js` | every Info section and its contents list; the Folio order tables; every link inside Info; external links open safely |
 | `a11y.spec.js` | every control has a name and every picture has alt text; dialogs take focus and close with Escape; Tab reaches the header |
 | `legacy-*.spec.js` | **Old data, new code**: what people already saved (bookmarks, their own orders, re-cut pages, settings) and the progress files they exported, from every released version, against the current site; whether the saved format changed; whether your own data changing (panels, sheets, pictures) would strand their work. See `tests/legacy/README.md`. Run on their own with `npm run test:legacy` |

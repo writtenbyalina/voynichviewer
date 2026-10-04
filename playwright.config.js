@@ -5,8 +5,13 @@ const { defineConfig, devices } = require("@playwright/test");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
 
-const PORT = 4173;
+// Each checkout of the repository gets its own port: the same one every time for this folder, and (almost always) a
+// different one for another folder or worktree. Playwright reuses whatever is already listening on the port, so with one
+// shared port a server serving ANOTHER checkout's files would be tested instead of this one's, and the results would be about the
+// wrong code. VV_PORT overrides it.
+const PORT = +process.env.VV_PORT || 4300 + (parseInt(crypto.createHash("md5").update(__dirname).digest("hex").slice(0, 6), 16) % 700);
 const CI = !!process.env.CI;
 // Two test runs at the same time (two terminals, or you and a second Claude session) would delete each other's working
 // files in a shared "test-results" folder and fail with ENOENT. So each local run gets a private folder. The HTML report

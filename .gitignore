@@ -4,6 +4,6 @@ __pycache__/
 .claude/
 
 # test tooling (npm install, npm test)
-node_modules/
+node_modules
 playwright-report/
 test-results/
