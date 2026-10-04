@@ -1229,15 +1229,15 @@ const Info = {
     requestAnimationFrame(() => this.go(this.at));
   },
 
-  /* The privacy notice. Settings (contact, host, Clarity id) live in privacy.js. */
+  /* The privacy notice. Settings (contact, host, Clarity id, Cloudflare token) live in privacy.js. */
   privacySec() {
     const P = Privacy, ext = (href, text) => h("a", { href, target: "_blank", rel: "noopener" }, text);
     const status = h("p", { class: "pv-status" });
     const update = () => {
       const c = P.choice();
       status.replaceChildren(h("b", {}, "Your choice: "),
-        P.gpc() ? "your browser sends a Global Privacy Control signal, so analytics stay off." :
-        c === "granted" ? "analytics allowed." : c === "denied" ? "analytics off." : "not made yet; analytics stay off until you allow them.",
+        P.gpc() ? "your browser sends a Global Privacy Control signal, so analytics, including the visit counter, stay off." :
+        c === "granted" ? "detailed analytics allowed." : c === "denied" ? "detailed analytics off." : "not made yet; detailed analytics stay off until you allow them.",
         P.local ? " (Analytics never run on a local copy of the site.)" : "");
     };
     update();
@@ -1246,12 +1246,17 @@ const Info = {
       h("p", { class: "small muted" }, `Last updated ${P.UPDATED}.`),
       h("p", {}, h("b", {}, "Who runs this site. "), "Voynich Viewer (voynichviewer.com) is an independent, non-commercial project. There are no accounts and no advertising, and no data is sold.",
         P.CONTACT ? [" Questions about your data: ", /^https?:/.test(P.CONTACT) ? ext(P.CONTACT, P.CONTACT) : h("a", { href: "mailto:" + P.CONTACT }, P.CONTACT), "."] : ""),
-      h("h3", {}, "Analytics, only if you say yes"),
+      h("h3", {}, "Detailed analytics, only if you say yes"),
       h("p", {}, "If you click ", h("b", {}, "Accept"), " in the strip at the bottom of the page, the site loads ", h("b", {}, "Microsoft Clarity"),
         ". Clarity records how the viewer is used: clicks, scrolling and mouse movement, which views you open, your device, browser and screen size, and your approximate location from your IP address. It can replay a visit as a recording. It sets cookies (such as _clck and _clsk) to recognise a returning browser. Microsoft processes this data for the site and may store it outside your country, including in the United States (",
         ext("https://privacy.microsoft.com/privacystatement", "Microsoft privacy statement"), ", ", ext("https://clarity.microsoft.com/terms", "Clarity terms"),
         "). The site uses it only to see which parts of the viewer people use and to find problems."),
       h("p", {}, "The legal basis is your consent. If you click ", h("b", {}, "Reject"), " or close the strip, Clarity is never loaded and sets no cookies. If your browser sends a Global Privacy Control signal, that counts as no."),
+      !!P.CF_TOKEN && h("h3", {}, "A visit counter, without cookies"),
+      !!P.CF_TOKEN && h("p", {}, "To know roughly how many people use the site, it also counts visits with ", h("b", {}, "Cloudflare Web Analytics"),
+        ", whatever you choose above. It sets no cookies and stores nothing in your browser. It records that a page was loaded, with timing figures and coarse details such as your country, browser and device type, and the page that sent you here. According to Cloudflare it does not track individual visitors across sites (",
+        ext("https://developers.cloudflare.com/web-analytics/data-metrics/data-origin-and-collection/", "how it collects data"), ", ", ext("https://www.cloudflare.com/privacypolicy/", "Cloudflare privacy policy"),
+        "). The legal basis is the site's legitimate interest in knowing how many people use it. If your browser sends a Global Privacy Control signal, the counter is switched off."),
       h("h3", {}, "Changing your mind"),
       h("p", {}, `Your choice is remembered in this browser for ${P.MONTHS} months, or until this notice changes; then you are asked again. You can change it here at any time, and from the “?” and 🐞 buttons at the top:`),
       status,
@@ -1265,7 +1270,7 @@ const Info = {
       h("p", {}, "The site is hosted on ", P.HOST.name, ", which may log visitors' IP addresses for security and to run the service (", ext(P.HOST.privacy, `${P.HOST.name} privacy`),
         "). The crop editor loads photographs straight from Yale University's image server, which sees your IP address like any website you visit."),
       h("h3", {}, "Your rights"),
-      h("p", {}, "Depending on where you live (for example under the GDPR in the EU and UK), you can ask to see, correct or delete data about you, object to its use, withdraw your consent, and complain to your data protection authority. Analytics data is held by Microsoft for the site; it can be deleted on request",
+      h("p", {}, "Depending on where you live (for example under the GDPR in the EU and UK), you can ask to see, correct or delete data about you, object to its use, withdraw your consent, and complain to your data protection authority. Detailed analytics data is held by Microsoft for the site; it can be deleted on request",
         P.CONTACT ? " (see the contact above)." : "."));
   },
 
