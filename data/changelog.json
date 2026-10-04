@@ -5,9 +5,7 @@
    "version": "1.2",
    "date": "2026-10-04",
    "changes": [
-    {"kind": "new", "text": "Sharper pages when you zoom in: the Reader now shows each page at full size from Yale's photographs, about 3,600 pixels tall instead of 1,400, so you can see the pen strokes and the grain of the parchment."},
-    {"kind": "improved", "text": "The pages around the one you are reading load at full size in the background, so zooming in is sharp at once. While a page is still loading, a bar runs along the top of the pages."},
-    {"kind": "fixed", "text": "Zoomed-in pages could look blurrier than they should, because they stayed drawn at the size they had when you started zooming."}
+    {"kind": "improved", "text": "Pages are sharp when you zoom in: they now load at full size from Yale's photographs."}
    ]
   },
   {
