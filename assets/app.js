@@ -335,7 +335,7 @@ function show(view) {
 
 // ================================================================ READER
 const R = { order: null, pages: null, spreads: null, at: 0, unfold: { L: false, R: false }, busy: false, newSet: null,
-            zoom: 1, zx: 0, zy: 0, dir: 1, aheadT: null,   // the way you are reading (+1 on, -1 back); its timer
+            zoom: 1, zx: 0, zy: 0, settleT: null, dir: 1, aheadT: null,   // the way you are reading (+1 on, -1 back)
             focus: null };   // the page asked for (Go to, a link, 3D) while its opening is shown; turning the page drops it
 
 const Reader = {
@@ -538,13 +538,20 @@ const Reader = {
     const z = $("#rd-zoomer");
     if (!z) return;
     z.style.transform = R.zoom > 1 ? `translate(${R.zx}px, ${R.zy}px) scale(${R.zoom})` : "";
-    $("#rd-stage").classList.toggle("zoomed", R.zoom > 1);
+    const st = $("#rd-stage");
+    st.classList.toggle("zoomed", R.zoom > 1);
+    // While you zoom or pan, the layer moves as one picture (will-change, in the CSS), drawn at the size it had when
+    // you began; once you stop, it is drawn again at the size it has now, or zoomed pages would stay as blurry as at
+    // the first step.
+    st.classList.add("moving");
+    clearTimeout(R.settleT);
+    R.settleT = setTimeout(() => st.classList.remove("moving"), 200);
     $("#rd-zoomlvl").textContent = Math.round(R.zoom * 100) + "%";
-    Sharp.check($("#rd-stage"), R.zoom, $("#rd-sharp"));
+    Sharp.check(st, R.zoom, $("#rd-sharp"));
     this.ahead();
   },
 
-  /* Once you stop on an opening for half a second, load ahead the full-size pages you are likely to zoom into next
+  /* When you stop on an opening for half a second, load ahead the full-size pages you are likely to zoom into next
      (Sharp.ahead): this opening as shown, then the next two openings in the direction you are reading, then the one
      behind. */
   ahead() {
@@ -805,19 +812,24 @@ const MAX_ZOOM = 5;   // zoomed in, pages are reloaded at full size from Yale (s
    page. When a page on screen is drawn bigger than its image, it is loaded at full size from Yale's image server and
    swapped in once it has arrived; until then, or if Yale cannot be reached, the page stays as it was. Yale's server
    cuts a crop that is an upright rectangle (almost every page); a slanted one is straightened in the browser, as the
-   crop editor does (warp, in work.js). Once you have zoomed in, the pages you are likely to zoom into next are loaded
-   ahead (Sharp.ahead, fed by the Reader), so that zooming into them is sharp at once. */
+   crop editor does (warp, in work.js). The pages you are likely to zoom into next are loaded ahead (Sharp.ahead, fed
+   by the Reader), so that zooming into them is sharp at once. */
 const YALE_IIIF = "https://collections.library.yale.edu/iiif/2/";
-const SHARP_SAY = { wait: "loading the full-size photograph from Yale…", done: "full size, from Yale's photograph",
+const SHARP_SAY = { wait: "loading the full-size photograph from Yale", done: "full size, from Yale's photograph",
   fail: "Yale's photograph could not be loaded" };
 const SHARP_KEEP = 20;   // full-size pages kept in memory (about 2 MB each): those loaded ahead, then the most recent
 const SHARP_AT_ONCE = 2;   // pages loaded ahead at the same time
-const loaded = src => { const img = new Image(); img.src = src; return img.decode().then(() => img); };
+const loaded = src => new Promise((ok, no) => {   // an image, loaded (not yet decoded: that waits for a visible tab)
+  const img = new Image();
+  img.onload = () => ok(img); img.onerror = () => no(new Error("Yale's answer is not an image"));
+  img.src = src;
+});
 
 /* An image from Yale's server, as a Blob. A page usually begins to arrive within 2 seconds, but about one request in five
    is held for some 30 seconds first, whatever is asked. So when nothing has begun to arrive after 6 seconds, ask once
-   more (the same image: Yale ignores the "?again") and keep whichever answer comes first. `signal` cancels it all. */
-function fromYale(url, signal) {
+   more (the same image: Yale ignores the "?again") and keep whichever answer comes first. `signal` cancels it all;
+   `bytes` hears how much has arrived (Yale does not say how much is coming). */
+function fromYale(url, signal, bytes) {
   return new Promise((ok, no) => {
     if (signal?.aborted) { no(new DOMException("no longer wanted", "AbortError")); return; }
     const asks = [];
@@ -830,8 +842,17 @@ function fromYale(url, signal) {
         if (settled) return;
         settled = true; clearTimeout(again);
         for (const x of asks) if (x !== c) x.abort();
-        return r.blob().then(ok, no);
+        return take(r).then(ok, no);
       }).catch(e => { if (--left === 0 && !settled) { settled = true; clearTimeout(again); no(e); } });
+    };
+    const take = async r => {
+      const rd = r.body.getReader(), parts = [];
+      for (let n = 0; ;) {
+        const { done, value } = await rd.read();
+        if (done) break;
+        parts.push(value); n += value.length; bytes?.(n);
+      }
+      return new Blob(parts, { type: r.headers.get("content-type") || "image/jpeg" });
     };
     const again = setTimeout(() => ask(url + "?again"), 6000);
     signal?.addEventListener("abort", () => { clearTimeout(again); for (const x of asks) x.abort(); });
@@ -847,15 +868,17 @@ const Sharp = {
   want: new Map(),        // crop -> panel, the pages to load ahead, most likely first
   busy: new Map(),        // crop -> AbortController, the pages being loaded ahead now
   needed: new Set(),      // crops a page on screen is waiting for: never cancelled
-  zoomer: store.get("zoomer", false),   // you have zoomed in, here or on an earlier visit
+  bytes: new Map(),       // crop -> bytes arrived so far (once loaded, its size)
+  boxes: new Map(),       // box -> where it says how its pages are doing, while zoomed in
+  tickT: null,
 
   crop(seg) { return `${seg.iiif}/${seg.quad.flat().map(Math.round).join(",")}/${seg.rotate || 0}`; },
 
   /* The pages in `box` are drawn at zoom z: look again soon, and say in `out` how the full-size images are doing. */
   check(box, z, out) {
     cancelAnimationFrame(this.timer.get(box));
-    if (z <= 1) { out.textContent = ""; return; }
-    if (!this.zoomer) { this.zoomer = true; store.set("zoomer", true); }
+    if (z <= 1) { out.textContent = ""; box.classList.remove("sharpening"); this.boxes.delete(box); return; }
+    this.boxes.set(box, out);
     this.timer.set(box, requestAnimationFrame(() => this.scan(box, out)));
   },
 
@@ -869,26 +892,50 @@ const Sharp = {
       if (r.right < v.left || r.left > v.right || r.bottom < v.top || r.top > v.bottom) continue;   // off screen
       if (r.height * dpr < (img.naturalHeight || 1400) * 1.15) continue;   // its image is still big enough
       const key = this.crop(seg);
-      if (this.ready.has(key)) { img.src = this.ready.get(key); img.dataset.sharp = "done"; continue; }
-      img.dataset.sharp = "wait";
-      this.needed.add(key);
+      if (this.ready.has(key)) img.dataset.sharp = "swap";   // loaded ahead: no need to say it is loading
+      else { img.dataset.sharp = img.dataset.waited = "wait"; this.needed.add(key); }
       this.load(seg, key)
-        .then(url => { img.src = url; img.dataset.sharp = "done"; }, () => { img.dataset.sharp = "fail"; })
+        .then(url => this.swap(img, url))
+        .then(() => { img.dataset.sharp = "done"; }, () => { img.dataset.sharp = "fail"; })
         .finally(() => { this.needed.delete(key); this.say(box, out); });
     }
     this.say(box, out);
   },
 
-  say(box, out) {
-    const s = $$("img[data-sharp]", box).map(i => i.dataset.sharp);
-    out.textContent = SHARP_SAY[["wait", "fail", "done"].find(x => s.includes(x))] || "";
+  /* Show the full-size image in `img` once it is decoded, so the page never goes blank while it is. */
+  swap(img, url) {
+    const pre = new Image();
+    pre.src = url;
+    return pre.decode().catch(() => {}).then(() => { img.src = url; });
   },
 
-  /* Is loading ahead worth it? Only once you have zoomed in, only where zooming in shows at least half as much again as
-     the 1400 px images (pages drawn `ph` px tall at 100%: on many phones even 500% gains little), and not when the
-     browser asks to save data. Zooming in still loads a page when it gains less. */
+  /* Say how the pages on screen are doing: while one is loading, a spinner, how much of the pages you had to wait for
+     has arrived, and a bar moving along the top of `box` (CSS .sharpening). */
+  say(box, out) {
+    const imgs = $$("img[data-sharp]", box), s = imgs.map(i => i.dataset.sharp);
+    const now = ["wait", "fail", "done"].find(x => s.includes(x));
+    box.classList.toggle("sharpening", now === "wait");
+    if (now !== "wait") { out.textContent = SHARP_SAY[now] || ""; return; }
+    const waited = imgs.filter(i => i.dataset.waited);
+    const mb = waited.reduce((a, i) => a + (this.bytes.get(this.crop(this.seg.get(i))) || 0), 0) / 1e6;
+    out.replaceChildren(h("i", { class: "spin", "aria-hidden": "true" }),
+      `${waited.length > 1 ? `loading ${waited.length} full-size photographs from Yale` : SHARP_SAY.wait}…${mb >= .1 ? ` ${mb.toFixed(1)} MB` : ""}`);
+  },
+
+  /* Some bytes arrived: say so where pages are waiting, at most four times a second. */
+  tick() {
+    if (this.tickT) return;
+    this.tickT = setTimeout(() => {
+      this.tickT = null;
+      for (const [box, out] of this.boxes) if (box.isConnected) this.say(box, out); else this.boxes.delete(box);
+    }, 250);
+  },
+
+  /* Is loading ahead worth it? Only where zooming in shows at least half as much again as the 1400 px images (pages
+     drawn `ph` px tall at 100%: on many phones even 500% gains little), and not when the browser asks to save data.
+     Zooming in still loads a page when it gains less. */
   worth(ph) {
-    return this.zoomer && !navigator.connection?.saveData && ph * MAX_ZOOM * (devicePixelRatio || 1) > 1400 * 1.5;
+    return !navigator.connection?.saveData && ph * MAX_ZOOM * (devicePixelRatio || 1) > 1400 * 1.5;
   },
 
   /* Load these panels' full-size images ahead, most likely first, a few at a time; stop loading any no longer listed. */
@@ -910,7 +957,8 @@ const Sharp = {
 
   load(seg, key, signal) {
     if (!this.got.has(key)) {
-      const p = this.fetch(seg.iiif, seg.quad.map(pt => pt.map(Math.round)), ((seg.rotate || 0) % 360 + 360) % 360, signal);
+      const p = this.fetch(seg.iiif, seg.quad.map(pt => pt.map(Math.round)), ((seg.rotate || 0) % 360 + 360) % 360, signal,
+        n => { this.bytes.set(key, n); this.tick(); });
       p.then(url => {
         this.ready.set(key, url);
         if (this.ready.size > SHARP_KEEP) {   // a page showing it keeps its image; it is only loaded again if drawn anew
@@ -926,14 +974,14 @@ const Sharp = {
     return this.got.get(key);
   },
 
-  async fetch(id, q, rot, signal) {
+  async fetch(id, q, rot, signal, bytes) {
     const xs = q.map(p => p[0]), ys = q.map(p => p[1]);
     const x0 = Math.min(...xs), y0 = Math.min(...ys), x1 = Math.max(...xs), y1 = Math.max(...ys);
     const upright = q[0][1] === q[1][1] && q[2][1] === q[3][1] && q[0][0] === q[3][0] && q[1][0] === q[2][0];
-    const blob = await fromYale(`${YALE_IIIF}${encodeURIComponent(id)}/${x0},${y0},${x1 - x0},${y1 - y0}/full/${upright ? rot : 0}/default.jpg`, signal);
+    const blob = await fromYale(`${YALE_IIIF}${encodeURIComponent(id)}/${x0},${y0},${x1 - x0},${y1 - y0}/full/${upright ? rot : 0}/default.jpg`, signal, bytes);
     const url = URL.createObjectURL(blob);
     if (upright) {
-      try { await loaded(url); return url; }   // decoded once now, so the swap does not stall a frame
+      try { await loaded(url); return url; }
       catch (e) { URL.revokeObjectURL(url); throw e; }
     }
     try {
@@ -1299,7 +1347,7 @@ const Info = {
         h("button", { class: "linkish", onclick: () => Work.open() }, "Your work"), ", or by clearing this site's data in your browser."),
       h("h3", {}, "Other services your browser contacts"),
       h("p", {}, "The site is hosted on ", P.HOST.name, ", which may log visitors' IP addresses for security and to run the service (", ext(P.HOST.privacy, `${P.HOST.name} privacy`),
-        "). The crop editor, and the Reader when you zoom in on a page (once you have zoomed in, also the pages around the one you are reading, so that zooming into them is sharp at once), load photographs straight from Yale University's image server, which sees your IP address like any website you visit."),
+        "). The crop editor, and the Reader (which loads the pages around the one you are reading at full size, so that zooming in is sharp at once), load photographs straight from Yale University's image server, which sees your IP address like any website you visit."),
       h("h3", {}, "Your rights"),
       h("p", {}, "Depending on where you live (for example under the GDPR in the EU and UK), you can ask to see, correct or delete data about you, object to its use, withdraw your consent, and complain to your data protection authority. Analytics data is held by Microsoft for the site; it can be deleted on request",
         P.CONTACT ? " (see the contact above)." : "."));
@@ -1452,7 +1500,7 @@ const Info = {
       this.sec("views", "Ways to look",
         h("ul", {},
           h("li", {}, h("b", {}, "3D. "), "The whole book as a block of sheets. Drag to turn it, scroll to zoom, and press ", h("kbd", {}, "1"), "–", h("kbd", {}, "5"), " for ready-made views (", h("kbd", {}, "3"), " looks down on the top edge, where nested sheets show as Vs, like the drawings above). The ", h("b", {}, "Spread"), " slider fans the sheets apart. Click a sheet to pull it out: you can turn it over, unfold it and read its notes. ", h("b", {}, "Opening"), " opens the book flat at a page, as in the Reader, and ", h("b", {}, "Touching faces"), " lists which pages lay against each other when the book was closed."),
-          h("li", {}, h("b", {}, "Reader. "), "Turn the pages like a book, two at a time: ", h("kbd", {}, "←"), " ", h("kbd", {}, "→"), " or the arrows. ", h("kbd", {}, "G"), " jumps to a page (try “78v”). Pinch or ⌘-scroll to zoom: zoomed in, a page is loaded again at full size from Yale's photograph, so you need to be online for the finest detail. Once you have zoomed in, the pages around the one you are reading are loaded ahead, so the next zoom is sharp at once. ", h("b", {}, "▦ Grid"), " (or ", h("kbd", {}, "O"), ") shows every page at once, quire by quire, with buttons to jump to each section and to your bookmarks: click any page to open it. The strip at the bottom is the whole book; amber quires are the ones the chosen order changes. Under the pages, “new pair” means those two pages don't face each other in today's binding, and “two halves of sheet 1|8” means you are looking into the fold of one sheet. In Davis's order you often see both together: reading each sheet on its own puts its two halves face to face."),
+          h("li", {}, h("b", {}, "Reader. "), "Turn the pages like a book, two at a time: ", h("kbd", {}, "←"), " ", h("kbd", {}, "→"), " or the arrows. ", h("kbd", {}, "G"), " jumps to a page (try “78v”). Pinch or ⌘-scroll to zoom: as you read, the pages around the one you are on are loaded at full size from Yale's photographs, so zooming in is sharp at once (you need to be online for the finest detail). ", h("b", {}, "▦ Grid"), " (or ", h("kbd", {}, "O"), ") shows every page at once, quire by quire, with buttons to jump to each section and to your bookmarks: click any page to open it. The strip at the bottom is the whole book; amber quires are the ones the chosen order changes. Under the pages, “new pair” means those two pages don't face each other in today's binding, and “two halves of sheet 1|8” means you are looking into the fold of one sheet. In Davis's order you often see both together: reading each sheet on its own puts its two halves face to face."),
           h("li", {}, h("b", {}, "Folio order. "), "Further down this page (", h("button", { class: "linkish", onclick: () => this.go("quires") }, "Folio order"), "): the order as tables laid out like Davis's own quire diagrams, next to another order if you like. Each row is a leaf, and the arcs join the two leaves of one sheet.")),
         h("div", { class: "callout" }, h("b", {}, "3D and the Reader stay in step. "), "Go to a page in the Reader, then open 3D: the sheet that page is on is picked out in gold. Pick a sheet or an opening in 3D, then open the Reader: you are on that page. Double-click a sheet in 3D, or press ", h("kbd", {}, "Enter"), ", to read from there.")),
 

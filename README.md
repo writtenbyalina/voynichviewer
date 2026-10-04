@@ -15,11 +15,11 @@ Site: [voynichviewer.com](https://voynichviewer.com).
   new gatherings, set sheets aside, read a gathering as separate sheets, turn a sheet inside out or upside down, sew a
   foldout at another fold. Only the sheet you move lifts in the animation. The eye next to a gathering hides it in 3D,
   like a layer, without changing the order.
-- **Reader**: turn the pages two at a time, unfold the foldouts, zoom, jump to a folio. Zoomed in, a page is loaded
-  again at full size (about 3,600 px tall) from Yale's IIIF image server, and swapped in when it arrives. Once you have
-  zoomed in, the Reader loads ahead the opening you are on, the next two and the one behind, so the next zoom is sharp
-  at once (not where zooming in gains little, as on many phones, nor when the browser asks to save data). **▦ Grid**
-  (key O) shows every page at once, quire by quire, with buttons for each section and for your bookmarks.
+- **Reader**: turn the pages two at a time, unfold the foldouts, zoom, jump to a folio. Zoomed in, a page is shown at
+  full size (about 3,600 px tall), loaded from Yale's IIIF image server. The Reader loads these ahead as you read (the
+  opening you are on, the next two and the one behind), so zooming in is sharp at once; not where zooming in gains
+  little, as on many phones, nor when the browser asks to save data. **▦ Grid** (key O) shows every page at once,
+  quire by quire, with buttons for each section and for your bookmarks.
 - **Bookmarks**: the ☆ in a page's corner (Reader), next to a page (3D), or key B; ★ at the top lists them. Name them,
   and go to one: 3D and the Reader both follow.
 - **Info**: credits, a plain-language guide, Davis's research (her 2025 post in brief, the Folio order tables built

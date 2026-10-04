@@ -95,7 +95,7 @@ dialog p { margin: 4px 0; }
 .rd-zoomer { position: absolute; inset: 0; transform-origin: 0 0; }
 .rd-stage.zoomed { cursor: grab; }
 .rd-stage.zoomed.panning { cursor: grabbing; }
-.rd-stage.zoomed .rd-zoomer { will-change: transform; }
+.rd-stage.zoomed.moving .rd-zoomer { will-change: transform; }   /* only while it moves: see Reader.applyZoom */
 .rd-zoombar { position: absolute; left: 12px; bottom: 10px; z-index: 6; display: flex; gap: 4px; align-items: center;
   max-width: calc(100% - 24px); }
 .rd-zoombar button { background: rgba(45, 41, 37, .85); color: var(--table-ink); border-color: var(--table-line); min-width: 34px; }
@@ -103,6 +103,18 @@ dialog p { margin: 4px 0; }
 .rd-zoomhint, .rd-sharp { color: var(--table-ink); font-size: 11px; margin-left: 6px; background: rgba(45, 41, 37, .85);
   padding: 3px 8px; border-radius: 99px; }
 .rd-stage.zoomed .rd-zoomhint, .rd-stage:not(.zoomed) .rd-sharp, .rd-sharp:empty { display: none; }
+/* a full-size page on screen is loading (Sharp.say): a spinner by the zoom, a bar moving along the top of the pages */
+.spin { display: inline-block; width: 9px; height: 9px; margin-right: 6px; vertical-align: -1px; border-radius: 50%;
+  border: 1.5px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.rd-stage.sharpening::after, .sv-stage.sharpening::after { content: ""; position: absolute; left: 0; right: 0; top: 0;
+  height: 3px; z-index: 7; pointer-events: none; background: linear-gradient(90deg, transparent, #f3c35c, transparent) no-repeat;
+  background-size: 40% 100%; animation: sharp-bar 1.4s ease-in-out infinite; }
+@keyframes sharp-bar { from { background-position: -70% 0; } to { background-position: 170% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+  .rd-stage.sharpening::after, .sv-stage.sharpening::after { animation: none; background: rgba(243, 195, 92, .6); }
+}
 @media (max-width: 760px) { .rd-zoomhint { display: none; } }
 .rd-page { display: flex; align-items: flex-start; position: relative; }
 .rd-page.left { justify-content: flex-end; }
