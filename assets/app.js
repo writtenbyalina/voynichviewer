@@ -74,7 +74,7 @@ const SECTION = { H: "Herbal", A: "Astronomical", Z: "Zodiac", B: "Balneological
 let D;                       // codex.json
 const SHEETS = new Map();    // "77|82" -> sheet
 let ORDERS = new Map();      // id -> resolved order
-const APP_VERSION = "1.3";
+const APP_VERSION = "1.4";
 const PAGE_SHEET = new Map();   // "f78v" -> "78|81", every page including lost ones
 const RETIRED = { "davis-blog-2025": "davis" };   // orders taken out of the menu -> the order an old link now opens
 
@@ -1121,8 +1121,9 @@ const MIN_ZOOM = 1 / 1.5 ** 3, MAX_ZOOM = 5;   // out: three 1.5x steps (30%); i
    page. When a page on screen is drawn bigger than its image, it is loaded at full size from Yale's image server and
    swapped in once it has arrived; until then, or if Yale cannot be reached, the page stays as it was. Yale's server
    cuts a crop that is an upright rectangle (almost every page); a slanted one is straightened in the browser, as the
-   crop editor does (warp, in work.js). The pages you are likely to zoom into next are loaded ahead (Sharp.ahead, fed
-   by the Reader), so that zooming into them is sharp at once. */
+   crop editor does (warp, in work.js), and so is one with a mask (another page showing past a torn edge, blacked
+   out). The pages you are likely to zoom into next are loaded ahead (Sharp.ahead, fed by the Reader), so that zooming
+   into them is sharp at once. */
 const YALE_IIIF = "https://collections.library.yale.edu/iiif/2/";
 const SHARP_SAY = { wait: "loading the full-size photograph from Yale", done: "full size, from Yale's photograph",
   fail: "Yale's photograph could not be loaded" };
@@ -1282,7 +1283,7 @@ const Sharp = {
   load(seg, key, signal) {
     if (!this.got.has(key)) {
       const p = this.fetch(seg.iiif, seg.quad.map(pt => pt.map(Math.round)), ((seg.rotate || 0) % 360 + 360) % 360, signal,
-        n => { this.bytes.set(key, n); this.tick(); });
+        n => { this.bytes.set(key, n); this.tick(); }, seg.mask);
       p.then(url => {
         this.ready.set(key, url);
         if (this.ready.size > SHARP_KEEP) {   // a page showing it keeps its image; it is only loaded again if drawn anew
@@ -1298,19 +1299,20 @@ const Sharp = {
     return this.got.get(key);
   },
 
-  async fetch(id, q, rot, signal, bytes) {
+  async fetch(id, q, rot, signal, bytes, mask) {
     const xs = q.map(p => p[0]), ys = q.map(p => p[1]);
     const x0 = Math.min(...xs), y0 = Math.min(...ys), x1 = Math.max(...xs), y1 = Math.max(...ys);
     const upright = q[0][1] === q[1][1] && q[2][1] === q[3][1] && q[0][0] === q[3][0] && q[1][0] === q[2][0];
-    const blob = await fromYale(`${YALE_IIIF}${encodeURIComponent(id)}/${x0},${y0},${x1 - x0},${y1 - y0}/full/${upright ? rot : 0}/default.jpg`, signal, bytes);
+    const asIs = upright && !mask?.length;   // Yale's crop needs nothing more
+    const blob = await fromYale(`${YALE_IIIF}${encodeURIComponent(id)}/${x0},${y0},${x1 - x0},${y1 - y0}/full/${asIs ? rot : 0}/default.jpg`, signal, bytes);
     const url = URL.createObjectURL(blob);
-    if (upright) {
+    if (asIs) {
       try { await loaded(url); return url; }
       catch (e) { URL.revokeObjectURL(url); throw e; }
     }
     try {
-      const img = await loaded(url);
-      const cv = warp({ img, k: img.naturalHeight / (y1 - y0) }, q.map(([x, y]) => [x - x0, y - y0]), Infinity, rot);
+      const img = await loaded(url), at = ([x, y]) => [x - x0, y - y0];
+      const cv = warp({ img, k: img.naturalHeight / (y1 - y0) }, q.map(at), Infinity, rot, mask?.map(poly => poly.map(at)));
       return URL.createObjectURL(await toJpeg(cv, .92));
     } finally { URL.revokeObjectURL(url); }
   },
