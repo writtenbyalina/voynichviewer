@@ -119,6 +119,12 @@ def locus(witnesses: dict[str, str]) -> dict:
                           else "maj" if best > total / 2 else "plur")
         if pick == () and status in ("unan", "maj", "single"):
             continue                                    # most read nothing here
+        rows = [[shown(codes_of[k]), round(v, 2), " ".join(n for n, _, _ in who[k])] for k, v in tally.most_common()]
+        rows += [[shown(codes), 0, n] for n, codes in abstain]
+        if pick == ():                                  # nothing wins a tie or the most votes: the column is kept in
+            stats["glyph." + status] += 1               # the record, writes nothing, and its gap joins the next one
+            units.append([len(c), 0, status[0], rows] + ([refs] if refs else []))
+            continue
         if c and pend:
             s0, m0 = pend
             st = gap_status(s0, sum(1 for n, v in m0.items() if n in VOTERS and v == ","))
@@ -134,8 +140,6 @@ def locus(witnesses: dict[str, str]) -> dict:
         codes = codes_of.get(pick, ()) if pick is not None else ("Z1",)
         text = shown(codes) if pick is not None else "?"
         if status != "unan" or any(v != text for v in refs.values()):
-            rows = [[shown(codes_of[k]), round(v, 2), " ".join(n for n, _, _ in who[k])] for k, v in tally.most_common()]
-            rows += [[shown(codes), 0, n] for n, codes in abstain]
             units.append([len(c), len(text), status[0], rows] + ([refs] if refs else []))
         c += text
         g += "".join(codes)

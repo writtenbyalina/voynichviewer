@@ -109,6 +109,16 @@ class Data(unittest.TestCase):
                         missing[code] += 1
         self.assertEqual(dict(missing), {})
 
+    def test_separators_only_between_glyphs(self):
+        bad = [i for i, _t, c, _p in json.loads((DATA / "index.json").read_text())["loci"]
+               if re.search(r"[.,][.,]|^[.,]|[.,]$", c)]
+        self.assertEqual(bad, [])
+
+    def test_meta_lists_every_page_with_text(self):
+        meta = json.loads((DATA / "meta.json").read_text())
+        files = {f.stem: len(json.loads(f.read_text())["loci"]) for f in (DATA / "pages").glob("*.json")}
+        self.assertEqual(meta["lines"], files)
+
     def test_witness_files_follow_the_index(self):
         n = len(self.index)
         for f in (DATA / "w").glob("*.json"):

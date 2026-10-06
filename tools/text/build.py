@@ -100,6 +100,7 @@ def main():
                    for n in vote.ORDER],
         "references": [{"code": n, "name": NAMES[n], "loci": coverage.get(n, 0)} for n in vote.REFERENCE],
         "loci": len(index), "pages": len(pages),
+        "lines": {page: len(loci) for page, loci in pages.items()},   # the pages with text, so nothing asks for one without
         "voters_per_locus": {str(k): v for k, v in sorted(cover.items())},
         "columns": {k.split(".")[1]: v for k, v in sorted(stats.items()) if k.startswith("glyph.")},
         "gaps": {k.split(".")[1]: v for k, v in sorted(stats.items()) if k.startswith("gap.")},

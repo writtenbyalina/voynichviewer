@@ -9,7 +9,7 @@ Built by `tools/text/build.py` (method 1) from the pinned inputs in `tools/text/
 - **5,385 loci** on 227 pages: every locus in ZL, the Rosettes included.
 - **Voters per locus**: 1: 5, 2: 54, 3: 55, 4: 1,142, 5: 2,554, 6: 1,465, 7: 110.
 - **Columns**: unan 144,189 (92.1%), maj 10,729 (6.9%), tie 1,010 (0.6%), plur 499 (0.3%), single 82 (0.1%), none 29 (0.0%).
-- **Gaps between columns**: none 113,922 (75.4%), all 29,614 (19.6%), most 2,521 (1.7%), doubt 1,898 (1.3%), unc 1,878 (1.2%), few 1,318 (0.9%).
+- **Gaps between columns**: none 113,894 (75.4%), all 29,614 (19.6%), most 2,520 (1.7%), doubt 1,897 (1.3%), unc 1,874 (1.2%), few 1,317 (0.9%).
 - **Voters**: ZL René Zandbergen & Gabriel Landini (5,385 loci); GC Glen Claston (5,366 loci); IT Takeshi Takahashi (5,214 loci); FG First Study Group (Friedman) (4,060 loci); CD Prescott Currier & Mary D'Imperio (2,196 loci); LU Jorge Stolfi (1,989 loci); LV John Grove (1,918 loci); LT John Tiltman (566 loci); LL Don Latham (205 loci); LP Theodore Petersen (via Karl Kluge) (209 loci); LR Mike Roe (31 loci); LX Denis Mardle (37 loci).
 - **Words in the consensus**: 39,393 with uncertain spaces as spaces, 37,519 without, about 38,456 counting them half.
 
