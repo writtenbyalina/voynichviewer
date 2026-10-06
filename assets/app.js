@@ -316,12 +316,14 @@ function goToPage(page, { open = false } = {}) {
 
 function setHash() {
   const at = S.view === "read" ? short(curLabel() || "") : S.view === "three" ? View3D.state() : S.view === "info" ? (Info.at || "") : "";
-  const hash = `#${S.view}/${encodeURIComponent(S.order)}${at ? "/" + at : ""}`;
+  const text = S.view === "read" && TextUI.open ? TextUI.hash() : "";
+  const hash = `#${S.view}/${encodeURIComponent(S.order)}${at || text ? "/" + at : ""}${text ? "/" + text : ""}`;
   if (location.hash !== hash) history.replaceState(null, "", hash);
 }
 
 function readHash() {
-  const [view, order, at] = location.hash.replace(/^#\/?/, "").split("/").map(x => { try { return decodeURIComponent(x); } catch { return x; } });
+  const [view, order, at, more] = location.hash.replace(/^#\/?/, "").split("/").map(x => { try { return decodeURIComponent(x); } catch { return x; } });
+  if (view === "read") TextUI.fromHash(more);
   if (["read", "three", "info"].includes(view)) S.view = view;
   if (view === "sources" || view === "collation") S.view = "info";   // the old Sources and Folio order tabs are sections of Info now
   const oid = RETIRED[order] || order;
@@ -385,9 +387,13 @@ const Reader = {
           h("button", { id: "rd-scribes", class: S.scribes ? "on" : "", title: "Colour bar = Davis's scribe", onclick: e => { S.scribes = !S.scribes; store.set("scribes", S.scribes); e.target.classList.toggle("on", S.scribes); Reader.render(); } }, "Scribes"),
           h("button", { id: "rd-ghosts", class: S.ghosts ? "on" : "", title: "Show lost leaves as blank pages", onclick: e => { S.ghosts = !S.ghosts; store.set("ghosts", S.ghosts); e.target.classList.toggle("on", S.ghosts); Reader.open(R.order, Reader.nearestKept()); } }, "Lost leaves"),
           h("button", { title: "Go to a folio (G)", onclick: () => Reader.ask() }, "Go to…"),
+          h("button", { id: "rd-textbtn", title: "The text of these pages, from its transcriptions (T)", "aria-pressed": "false",
+            "aria-controls": "rd-text", onclick: () => TextUI.toggle() }, "Text"),
           h("button", { id: "rd-bm", title: "Bookmark a page of this opening (B)", onclick: () => Bookmarks.here() }, "☆", h("span", { class: "txt" }, " Bookmark")),
           h("button", { id: "rd-gridbtn", title: "See every page at once, to jump anywhere (O)", onclick: () => Reader.toggleGrid() }, h("span", { class: "ico" }, "▦ "), "Grid"),
         )),
+      // the pages, and beside them (below on a phone) the text panel (text.js)
+      h("div", { class: "rd-row", id: "rd-row" }, h("div", { class: "rd-col" },
       h("div", { class: "rd-stage", id: "rd-stage" },
         h("div", { class: "rd-zoomer", id: "rd-zoomer" }),
         // zoomed in: whether the pages on screen are at full size yet (Sharp), over the corner of the pages, so the row
@@ -405,7 +411,8 @@ const Reader = {
         h("div", { class: "rd-note", id: "rd-note" }),
         h("button", { class: "rd-more", id: "rd-more", hidden: true, "aria-expanded": "false", "aria-controls": "rd-notepop",
           onclick: () => Reader.toggleNote() }, "more"),
-        h("div", { class: "rd-notepop", id: "rd-notepop", hidden: true, role: "region", "aria-label": "Note on this opening" })),
+        h("div", { class: "rd-notepop", id: "rd-notepop", hidden: true, role: "region", "aria-label": "Note on this opening" }))),
+        h("aside", { class: "tx", id: "rd-text", hidden: true, "aria-label": "Text of these pages" })),
       h("div", { class: "strip", id: "rd-strip" }),
       h("div", { class: "rd-grid", id: "rd-grid", hidden: true }),
     );
@@ -417,6 +424,7 @@ const Reader = {
     });
     this.wireZoom();
     this.built = true;
+    TextUI.place();
   },
 
   open(order, at) {
@@ -449,6 +457,7 @@ const Reader = {
   report() {
     const p = curSide();
     if (p) setPos(p.shown.page, p.sheet, "read");
+    TextUI.sync();
   },
 
   /* label of the current page, or of the nearest page that is not a lost leaf (used when hiding them) */
@@ -1006,6 +1015,7 @@ const Reader = {
     const nt = note || (ev ? ev[0].text : "");
     $("#rd-note").replaceChildren(h("span", { class: "rd-note-text" }, ...flags.flatMap(f => [f, " "]), nt));
     this.toggleNote(false);
+    TextUI.sync();
   },
 
   renderStrip() {
@@ -1036,7 +1046,7 @@ const Reader = {
   toggleGrid(on = !R.grid) {
     R.grid = on;
     $("#rd-grid").hidden = !on;
-    for (const id of ["#rd-stage", "#rd-foot", "#rd-strip"]) $(id).hidden = on;
+    for (const id of ["#rd-row", "#rd-stage", "#rd-foot", "#rd-strip"]) $(id).hidden = on;
     $("#rd-gridbtn").classList.toggle("on", on);
     if (on) this.renderGrid(true); else this.render(true);
   },
@@ -1107,6 +1117,8 @@ const Reader = {
     else if (e.key === "-" || e.key === "_") this.zoomBy(1 / 1.5);
     else if (e.key === "0") this.resetZoom();
     else if (e.key === "g" || e.key === "G") this.ask();
+    else if (e.key === "t" || e.key === "T") TextUI.toggle();
+    else if (TextUI.open && TextUI.key(e)) e.preventDefault();
     else if (e.key === "c" || e.key === "C") {
       const p = curSide();
       const sg = p && !p.lost && (p.shown.img ? p.shown : p.segs.find(x => !x.missing));
@@ -1436,6 +1448,52 @@ const View3D = {
   key(e) { this.mod?.key(e); },
   state() { return this.pending || (this.mod ? this.mod.state() : ""); },
   restore(st) { if (this.mod) this.mod.restore(st); else this.pending = st; },
+};
+
+// ================================================================ TEXT (text.js)
+/* The text of the pages, from their transcriptions: the Reader's text panel. The code (assets/text.js) and the data
+   (data/text/) load the first time the panel opens. */
+const TextUI = {
+  mod: null, loading: null,
+  open: store.get("text:open", false),
+  wanted: null,   // what the address asked of the panel ("text?l=f1r.2"), until the panel has it
+  load() {
+    this.loading ||= import(ASSETS + "text.js").then(m => (this.mod = m.default)).catch(e => {
+      this.loading = null;
+      const el = $("#rd-text");
+      if (el) el.replaceChildren(h("p", { class: "tx-msg" }, "The text could not load: " + e.message));
+      throw e;
+    });
+    return this.loading;
+  },
+  toggle(on = !this.open) {
+    this.open = on;
+    store.set("text:open", on);
+    this.place();
+    setHash();
+  },
+  /* show or hide the panel, and fill it */
+  place() {
+    const el = $("#rd-text"), b = $("#rd-textbtn");
+    if (!el) return;
+    el.hidden = !this.open;
+    b.classList.toggle("on", this.open);
+    b.setAttribute("aria-pressed", String(this.open));
+    this.sync();
+  },
+  /* the panel follows the opening (cheap when nothing changed) */
+  sync() {
+    if (this.open && $("#rd-text") && R.spreads) this.load().then(m => m.sync()).catch(() => {});
+  },
+  key(e) { return this.mod ? this.mod.key(e) : false; },
+  hash() { return this.mod ? this.mod.hash() : this.wanted || "text"; },
+  fromHash(more) {
+    const [what, query] = String(more || "").split("?");
+    if (what !== "text") return;
+    this.open = true;
+    this.wanted = more;
+    if (this.mod) this.mod.fromHash(query || "");
+  },
 };
 
 // ================================================================ FOLIO ORDER (a section of Info)

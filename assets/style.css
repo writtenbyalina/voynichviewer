@@ -78,6 +78,10 @@ dialog p { margin: 4px 0; }
 
 /* ---------- Read ---------- */
 #v-read { display: flex; flex-direction: column; background: var(--table); color: var(--table-ink); }
+/* the pages (stage and the row under it), and beside them the text panel (below them on a phone) */
+.rd-row { flex: 1; min-height: 0; display: flex; }
+.rd-row[hidden] { display: none; }
+.rd-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* one row down to 700 px, two below that, whatever the opening: the meta line gives way (cut short, full text on
    hover) so the bar is always the same height and the pages under it don't jump. Under 1000 px the buttons tighten
    (Bookmark shows only its star, Grid only its word). */
@@ -770,3 +774,67 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .bm-pages button { font: 600 12.5px ui-monospace, Menlo, monospace; padding: 4px 10px; }
 .bm-pages button.on { background: #f3c35c; border-color: #f3c35c; color: #2d2925; }
 #v-read [hidden] { display: none !important; }   /* the grid hides the open book, its note and its strip */
+
+/* ---------- Text panel (text.js) ---------- */
+.tx { --tx-gold: #f3c35c; position: relative; width: var(--tx-w, clamp(320px, 33vw, 456px)); flex: none;
+  display: flex; flex-direction: column; min-height: 0; background: #221e1a; border-left: 1px solid var(--table-line); }
+.tx[hidden] { display: none; }
+.tx-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 2; touch-action: none; }
+.tx-grip:hover, .tx-grip:focus-visible { background: linear-gradient(90deg, transparent 3px, var(--table-muted) 3px, var(--table-muted) 5px, transparent 5px); outline: none; }
+.tx-head { padding: 8px 12px; border-bottom: 1px solid var(--table-line); }
+.tx-ctl { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.tx-ctl select, .tx-ctl button { background: transparent; color: var(--table-ink); border: 1px solid var(--table-line);
+  border-radius: var(--radius); min-height: 32px; }
+.tx-ctl select { padding: 4px 6px; max-width: 100%; }
+.tx-ctl select option { color: var(--ink); background: #fff; }
+.tx-ctl button:hover, .tx-ctl select:hover { border-color: var(--table-muted); }
+.tx-ctl .tx-x { margin-left: auto; min-width: 32px; padding: 0 8px; }
+.tx-body { flex: 1; min-height: 0; overflow: auto; padding: 4px 16px 16px; outline: none; }
+.tx-msg { color: var(--table-muted); padding: 12px 0; margin: 0; }
+.tx-page + .tx-page, .tx-folded + .tx-page { border-top: 1px solid var(--table-line); margin-top: 14px; }
+.tx-ph { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding-top: 10px; }
+.tx-ph h3 { margin: 0; font-size: 16px; }
+.tx-count { color: var(--table-muted); font-size: 13px; }
+.tx-who { font-size: 13px; color: var(--table-muted); }
+.tx-who summary { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; list-style: none; }
+.tx-who summary::-webkit-details-marker { display: none; }
+.tx-who summary::before { content: "· "; text-decoration: none; display: inline-block; white-space: pre; }
+.tx-who[open] { flex-basis: 100%; }
+.tx-who ul { margin: 6px 0 4px; padding-left: 18px; color: var(--table-ink); }
+.tx-who li span { color: var(--table-muted); }
+.tx-who p { margin: 0 0 6px; }
+.tx-facts { margin: 2px 0 6px; color: var(--table-muted); font-size: 13px; }
+.tx-kind { margin: 14px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--table-muted); font-weight: 600; }
+.tx-lines.k-L { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); column-gap: 12px; }
+.tx .ln { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 0 8px; border-radius: 4px; }
+.tx .ln.ps { margin-top: 10px; }
+.tx .ln .no { align-self: start; background: none; border: none; padding: 0; min-height: 0; color: var(--table-muted); text-align: right;
+  font: 12px/24.6px ui-monospace, Menlo, monospace; cursor: copy; border-radius: 3px; }
+.tx .ln .no:hover, .tx .ln .no:focus-visible { color: var(--table-ink); }
+.tx .ln .t { font: 14.5px/24.6px ui-monospace, "SF Mono", Menlo, Consolas, monospace; word-spacing: .2em; overflow-wrap: anywhere; }
+.tx .w { border-radius: 3px; }
+.tx .w.mk:focus-visible { outline: 2px solid var(--tx-gold); outline-offset: 1px; }
+.tx .c { text-decoration: underline dotted var(--tx-gold) 2px; text-underline-offset: 4px; }
+.tx .c-m { text-decoration-style: dotted; text-decoration-thickness: 1px; }
+/* an uncertain space: its comma, drawn as a gold dot (copying gives the comma) */
+.tx .us { position: relative; display: inline-block; width: .55em; color: transparent; }
+.tx .us::after { content: "·"; position: absolute; left: 0; right: 0; text-align: center; color: var(--tx-gold); font-weight: 700; }
+/* where some wrote a space and the consensus has none, or a glyph only some read */
+.tx .dj { display: inline-block; width: 0; height: .75em; vertical-align: -.05em; border-left: 1.5px solid var(--tx-gold); margin: 0 1px; opacity: .85; }
+/* a space not everyone wrote */
+.tx .gm { position: relative; }
+.tx .gm::after { content: ""; position: absolute; left: calc(50% - 1.5px); bottom: .1em; width: 3px; height: 3px; border-radius: 50%; background: var(--tx-gold); }
+.tx-folded { color: var(--table-muted); font-size: 13px; margin: 12px 0 0; }
+.tx-link { background: none; border: none; padding: 0; color: var(--tx-gold); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: inherit; }
+.tx-foot { border-top: 1px solid var(--table-line); margin-top: 20px; padding-top: 8px; font-size: 12px; color: var(--table-muted); }
+.tx-foot p { margin: 0 0 6px; }
+.tx-foot a { color: var(--table-ink); }
+@media (max-width: 700px) { #rd-textbtn { order: -1; } }   /* first in the row of tools that scrolls */
+@media (max-width: 760px) {
+  .rd-row { flex-direction: column; }
+  .tx { width: auto; height: var(--tx-h, 42%); border-left: 0; border-top: 1px solid var(--table-line); }
+  .tx-grip { left: 0; right: 0; top: -6px; bottom: auto; width: auto; height: 14px; cursor: row-resize; }
+  .tx-grip::before { content: ""; position: absolute; left: calc(50% - 20px); top: 4px; width: 40px; height: 4px; border-radius: 2px; background: var(--table-muted); }
+  .tx-grip:hover, .tx-grip:focus-visible { background: none; }
+  .tx-body { padding: 0 12px 12px; }
+}
