@@ -1,0 +1,1545 @@
+{
+"family": "Voynich VV",
+"font": "assets/fonts/voynich-vv.woff2",
+"glyphs": {
+"A1": {
+"ch": "o",
+"eva": "o",
+"kind": "v101"
+},
+"A2": {
+"ch": "9",
+"eva": "y",
+"kind": "v101"
+},
+"A3": {
+"ch": "a",
+"eva": "a",
+"kind": "v101"
+},
+"A4": {
+"ch": "Á",
+"eva": "u",
+"kind": "v101"
+},
+"Aa": {
+"ch": "A",
+"eva": "a",
+"kind": "v101"
+},
+"Ab": {
+"ch": "(",
+"eva": "y",
+"kind": "v101"
+},
+"Ac": {
+"ch": "Ä",
+"eva": "o",
+"kind": "v101"
+},
+"Ad": {
+"ch": "¾",
+"eva": "y",
+"kind": "v101"
+},
+"Ae": {
+"ch": "",
+"eva": "a",
+"kind": "drawn",
+"note": "a with a plume"
+},
+"Af": {
+"ch": "½",
+"eva": "oo",
+"kind": "v101"
+},
+"Ag": {
+"ch": "»",
+"eva": "y",
+"kind": "v101"
+},
+"Ah": {
+"ch": "¿",
+"eva": "y",
+"kind": "v101"
+},
+"Ai": {
+"ch": "",
+"eva": "o",
+"kind": "v101"
+},
+"Aj": {
+"ch": "Â",
+"eva": "o",
+"kind": "v101"
+},
+"Ak": {
+"ch": "o",
+"eva": "a",
+"kind": "v101"
+},
+"Al": {
+"ch": "o",
+"eva": "o",
+"kind": "v101"
+},
+"Am": {
+"ch": "À",
+"eva": "a",
+"kind": "v101"
+},
+"An": {
+"ch": "A",
+"eva": "a",
+"kind": "v101"
+},
+"B1": {
+"ch": "8",
+"eva": "d",
+"kind": "v101"
+},
+"B2": {
+"ch": "e",
+"eva": "l",
+"kind": "v101"
+},
+"B3": {
+"ch": "p",
+"eva": "m",
+"kind": "v101"
+},
+"B4": {
+"ch": "*",
+"eva": "g",
+"kind": "v101"
+},
+"B5": {
+"ch": "&",
+"eva": "j",
+"kind": "v101"
+},
+"B6": {
+"ch": "ü",
+"eva": "z",
+"kind": "v101"
+},
+"B7": {
+"ch": "e",
+"eva": "l",
+"kind": "v101"
+},
+"B8": {
+"ch": "p",
+"eva": "m",
+"kind": "v101"
+},
+"Ba": {
+"ch": "7",
+"eva": "d",
+"kind": "v101"
+},
+"Bb": {
+"ch": "6",
+"eva": "d",
+"kind": "v101"
+},
+"Bc": {
+"ch": "Q",
+"eva": "m",
+"kind": "v101"
+},
+"Bd": {
+"ch": "",
+"eva": "l",
+"kind": "drawn",
+"note": "a descending stem with a loop on its left"
+},
+"Be": {
+"ch": "",
+"eva": "m",
+"kind": "drawn",
+"note": "a stem through a small o"
+},
+"Bf": {
+"ch": "7",
+"eva": "ch",
+"kind": "v101"
+},
+"Bg": {
+"ch": "p",
+"eva": "m",
+"kind": "v101"
+},
+"Bh": {
+"ch": "",
+"eva": "ch",
+"kind": "drawn",
+"note": "c running into l's loop"
+},
+"Bi": {
+"ch": "8",
+"eva": "d",
+"kind": "v101"
+},
+"Bj": {
+"ch": "°",
+"eva": "r",
+"kind": "v101"
+},
+"C1": {
+"ch": "y",
+"eva": "r",
+"kind": "v101"
+},
+"C2": {
+"ch": "s",
+"eva": "s",
+"kind": "v101"
+},
+"Ca": {
+"ch": "x",
+"eva": "r",
+"kind": "v101"
+},
+"Cb": {
+"ch": "Y",
+"eva": "r",
+"kind": "v101"
+},
+"Cc": {
+"ch": "t",
+"eva": "s",
+"kind": "v101"
+},
+"Cd": {
+"ch": "b",
+"eva": "r",
+"kind": "v101"
+},
+"Ce": {
+"ch": "T",
+"eva": "s",
+"kind": "v101"
+},
+"Cf": {
+"ch": "$",
+"eva": "s",
+"kind": "v101"
+},
+"Cg": {
+"ch": "X",
+"eva": "r",
+"kind": "v101"
+},
+"Ch": {
+"ch": "Ð",
+"eva": "e",
+"kind": "v101"
+},
+"Ci": {
+"ch": "¤",
+"eva": "r",
+"kind": "v101"
+},
+"Cj": {
+"ch": "¯",
+"eva": "e",
+"kind": "v101"
+},
+"Ck": {
+"ch": "®",
+"eva": "r",
+"kind": "v101"
+},
+"Cl": {
+"ch": "±",
+"eva": "s",
+"kind": "v101"
+},
+"Cm": {
+"ch": "²",
+"eva": "d",
+"kind": "v101"
+},
+"Cn": {
+"ch": "y",
+"eva": "s",
+"kind": "v101"
+},
+"Co": {
+"ch": "s",
+"eva": "s",
+"kind": "v101"
+},
+"Cp": {
+"ch": "",
+"eva": "r",
+"kind": "drawn",
+"note": "a three-shaped glyph with a small o"
+},
+"Cq": {
+"ch": "y",
+"eva": "r",
+"kind": "v101"
+},
+"D1": {
+"ch": "4",
+"eva": "q",
+"kind": "v101"
+},
+"Da": {
+"ch": "",
+"eva": "q",
+"kind": "drawn",
+"note": "q with a plume"
+},
+"Db": {
+"ch": "¸",
+"eva": "q",
+"kind": "v101"
+},
+"Dc": {
+"ch": "",
+"eva": "qo",
+"kind": "v101"
+},
+"E1": {
+"ch": "i",
+"eva": "i",
+"kind": "v101"
+},
+"E2": {
+"ch": "N",
+"eva": "n",
+"kind": "v101"
+},
+"E3": {
+"ch": "i",
+"eva": "i",
+"kind": "v101"
+},
+"Ea": {
+"ch": "È",
+"eva": "i",
+"kind": "v101"
+},
+"Eb": {
+"ch": "Ê",
+"eva": "?",
+"kind": "v101"
+},
+"Ec": {
+"ch": "Ë",
+"eva": "?",
+"kind": "v101"
+},
+"Ed": {
+"ch": "¡",
+"eva": "n",
+"kind": "v101"
+},
+"Ee": {
+"ch": "©",
+"eva": "l",
+"kind": "v101"
+},
+"Ef": {
+"ch": "",
+"eva": "n",
+"kind": "drawn",
+"note": "drawn by Claston as Cl (@177;), the same three-shaped glyph"
+},
+"F1": {
+"ch": "n",
+"eva": "in",
+"kind": "v101"
+},
+"F2": {
+"ch": "I",
+"eva": "ii",
+"kind": "v101"
+},
+"F3": {
+"ch": "z",
+"eva": "ir",
+"kind": "v101"
+},
+"F4": {
+"ch": "z",
+"eva": "ir",
+"kind": "v101"
+},
+"F5": {
+"ch": "I",
+"eva": "ii",
+"kind": "v101"
+},
+"Fa": {
+"ch": "´",
+"eva": "ii",
+"kind": "v101"
+},
+"Fb": {
+"ch": "I",
+"eva": "ii",
+"kind": "v101"
+},
+"Fc": {
+"ch": "n",
+"eva": "in",
+"kind": "v101"
+},
+"G1": {
+"ch": "m",
+"eva": "iin",
+"kind": "v101"
+},
+"G2": {
+"ch": "μ",
+"eva": "iii",
+"kind": "v101"
+},
+"G3": {
+"ch": "Z",
+"eva": "iir",
+"kind": "v101"
+},
+"G4": {
+"ch": "μ",
+"eva": "iii",
+"kind": "v101"
+},
+"Ga": {
+"ch": "m",
+"eva": "iin",
+"kind": "v101"
+},
+"Gb": {
+"ch": "μ",
+"eva": "iii",
+"kind": "v101"
+},
+"Gc": {
+"ch": "Z",
+"eva": "iir",
+"kind": "v101"
+},
+"Gd": {
+"ch": "Z",
+"eva": "iir",
+"kind": "v101"
+},
+"H1": {
+"ch": "M",
+"eva": "iiin",
+"kind": "v101"
+},
+"H2": {
+"ch": "",
+"eva": "iiiin",
+"kind": "v101"
+},
+"H3": {
+"ch": "",
+"eva": "iiir",
+"kind": "v101"
+},
+"Ha": {
+"ch": "M",
+"eva": "iiin",
+"kind": "v101"
+},
+"Hb": {
+"ch": "M",
+"eva": "iiin",
+"kind": "v101"
+},
+"Hc": {
+"ch": "",
+"eva": "iiiin",
+"kind": "v101"
+},
+"Hd": {
+"ch": "Z",
+"eva": "iiir",
+"kind": "v101"
+},
+"J1": {
+"ch": "c",
+"eva": "e",
+"kind": "v101"
+},
+"J2": {
+"ch": "Ï",
+"eva": "b",
+"kind": "v101"
+},
+"Ja": {
+"ch": "E",
+"eva": "c",
+"kind": "v101"
+},
+"Jb": {
+"ch": "Æ",
+"eva": "h",
+"kind": "v101"
+},
+"Jc": {
+"ch": "¼",
+"eva": "e",
+"kind": "v101"
+},
+"Jd": {
+"ch": "ž",
+"eva": "b",
+"kind": "v101"
+},
+"K1": {
+"ch": "1",
+"eva": "ch",
+"kind": "v101"
+},
+"K2": {
+"ch": "cc",
+"eva": "ee",
+"kind": "v101"
+},
+"K3": {
+"ch": "C",
+"eva": "ee",
+"kind": "v101"
+},
+"Ka": {
+"ch": "",
+"eva": "oh",
+"kind": "joined"
+},
+"Kb": {
+"ch": "Ü",
+"eva": "co",
+"kind": "v101"
+},
+"Kc": {
+"ch": "",
+"eva": "cy",
+"kind": "joined"
+},
+"Kd": {
+"ch": "ß",
+"eva": "ca",
+"kind": "v101"
+},
+"Ke": {
+"ch": "",
+"eva": "ch",
+"kind": "joined"
+},
+"Kf": {
+"ch": "1",
+"eva": "ch",
+"kind": "v101"
+},
+"Kg": {
+"ch": "",
+"eva": "yo",
+"kind": "v101"
+},
+"Kh": {
+"ch": "á",
+"eva": "cl",
+"kind": "v101"
+},
+"Ki": {
+"ch": "",
+"eva": "oy",
+"kind": "v101"
+},
+"Kj": {
+"ch": "",
+"eva": "ai",
+"kind": "joined"
+},
+"Kk": {
+"ch": "",
+"eva": "cy",
+"kind": "drawn",
+"note": "c running into y's tail"
+},
+"Kl": {
+"ch": "E",
+"eva": "c",
+"kind": "v101"
+},
+"Km": {
+"ch": "",
+"eva": "cl",
+"kind": "v101"
+},
+"Kn": {
+"ch": "",
+"eva": "ch",
+"kind": "drawn",
+"note": "o joined to a reversed c"
+},
+"L1": {
+"ch": "2",
+"eva": "sh",
+"kind": "v101"
+},
+"La": {
+"ch": "3",
+"eva": "sh",
+"kind": "v101"
+},
+"Lb": {
+"ch": "5",
+"eva": "sh",
+"kind": "v101"
+},
+"Lc": {
+"ch": "%",
+"eva": "sh",
+"kind": "v101"
+},
+"Ld": {
+"ch": "+",
+"eva": "sh",
+"kind": "v101"
+},
+"Le": {
+"ch": "!",
+"eva": "sh",
+"kind": "v101"
+},
+"Lf": {
+"ch": "#",
+"eva": "sh",
+"kind": "v101"
+},
+"Lg": {
+"ch": "Õ",
+"eva": "sh",
+"kind": "v101"
+},
+"Lh": {
+"ch": "Î",
+"eva": "cr",
+"kind": "v101"
+},
+"Li": {
+"ch": "Ö",
+"eva": "sh",
+"kind": "v101"
+},
+"Lj": {
+"ch": "×",
+"eva": "sh",
+"kind": "v101"
+},
+"Lk": {
+"ch": "Ý",
+"eva": "sh",
+"kind": "v101"
+},
+"Ll": {
+"ch": "à",
+"eva": "sh",
+"kind": "v101"
+},
+"Lm": {
+"ch": "â",
+"eva": "sh",
+"kind": "v101"
+},
+"Ln": {
+"ch": "S",
+"eva": "es",
+"kind": "v101"
+},
+"Lo": {
+"ch": "Û",
+"eva": "so",
+"kind": "v101"
+},
+"Lp": {
+"ch": "Ù",
+"eva": "sy",
+"kind": "v101"
+},
+"Lq": {
+"ch": "",
+"eva": "sa",
+"kind": "joined"
+},
+"Lr": {
+"ch": "5",
+"eva": "cs",
+"kind": "v101"
+},
+"Ls": {
+"ch": "ã",
+"eva": "sh",
+"kind": "v101"
+},
+"Lt": {
+"ch": "5",
+"eva": "ss",
+"kind": "v101"
+},
+"Lu": {
+"ch": "",
+"eva": "se",
+"kind": "joined"
+},
+"M1": {
+"ch": "ccc",
+"eva": "eee",
+"kind": "v101"
+},
+"M2": {
+"ch": "D",
+"eva": "eeb",
+"kind": "v101"
+},
+"M3": {
+"ch": "d",
+"eva": "eee",
+"kind": "v101"
+},
+"M4": {
+"ch": "cC",
+"eva": "eee",
+"kind": "v101"
+},
+"M5": {
+"ch": "Cc",
+"eva": "eee",
+"kind": "v101"
+},
+"Ma": {
+"ch": "",
+"eva": "chh",
+"kind": "joined"
+},
+"Mb": {
+"ch": "Þ",
+"eva": "shh",
+"kind": "v101"
+},
+"Mc": {
+"ch": "",
+"eva": "csh",
+"kind": "joined"
+},
+"Md": {
+"ch": "",
+"eva": "sha",
+"kind": "joined"
+},
+"Me": {
+"ch": "Ñ",
+"eva": "ese",
+"kind": "v101"
+},
+"N1": {
+"ch": "cccc",
+"eva": "eeee",
+"kind": "v101"
+},
+"N2": {
+"ch": "B",
+"eva": "eeeb",
+"kind": "v101"
+},
+"Na": {
+"ch": "Ò",
+"eva": "eeee",
+"kind": "v101"
+},
+"Nb": {
+"ch": "cd",
+"eva": "eeee",
+"kind": "v101"
+},
+"Nc": {
+"ch": "dc",
+"eva": "eeee",
+"kind": "v101"
+},
+"Nd": {
+"ch": "ccC",
+"eva": "eeee",
+"kind": "v101"
+},
+"P1": {
+"ch": "g",
+"eva": "p",
+"kind": "v101"
+},
+"P2": {
+"ch": "f",
+"eva": "f",
+"kind": "v101"
+},
+"P3": {
+"ch": "j",
+"eva": "p",
+"kind": "v101"
+},
+"P4": {
+"ch": "u",
+"eva": "f",
+"kind": "v101"
+},
+"Pa": {
+"ch": "w",
+"eva": "f",
+"kind": "v101"
+},
+"Pb": {
+"ch": "é",
+"eva": "p",
+"kind": "v101"
+},
+"Pc": {
+"ch": "ì",
+"eva": "f",
+"kind": "v101"
+},
+"Pd": {
+"ch": "",
+"eva": "p",
+"kind": "drawn",
+"note": "k's left leg alone: a stem with a pointed head"
+},
+"Pe": {
+"ch": "",
+"eva": "f",
+"kind": "drawn",
+"note": "a gallows stem with l's loop at its head"
+},
+"Pf": {
+"ch": "g",
+"eva": "p",
+"kind": "v101"
+},
+"Pg": {
+"ch": "g",
+"eva": "p",
+"kind": "v101"
+},
+"Ph": {
+"ch": "f",
+"eva": "f",
+"kind": "v101"
+},
+"Pi": {
+"ch": "",
+"eva": "p",
+"kind": "drawn",
+"note": "a gallows stem with a bar and a hook at its head"
+},
+"Pj": {
+"ch": "g",
+"eva": "p",
+"kind": "v101"
+},
+"Pk": {
+"ch": "",
+"eva": "f",
+"kind": "drawn",
+"note": "a gallows stem with a small c at its head"
+},
+"Pl": {
+"ch": "g",
+"eva": "p",
+"kind": "v101"
+},
+"Q1": {
+"ch": "h",
+"eva": "k",
+"kind": "v101"
+},
+"Q2": {
+"ch": "k",
+"eva": "t",
+"kind": "v101"
+},
+"Qa": {
+"ch": "W",
+"eva": "k",
+"kind": "v101"
+},
+"Qb": {
+"ch": "ò",
+"eva": "t",
+"kind": "v101"
+},
+"Qc": {
+"ch": "ô",
+"eva": "t",
+"kind": "v101"
+},
+"Qd": {
+"ch": "û",
+"eva": "k",
+"kind": "v101"
+},
+"Qe": {
+"ch": "",
+"eva": "k",
+"kind": "drawn",
+"note": "k gallows with a small loop"
+},
+"Qf": {
+"ch": "h",
+"eva": "k",
+"kind": "v101"
+},
+"Qg": {
+"ch": "",
+"eva": "k",
+"kind": "drawn",
+"note": "k gallows with a small loop and a bar across"
+},
+"Qh": {
+"ch": "",
+"eva": "t",
+"kind": "drawn",
+"note": "t gallows with a second loop on its loop"
+},
+"Qi": {
+"ch": "g",
+"eva": "t",
+"kind": "v101"
+},
+"Qj": {
+"ch": "h",
+"eva": "k",
+"kind": "v101"
+},
+"Qk": {
+"ch": "h",
+"eva": "k",
+"kind": "v101"
+},
+"Ql": {
+"ch": "h",
+"eva": "k",
+"kind": "v101"
+},
+"Ra": {
+"ch": "ê",
+"eva": "cf",
+"kind": "v101"
+},
+"Rb": {
+"ch": "",
+"eva": "cp",
+"kind": "joined"
+},
+"Rc": {
+"ch": "î",
+"eva": "ph",
+"kind": "v101"
+},
+"Rd": {
+"ch": "ú",
+"eva": "po",
+"kind": "v101"
+},
+"Re": {
+"ch": "",
+"eva": "cf",
+"kind": "joined"
+},
+"Rf": {
+"ch": "",
+"eva": "cp",
+"kind": "drawn",
+"note": "a short stem with a small c at its foot"
+},
+"Rg": {
+"ch": "",
+"eva": "cp",
+"kind": "drawn",
+"note": "c with a short pointed stem"
+},
+"S1": {
+"ch": "v",
+"eva": "ck",
+"kind": "v101"
+},
+"S2": {
+"ch": "è",
+"eva": "ct",
+"kind": "v101"
+},
+"Sa": {
+"ch": "ÿ",
+"eva": "kh",
+"kind": "v101"
+},
+"Sb": {
+"ch": "æ",
+"eva": "th",
+"kind": "v101"
+},
+"Sc": {
+"ch": "þ",
+"eva": "to",
+"kind": "v101"
+},
+"Sd": {
+"ch": "–",
+"eva": "ct",
+"kind": "v101"
+},
+"Se": {
+"ch": "",
+"eva": "ek",
+"kind": "joined"
+},
+"Sf": {
+"ch": "",
+"eva": "st",
+"kind": "v101"
+},
+"Sg": {
+"ch": "",
+"eva": "ck",
+"kind": "drawn",
+"note": "ck begun with a dot"
+},
+"T1": {
+"ch": "J",
+"eva": "cph",
+"kind": "v101"
+},
+"T2": {
+"ch": "F",
+"eva": "cfh",
+"kind": "v101"
+},
+"T3": {
+"ch": "",
+"eva": "cph",
+"kind": "drawn",
+"note": "cph begun with i (ifh's start)"
+},
+"T4": {
+"ch": "™",
+"eva": "cfh",
+"kind": "v101"
+},
+"T5": {
+"ch": "G",
+"eva": "cph",
+"kind": "v101"
+},
+"T6": {
+"ch": "U",
+"eva": "cfh",
+"kind": "v101"
+},
+"Ta": {
+"ch": "",
+"eva": "cph",
+"kind": "drawn",
+"note": "bench with a short stem, its head pointed (k's left leg)"
+},
+"Tb": {
+"ch": "",
+"eva": "cfh",
+"kind": "drawn",
+"note": "bench with a stem carrying l's loop"
+},
+"Tc": {
+"ch": "",
+"eva": "cfh",
+"kind": "drawn",
+"note": "bench with a looped stem, set further left"
+},
+"Td": {
+"ch": "",
+"eva": "cph",
+"kind": "drawn",
+"note": "cph with a shorter, pointed left leg"
+},
+"Te": {
+"ch": "J",
+"eva": "cph",
+"kind": "v101"
+},
+"Tf": {
+"ch": "Ú",
+"eva": "cfh",
+"kind": "v101"
+},
+"Tg": {
+"ch": "ð",
+"eva": "cph",
+"kind": "v101"
+},
+"Th": {
+"ch": "",
+"eva": "cph",
+"kind": "drawn",
+"note": "bench with a stem ending in a small loop (k's right stem)"
+},
+"Ti": {
+"ch": "",
+"eva": "cph",
+"kind": "drawn",
+"note": "bench with a stem and a small o beside its head"
+},
+"Tj": {
+"ch": "J",
+"eva": "cph",
+"kind": "v101"
+},
+"Tk": {
+"ch": "",
+"eva": "cph",
+"kind": "drawn",
+"note": "bench with the curled head of t's left leg"
+},
+"Tl": {
+"ch": "—",
+"eva": "cpo",
+"kind": "v101"
+},
+"Tm": {
+"ch": "ø",
+"eva": "yfa",
+"kind": "v101"
+},
+"Tn": {
+"ch": "",
+"eva": "yph",
+"kind": "drawn",
+"note": "cph begun with y"
+},
+"To": {
+"ch": "",
+"eva": "oph",
+"kind": "drawn",
+"note": "cph begun with o"
+},
+"Tp": {
+"ch": "",
+"eva": "ofa",
+"kind": "joined"
+},
+"Tq": {
+"ch": "",
+"eva": "cfy",
+"kind": "joined"
+},
+"Tr": {
+"ch": "",
+"eva": "cfy",
+"kind": "joined"
+},
+"Ts": {
+"ch": "",
+"eva": "cfh",
+"kind": "drawn",
+"note": "bench begun with i, with a looped stem"
+},
+"Tt": {
+"ch": "",
+"eva": "cfh",
+"kind": "drawn",
+"note": "bench begun with i, with a stem pointed to the right"
+},
+"U1": {
+"ch": "H",
+"eva": "ckh",
+"kind": "v101"
+},
+"U2": {
+"ch": "K",
+"eva": "cth",
+"kind": "v101"
+},
+"U3": {
+"ch": "ä",
+"eva": "ckh",
+"kind": "v101"
+},
+"U4": {
+"ch": "V",
+"eva": "cth",
+"kind": "v101"
+},
+"U5": {
+"ch": "ý",
+"eva": "cto",
+"kind": "v101"
+},
+"U6": {
+"ch": "õ",
+"eva": "cty",
+"kind": "v101"
+},
+"U7": {
+"ch": "÷",
+"eva": "ykh",
+"kind": "v101"
+},
+"Ua": {
+"ch": "å",
+"eva": "cky",
+"kind": "v101"
+},
+"Ub": {
+"ch": "ç",
+"eva": "cko",
+"kind": "v101"
+},
+"Uc": {
+"ch": "Ó",
+"eva": "skh",
+"kind": "v101"
+},
+"Ud": {
+"ch": "",
+"eva": "sth",
+"kind": "drawn",
+"note": "cth with a plume over its first c"
+},
+"Ue": {
+"ch": "",
+"eva": "ckh",
+"kind": "joined"
+},
+"Uf": {
+"ch": "",
+"eva": "cth",
+"kind": "joined"
+},
+"Ug": {
+"ch": "ö",
+"eva": "cka",
+"kind": "v101"
+},
+"Uh": {
+"ch": "ñ",
+"eva": "cts",
+"kind": "v101"
+},
+"Ui": {
+"ch": "",
+"eva": "yko",
+"kind": "joined"
+},
+"Uj": {
+"ch": "",
+"eva": "ckh",
+"kind": "drawn",
+"note": "bench with a two-legged gallows whose loop is only a hook"
+},
+"Uk": {
+"ch": "",
+"eva": "ykh",
+"kind": "drawn",
+"note": "the same begun with y"
+},
+"Ul": {
+"ch": "ó",
+"eva": "sko",
+"kind": "v101"
+},
+"Um": {
+"ch": "F",
+"eva": "ckh",
+"kind": "v101"
+},
+"Un": {
+"ch": "H",
+"eva": "ckh",
+"kind": "v101"
+},
+"Uo": {
+"ch": "",
+"eva": "ckh",
+"kind": "drawn",
+"note": "ckh begun with a dot"
+},
+"Up": {
+"ch": "í",
+"eva": "cth",
+"kind": "v101"
+},
+"V1": {
+"ch": "R",
+"eva": "cphh",
+"kind": "v101"
+},
+"V2": {
+"ch": "r",
+"eva": "cfhh",
+"kind": "v101"
+},
+"Va": {
+"ch": "",
+"eva": "cphh",
+"kind": "drawn",
+"note": "iph with another h"
+},
+"Vb": {
+"ch": "",
+"eva": "cfhh",
+"kind": "joined"
+},
+"Vc": {
+"ch": "",
+"eva": "cfsh",
+"kind": "drawn",
+"note": "cfhh with a plume over its last bench"
+},
+"Vd": {
+"ch": "",
+"eva": "acfhh",
+"kind": "joined"
+},
+"Ve": {
+"ch": "ï",
+"eva": "scph",
+"kind": "v101"
+},
+"W1": {
+"ch": "l",
+"eva": "ckhh",
+"kind": "v101"
+},
+"W2": {
+"ch": "L",
+"eva": "cthh",
+"kind": "v101"
+},
+"Wa": {
+"ch": "",
+"eva": "ckhch",
+"kind": "joined"
+},
+"Wb": {
+"ch": "",
+"eva": "cthch",
+"kind": "joined"
+},
+"Wc": {
+"ch": "ë",
+"eva": "cksh",
+"kind": "v101"
+},
+"Wd": {
+"ch": "•",
+"eva": "cths",
+"kind": "v101"
+},
+"We": {
+"ch": "",
+"eva": "chky",
+"kind": "joined"
+},
+"Wf": {
+"ch": "",
+"eva": "sckh",
+"kind": "v101"
+},
+"Wg": {
+"ch": "ù",
+"eva": "ykch",
+"kind": "v101"
+},
+"Wh": {
+"ch": "",
+"eva": "ckhh",
+"kind": "joined"
+},
+"Wi": {
+"ch": "",
+"eva": "ckoh",
+"kind": "joined"
+},
+"Wj": {
+"ch": "",
+"eva": "ckah",
+"kind": "joined"
+},
+"Wk": {
+"ch": "",
+"eva": "ctah",
+"kind": "joined"
+},
+"Wl": {
+"ch": "",
+"eva": "ctyh",
+"kind": "joined"
+},
+"Wm": {
+"ch": "",
+"eva": "ckhy",
+"kind": "joined"
+},
+"Wn": {
+"ch": "",
+"eva": "cthy",
+"kind": "joined"
+},
+"Wo": {
+"ch": "",
+"eva": "cckhh",
+"kind": "joined"
+},
+"Wp": {
+"ch": "",
+"eva": "cthh",
+"kind": "drawn",
+"note": "cthh begun with a dot"
+},
+"Wq": {
+"ch": "",
+"eva": "ckhh",
+"kind": "drawn",
+"note": "ckh followed by an epsilon-like h (@191;)"
+},
+"Wr": {
+"ch": "",
+"eva": "ckhch",
+"kind": "drawn",
+"note": "ckh begun with a dot, then two epsilon-like h"
+},
+"X1": {
+"ch": "|",
+"eva": "x",
+"kind": "v101"
+},
+"X2": {
+"ch": "^",
+"eva": "v",
+"kind": "v101"
+},
+"Xa": {
+"ch": "\\",
+"eva": "x",
+"kind": "v101"
+},
+"Xb": {
+"ch": "¦",
+"eva": "?",
+"kind": "v101"
+},
+"Xc": {
+"ch": "¨",
+"eva": "?",
+"kind": "v101"
+},
+"Xd": {
+"ch": "É",
+"eva": "?",
+"kind": "v101"
+},
+"Xe": {
+"ch": "«",
+"eva": "y",
+"kind": "v101"
+},
+"Xf": {
+"ch": "Ì",
+"eva": "?",
+"kind": "v101"
+},
+"Xg": {
+"ch": "¢",
+"eva": "?",
+"kind": "v101"
+},
+"Xh": {
+"ch": "Ç",
+"eva": "x",
+"kind": "v101"
+},
+"Xi": {
+"ch": "£",
+"eva": "r",
+"kind": "v101"
+},
+"Xj": {
+"ch": "¥",
+"eva": "e",
+"kind": "v101"
+},
+"Xk": {
+"ch": "§",
+"eva": "y",
+"kind": "v101"
+},
+"Xl": {
+"ch": "³",
+"eva": "?",
+"kind": "v101"
+},
+"Xm": {
+"ch": "",
+"eva": "x",
+"kind": "drawn",
+"note": "a bar on two legs (pi-shaped)"
+},
+"Xn": {
+"ch": "",
+"eva": "?",
+"kind": "drawn",
+"note": "Claston's @171; hook, the same 7-shape"
+},
+"Xo": {
+"ch": "",
+"eva": "?",
+"kind": "drawn",
+"note": "Claston's @178; (Cm), the same S-shape"
+},
+"Xp": {
+"ch": "",
+"eva": "r",
+"kind": "drawn",
+"note": "Claston's @162; hook, the same small form"
+},
+"Yd": {
+"ch": "",
+"eva": "?",
+"kind": "illegible"
+},
+"Yn": {
+"ch": "",
+"eva": "?",
+"kind": "illegible"
+},
+"Yp": {
+"ch": "",
+"eva": "?",
+"kind": "illegible"
+},
+"Ys": {
+"ch": "",
+"eva": "?",
+"kind": "illegible"
+},
+"Yx": {
+"ch": "›",
+"eva": "?",
+"kind": "v101"
+},
+"Yy": {
+"ch": "š",
+"eva": "?",
+"kind": "v101"
+},
+"Z1": {
+"ch": "?",
+"eva": "?",
+"kind": "v101"
+}
+}
+}
