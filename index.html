@@ -18,6 +18,7 @@
   <nav id="cx-tabs" role="tablist">
     <button role="tab" data-view="three">3D</button>
     <button role="tab" data-view="read">Reader</button>
+    <button role="tab" data-view="text" title="Search the text of the whole book (/)">Text</button>
     <button role="tab" data-view="info">Info</button>
   </nav>
   <label class="order-pick"><span class="op-l">Order</span>
@@ -35,6 +36,7 @@
 <main id="cx-main">
   <section id="v-read" class="view" hidden></section>
   <section id="v-three" class="view" hidden></section>
+  <section id="v-text" class="view" hidden></section>
   <section id="v-info" class="view" hidden></section>
 </main>
 <div id="cx-toast" role="status" aria-live="polite"></div>
@@ -57,6 +59,9 @@
   <div class="keys">
     <h4>Reader</h4>
     <p><kbd>←</kbd> <kbd>→</kbd> turn the page · <kbd>U</kbd> unfold / fold this opening · <kbd>Home</kbd> <kbd>End</kbd> first / last · <kbd>G</kbd> go to a folio · <kbd>O</kbd> grid of every page · <kbd>B</kbd> bookmark the page · <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> zoom · <kbd>C</kbd> crop the page (or hover a page and click ✂ Crop)</p>
+    <h4>Text</h4>
+    <p><kbd>T</kbd> in the Reader: the text of the pages, beside them · <kbd>N</kbd> <kbd>Shift</kbd>+<kbd>N</kbd> next / previous mark, with its card · <kbd>I</kbd> lines or interlinear · <kbd>Esc</kbd> close the card</p>
+    <p><kbd>/</kbd> anywhere: search the text · <kbd>↓</kbd> <kbd>↑</kbd> move through the results · <kbd>Enter</kbd> open one in the Reader</p>
     <h4>3D</h4>
     <p>Drag to turn the book · <kbd>Shift</kbd>-drag or right-drag to pan · scroll or pinch to zoom · <kbd>⌥</kbd> + arrows turn it from the keyboard (<kbd>⌥ Shift</kbd> + arrows pan) · <kbd>+</kbd> <kbd>−</kbd> zoom</p>
     <p><kbd>1</kbd> front ¾ · <kbd>2</kbd> spine · <kbd>3</kbd> head · <kbd>4</kbd> fore-edge · <kbd>5</kbd> reader's eye · <kbd>0</kbd> reset view · <kbd>[</kbd> <kbd>]</kbd> spread · <kbd>P</kbd> standing / lying · <kbd>M</kbd> block / opening</p>

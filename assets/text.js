@@ -7,7 +7,7 @@
 
 const DIR = "data/text/";
 const got = new Map();   // path -> the promise of its JSON
-function load(path) {
+export function load(path) {
   if (!got.has(path)) got.set(path, fetch(DIR + path).then(r => {
     if (!r.ok) throw new Error(`${path}: ${r.status}`);
     return r.json();
@@ -302,6 +302,7 @@ const T = {
       h("div", { class: "tx-head" },
         h("div", { class: "tx-ctl" }, views, fonts, reading, marks,
           h("button", { class: "tx-x", title: "Close the text (T)", "aria-label": "Close the text", onclick: () => TextUI.toggle(false) }, "✕"))),
+      h("div", { class: "tx-step", hidden: true, role: "navigation", "aria-label": "Search results" }),
       h("div", { class: "tx-body", tabindex: "-1" }));
     this.grip($(".tx-grip", el), el);
     const body = $(".tx-body", el);
@@ -413,6 +414,7 @@ const T = {
     body.scrollTop = 0;
     const want = R.focus && $$(".tx-page", body).find(el => short(el.dataset.page) === short(R.focus));
     if (want && want !== body.querySelector(".tx-page")) want.scrollIntoView({ block: "start" });
+    this.light(body);
   },
 
   /* one page: a header with its facts, then its loci by kind, each kind said once */
@@ -783,13 +785,55 @@ const T = {
     if (e.key === "Escape" && this.card) { this.closeCard(); return true; }
     return false;
   },
-  /* the address: text, then the reading if it is not the consensus */
-  hash() { return "text" + (this.reading !== "cons" ? "?r=" + this.reading : ""); },
+  /* the address: text, then the reading if it is not the consensus, and a line asked for (a search result) */
+  ask: null,   // { l: "f1r.2", m: [start, end], hit: k } from the address, until the reader moves on
+  hash() {
+    const p = new URLSearchParams();
+    if (this.reading !== "cons") p.set("r", this.reading);
+    if (this.ask) {
+      p.set("l", this.ask.l);
+      if (this.ask.m) p.set("m", this.ask.m.join("-"));
+      if (this.ask.hit) p.set("hit", this.ask.hit);
+    }
+    const q = p.toString();
+    return "text" + (q ? "?" + q : "");
+  },
   fromHash(q) {
     const p = new URLSearchParams(q);
     const r = p.get("r");
     this.reading = r && (SHORT[r]) ? r : "cons";
+    this.ask = p.get("l") ? { l: p.get("l"), m: p.get("m") ? p.get("m").split("-").map(Number) : null, hit: +p.get("hit") || 0, seen: false } : null;
+    this.onShow = "";
     if (this.el) this.sync();
+  },
+  /* light the line asked for, and its match; and the stepper through the search's results */
+  light(body) {
+    const a = this.ask;
+    const bar = $(".tx-step", this.el);
+    if (!a) { bar.hidden = true; return; }
+    const ln = $$(".ln", body).find(x => x.dataset.id === a.l);
+    if (!ln) {   // not there yet (the reader is on its way), or the reader has moved on
+      bar.hidden = true;
+      if (a.seen) { this.ask = null; setHash(); }
+      return;
+    }
+    a.seen = true;
+    ln.classList.add("lit");
+    if (a.m && this.reading === "cons") for (const w of $$(".w", ln)) {
+      const o = +w.dataset.o, e = o + w.dataset.e.length;
+      if (o < a.m[1] && e > a.m[0]) w.classList.add("hit");
+    }
+    requestAnimationFrame(() => ln.scrollIntoView({ block: "center" }));
+    const S_ = TextTab.mod, n = a.hit && S_ ? S_.hit(a.hit) : null;
+    bar.hidden = !n;
+    if (!n) return;
+    const prev = S_.hit(a.hit - 1), next = S_.hit(a.hit + 1);
+    bar.replaceChildren(
+      h("span", {}, `Result ${a.hit.toLocaleString("en")} of ${n.n.toLocaleString("en")}`),
+      h("button", { title: "Previous result", "aria-label": "Previous result", disabled: !prev, onclick: () => { location.hash = prev.href; } }, "‹"),
+      h("button", { title: "Next result", "aria-label": "Next result", disabled: !next, onclick: () => { location.hash = next.href; } }, "›"),
+      h("span", { class: "sp" }),
+      h("a", { href: S_.back() }, "All results"));
   },
 };
 
@@ -798,7 +842,5 @@ async function copy(s) {
   try { await navigator.clipboard.writeText(s); toast(`Copied ${s}`); }
   catch { toast(`Copy did not work: the line is ${s}`); }
 }
-
-if (TextUI.wanted) T.fromHash(String(TextUI.wanted).split("?")[1] || "");
 
 export default T;

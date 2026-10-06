@@ -315,7 +315,7 @@ function goToPage(page, { open = false } = {}) {
 }
 
 function setHash() {
-  const at = S.view === "read" ? short(curLabel() || "") : S.view === "three" ? View3D.state() : S.view === "info" ? (Info.at || "") : "";
+  const at = S.view === "read" ? short(curLabel() || "") : S.view === "three" ? View3D.state() : S.view === "info" ? (Info.at || "") : S.view === "text" ? TextTab.state() : "";
   const text = S.view === "read" && TextUI.open ? TextUI.hash() : "";
   const hash = `#${S.view}/${encodeURIComponent(S.order)}${at || text ? "/" + at : ""}${text ? "/" + text : ""}`;
   if (location.hash !== hash) history.replaceState(null, "", hash);
@@ -324,7 +324,7 @@ function setHash() {
 function readHash() {
   const [view, order, at, more] = location.hash.replace(/^#\/?/, "").split("/").map(x => { try { return decodeURIComponent(x); } catch { return x; } });
   if (view === "read") TextUI.fromHash(more);
-  if (["read", "three", "info"].includes(view)) S.view = view;
+  if (["read", "three", "info", "text"].includes(view)) S.view = view;
   if (view === "sources" || view === "collation") S.view = "info";   // the old Sources and Folio order tabs are sections of Info now
   const oid = RETIRED[order] || order;
   if (oid && ORDERS.has(oid)) S.order = oid;
@@ -350,6 +350,7 @@ function setOrder(id, opts = {}) {   // opts reach the 3D morph: { ms, moved }
   if (S.view === "read") Reader.open(o);
   if (S.view === "info") Collation.render();
   if (S.view === "three") View3D.open(o, opts);
+  if (S.view === "text") TextTab.mount();   // the book strip follows the order
   setHash();
 }
 
@@ -360,6 +361,7 @@ function show(view) {
   if (view === "read") Reader.open(ORDERS.get(S.order), POS.by && POS.by !== "read" ? POS.page : undefined);
   if (view === "three") View3D.mount();
   if (view === "info") Info.render();
+  if (view === "text") TextTab.mount();
   setHash();
 }
 
@@ -1458,7 +1460,11 @@ const TextUI = {
   open: store.get("text:open", false),
   wanted: null,   // what the address asked of the panel ("text?l=f1r.2"), until the panel has it
   load() {
-    this.loading ||= import(ASSETS + "text.js").then(m => (this.mod = m.default)).catch(e => {
+    this.loading ||= import(ASSETS + "text.js").then(m => {
+      this.mod = m.default;
+      if (this.wanted) this.mod.fromHash(String(this.wanted).split("?")[1] || "");   // what the address asked
+      return this.mod;
+    }).catch(e => {
       this.loading = null;
       const el = $("#rd-text");
       if (el) el.replaceChildren(h("p", { class: "tx-msg" }, "The text could not load: " + e.message));
@@ -1493,6 +1499,28 @@ const TextUI = {
     this.open = true;
     this.wanted = more;
     if (this.mod) this.mod.fromHash(query || "");
+  },
+};
+
+/* The Text tab: search the whole book's text (assets/search.js), loaded the first time it opens. */
+const TextTab = {
+  mod: null, loading: null, pending: "",
+  load() {
+    this.loading ||= import(ASSETS + "search.js").then(m => (this.mod = m.default)).catch(e => {
+      this.loading = null;
+      $("#v-text").replaceChildren(h("p", { class: "sx-fail" }, "Search could not load: " + e.message));
+      throw e;
+    });
+    return this.loading;
+  },
+  mount() {   // at once when loaded, so that the address it reads is the one show() writes back
+    if (this.mod) this.mod.mount(); else this.load().then(m => m.mount()).catch(() => {});
+  },
+  state() { return this.mod ? this.mod.state() : location.hash.replace(/^#\/?text\/[^/]*\/?/, "") || "search"; },
+  /* "/" anywhere: the search box */
+  focus() {
+    if (S.view !== "text") show("text");
+    this.load().then(m => setTimeout(() => m.focus(), 0)).catch(() => {});
   },
 };
 
@@ -2098,6 +2126,7 @@ async function boot() {
     }
     if (e.metaKey || e.ctrlKey || (e.altKey && S.view !== "three")) return;
     if (e.key === "?") { $("#cx-help-dlg").showModal(); return; }
+    if (e.key === "/") { e.preventDefault(); TextTab.focus(); return; }
     if (S.view === "read") Reader.key(e);
     else if (S.view === "three") View3D.key(e);
   });
