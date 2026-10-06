@@ -345,7 +345,7 @@ const T = {
       h("div", { class: "sx-strip-h" }, h("span", {}, `The book in ${order.title}`),
         h("span", { class: "muted" }, all.some(Boolean) ? `hits on ${all.filter(Boolean).length} of ${sides.length} pages; most on ${top.map(([n, k]) => `${short(sideLabel(sides[k]))} (${n})`).join(", ")}` : "no hits")),
       h("div", { class: "sx-bars", role: "img", "aria-label": `Hits page by page in ${order.title}` },
-        sides.map((p, k) => h("button", { type: "button", class: `sx-bar${now[k] ? " on" : ""}`, tabindex: "-1",
+        sides.map((p, k) => h("button", { type: "button", class: "sx-bar", tabindex: "-1",
           title: `${short(sideLabel(p))}: ${now[k]}${all[k] !== now[k] ? ` of ${all[k]}` : ""}${cmp ? ` · compared: ${cmp[k]}` : ""}`,
           onclick: () => this.jump(p) },
           h("i", { class: "all", style: { height: Math.round(H * all[k] / max) + "px" } }),

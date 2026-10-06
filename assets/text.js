@@ -741,7 +741,11 @@ const T = {
     const cw = card.offsetWidth, ch = card.offsetHeight;
     let x = Math.min(host.width - cw - 8, Math.max(8, r.left - host.left - cw / 2 + r.width / 2));
     let y = r.bottom - host.top + 8;
-    if (y + ch > host.height - 8) y = Math.max(8, r.top - host.top - ch - 8);
+    if (y + ch > host.height - 8) y = r.top - host.top - ch - 8;   // no room below: above
+    if (y < 8) {   // no room above either: beside the text panel, over the pages, level with the word
+      x = Math.max(8, this.el.getBoundingClientRect().left - host.left - cw - 12);
+      y = Math.min(host.height - ch - 8, Math.max(8, r.top - host.top - ch / 3));
+    }
     card.style.left = x + "px"; card.style.top = y + "px";
   },
   closeCard(refocus = true) {
