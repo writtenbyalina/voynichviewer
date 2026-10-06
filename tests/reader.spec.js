@@ -70,6 +70,9 @@ test.describe("turning pages", () => {
       await openReader(page);
       const k = await page.evaluate(() => R.spreads.findIndex(sp => sp.some(p => p && !p.lost && p.segs.length > 1 && !p.grid) && !sp.some(p => p && p.grid)));
       await page.evaluate(k => Reader.go(k, 0), k);
+      // With animation on, the move waits for the foldout's pictures before R.at changes: until it has arrived, the
+      // pictures on screen and R.at are still the cover's, and the → below would turn on from k, not from the cover
+      await expect.poll(() => page.evaluate(k => R.at === k && !R.busy, k), { message: "the Reader should arrive at the foldout", timeout: 10_000 }).toBe(true);
       await readerPicturesLoaded(page);
       const before = await readerState(page);
       const idle = () => expect.poll(() => page.evaluate(() => R.busy), { message: "the animation should finish", timeout: 10_000 }).toBe(false);
