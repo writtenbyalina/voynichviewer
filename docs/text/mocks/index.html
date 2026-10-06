@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text mocks</title>
+<style>
+@font-face{font-family:Voy;src:url(../../../assets/fonts/voynich-vv.woff2)}
+/* Tokens copied from assets/style.css; the dark set is proposed. */
+:root{
+  --bg:#f6f4ef;--panel:#fff;--ink:#1f2328;--muted:#646b73;--line:#d9d5cc;--accent:#2b5fd9;
+  --gold:#a06f00;--gold-soft:#fbf0cf;--mark:#b07d00;
+  --table:#2d2925;--table2:#221e1a;--table-ink:#e9e3d8;--table-muted:#a69d8f;--table-line:#4a443d;--tgold:#f3c35c;
+  --chip:#efece5;--hit:#fdf0c7;--bar:#c9c2b5;--held:#e7e3da;
+  --radius:6px;
+  font:14px/1.45 -apple-system,"system-ui","Segoe UI",Inter,system-ui,sans-serif;color:var(--ink);
+}
+[data-theme=dark]{
+  --bg:#191714;--panel:#221f1b;--ink:#ece6dc;--muted:#a69d8f;--line:#3a352f;--accent:#8fb0ff;
+  --gold:#f3c35c;--gold-soft:#3a3122;--mark:#f3c35c;
+  --table:#24211d;--table2:#1b1916;--table-line:#3d3832;
+  --chip:#2c2823;--hit:#4a3d1f;--bar:#5a534a;--held:#2a2622;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);height:100%}
+body{display:flex;flex-direction:column;min-height:100vh}
+.mono,.eva{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+button,select,input{font:inherit;color:inherit}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:var(--radius);padding:4px 10px;min-height:32px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.btn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.pill{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:3px 10px;font-size:13px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.pill b{font-weight:600}
+.muted{color:var(--muted)}
+.caps{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+/* top bar */
+.top{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line);height:46px}
+.brand{font-weight:700;white-space:nowrap}.ver{font-size:11px;border:1px solid var(--line);border-radius:99px;padding:0 6px;margin-left:6px;font-family:ui-monospace,Menlo,monospace;background:var(--chip)}
+.tabs{display:flex;gap:2px;margin-left:12px}
+.tabs span{padding:5px 10px;border-radius:var(--radius)}.tabs span.on{background:var(--ink);color:var(--bg)}
+.top .sp{flex:1}
+.top select{border:1px solid var(--line);border-radius:var(--radius);padding:4px 8px;background:var(--panel);min-width:230px}
+/* Reader */
+.reader{flex:1;display:flex;flex-direction:column;background:var(--table);color:var(--table-ink);min-height:0}
+.rd-bar{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--table-line);height:48px}
+.rd-bar .btn{background:transparent;border-color:var(--table-line);color:var(--table-ink)}
+.rd-bar .btn.on{background:var(--table-ink);color:var(--table);border-color:var(--table-ink)}
+.rd-bar .where{font-weight:700}.rd-bar .meta{color:var(--table-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-body{flex:1;display:flex;min-height:0}
+.stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-width:0;padding:14px 64px}
+.stage img{max-height:100%;max-width:100%;box-shadow:0 6px 24px #0007;display:block}
+.stage .navb{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:86px;border:1px solid var(--table-line);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--table-ink);font-size:20px}
+.stage .navb.l{left:10px}.stage .navb.r{right:10px}
+.hl{position:absolute;border:2px solid var(--tgold);border-radius:3px;background:#f3c35c22;pointer-events:none}
+.strip{height:52px;border-top:1px solid var(--table-line);padding:6px 16px;display:flex;align-items:flex-end;gap:1px;overflow:hidden}
+.strip i{display:block;width:5px;height:20px;background:#8a7f6e}.strip i.cur{background:var(--tgold)}
+/* Text panel (Reader) */
+.tx{width:456px;flex:none;border-left:1px solid var(--table-line);background:var(--table2);display:flex;flex-direction:column;min-height:0}
+.tx-head{padding:12px 16px 10px;border-bottom:1px solid var(--table-line)}
+.tx-head h2{margin:0;font-size:16px;display:flex;align-items:baseline;gap:8px}
+.tx-head .facts{color:var(--table-muted);font-size:13px;margin-top:2px}
+.tx-ctl{display:flex;gap:6px;margin-top:10px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--table-line);border-radius:var(--radius);overflow:hidden}
+.seg span{padding:4px 10px;font-size:13px;color:var(--table-ink)}.seg span.on{background:var(--table-ink);color:var(--table)}
+.tsel{border:1px solid var(--table-line);border-radius:var(--radius);padding:4px 10px;font-size:13px;color:var(--table-ink)}
+.tsearch{flex:1;min-width:120px;border:1px solid var(--table-line);border-radius:var(--radius);padding:4px 10px;font-size:13px;color:var(--table-muted);display:flex;justify-content:space-between}
+.tsearch kbd{font-family:ui-monospace,Menlo,monospace;border:1px solid var(--table-line);border-radius:4px;padding:0 5px;font-size:11px}
+.tx-body{flex:1;overflow:auto;padding:10px 16px 16px}
+.grp{margin:14px 0 6px}.grp:first-child{margin-top:2px}
+.ln{display:grid;grid-template-columns:30px 1fr;gap:0 8px;padding:1px 0;border-radius:4px}
+.ln .no{color:var(--table-muted);font-size:12px;text-align:right;padding-top:2px;font-family:ui-monospace,Menlo,monospace}
+.ln .t{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:14.5px;line-height:1.7;word-spacing:.15em}
+.ln.cur{background:#f3c35c14}
+.glyph .ln .t{font-family:Voy,serif;font-size:25px;line-height:1.45;word-spacing:.05em;letter-spacing:.01em}
+.glyph .ln .t .us{font-family:-apple-system,system-ui,sans-serif;font-size:14px}
+.glyph .w.st{display:inline-flex;flex-direction:column;align-items:center;vertical-align:top;margin-right:.35em;line-height:1.15}
+.glyph .w.st .ev{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--table-muted);letter-spacing:0;margin-top:1px}
+.glyph .ln .t{word-spacing:0}
+.glyph .c{text-underline-offset:6px}
+.ln.pstart{margin-top:10px}
+.w{border-radius:3px}
+.w.sel{background:#f3c35c33;outline:1px solid var(--tgold)}
+.c{text-decoration:underline dotted var(--tgold) 2px;text-underline-offset:4px}
+.us{display:inline-block;width:.5em;text-align:center;color:var(--tgold);font-size:12px;vertical-align:1px}
+.dj{display:inline-block;width:0;border-left:1.5px solid var(--tgold);height:.7em;vertical-align:.45em;opacity:.8}
+.tx-foot{border-top:1px solid var(--table-line);margin-top:18px;padding:10px 0 0;font-size:12px;color:var(--table-muted)}
+.tx.wide{width:min(780px,58%)}
+.tx-foot a{color:var(--table-ink)}
+/* apparatus card */
+.card{position:absolute;z-index:5;width:360px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px #0006;padding:12px 14px;font-size:13px}
+.card .x{position:absolute;right:10px;top:8px;color:var(--muted)}
+.card .hdr{display:flex;gap:10px;align-items:baseline}
+.card .big{font-family:ui-monospace,Menlo,monospace;font-size:22px;letter-spacing:.06em}
+.card .agree{display:flex;gap:2px;margin:2px 0 8px}
+.card .agree span{display:inline-block;width:13.2px;height:4px;border-radius:2px;background:var(--bar)}
+.card .agree span.lo{background:var(--mark)}
+.card table{width:100%;border-collapse:collapse;margin:4px 0}
+.card td{padding:3px 4px;vertical-align:top;border-top:1px solid var(--line)}
+.card td.r{font-family:ui-monospace,Menlo,monospace;font-size:14px;white-space:nowrap;width:64px}
+.card td.n{text-align:right;color:var(--muted);width:26px}
+.card .ref td{color:var(--muted)}
+.card .votes{color:var(--muted);margin:6px 0 8px}
+.card .acts{display:flex;gap:6px;flex-wrap:wrap}
+.card .acts .btn{font-size:12px;min-height:28px}
+.card .note{font-size:12px;color:var(--muted)}
+/* interlinear */
+.il{margin:4px 0 16px}
+.il .lab{font-size:12px;color:var(--table-muted);margin:10px 0 4px;display:flex;justify-content:space-between}
+.il .rows{display:grid;grid-template-columns:76px auto;gap:0 8px;overflow-x:auto}
+.il .who{font-size:11.5px;color:var(--table-muted);white-space:nowrap;line-height:21px;text-align:right}
+.il .who.cons{color:var(--table-ink);font-weight:600}
+.il .seq{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;white-space:pre;line-height:21px}
+.il .seq .d{color:var(--table-muted);opacity:.55}
+.il .seq .x{color:#1b1916;background:var(--tgold);border-radius:2px}
+.il .seq .xs{background:#f3c35c55;border-radius:2px}
+.il .seq.cons{font-weight:600}
+.il .bars{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;white-space:pre;line-height:8px;height:10px}
+.il .bars i{display:inline-block;width:1ch;vertical-align:bottom;background:#8a7f6e;border-radius:1px}
+.il .bars i.lo{background:var(--tgold)}
+.il .ref{opacity:.75}
+.il .sep{grid-column:1/-1;border-top:1px dashed var(--table-line);margin:3px 0}
+.legend{font-size:12px;color:var(--table-muted);display:flex;gap:12px;flex-wrap:wrap;margin:2px 0 6px}
+.legend b{color:var(--table-ink);font-weight:500}
+/* Search / Dissect */
+.textv{flex:1;display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.sq{padding:14px 20px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+.subtabs{display:flex;gap:16px;margin-bottom:10px;font-weight:600}
+.subtabs span{padding-bottom:4px;color:var(--muted)}.subtabs span.on{color:var(--ink);border-bottom:2px solid var(--ink)}
+.qrow{display:flex;gap:8px;align-items:center}
+.qbox{flex:1;border:1.5px solid var(--ink);border-radius:8px;padding:8px 12px;font-family:ui-monospace,Menlo,monospace;font-size:17px;display:flex;align-items:center;gap:2px;min-height:44px;background:var(--panel)}
+.qbox .op{color:var(--accent);font-weight:700}.qbox .q{color:var(--muted);font-size:12px;font-family:-apple-system,system-ui,sans-serif;margin-left:auto}
+.qbox .cur{display:inline-block;width:1.5px;height:20px;background:var(--ink);margin-left:1px}
+.echo{margin:8px 2px 8px;font-size:13.5px}.echo b{font-weight:600}
+.opts{display:flex;gap:6px;flex-wrap:wrap}
+.opts .pill .k{color:var(--muted)}
+.sbody{flex:1;display:flex;min-height:0}
+.facets{width:268px;flex:none;border-right:1px solid var(--line);padding:12px 16px;overflow:auto;background:var(--panel)}
+.facet{margin-bottom:16px}
+.facet .row{display:grid;grid-template-columns:1fr auto;gap:4px;padding:4px 6px;border-radius:5px;font-size:13px;align-items:center;min-height:30px}
+.facet .row:hover{background:var(--chip)}
+.facet .row .n{font-variant-numeric:tabular-nums}
+.facet .row .rg{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+.facet .row .barbg{grid-column:1/-1;height:3px;background:var(--chip);border-radius:2px;margin-top:-2px}
+.facet .row .barbg i{display:block;height:3px;background:var(--bar);border-radius:2px}
+.facet .row.on{background:var(--gold-soft)}
+.res{flex:1;overflow:auto;padding:12px 20px 30px;min-width:0}
+.sum{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sum .count{font-size:20px;font-weight:700}
+.sum .acts{margin-left:auto;display:flex;gap:6px}
+.chain{display:flex;gap:6px;align-items:center;margin:8px 0;font-size:13px;flex-wrap:wrap}
+.chain .step{background:var(--chip);border-radius:5px;padding:2px 8px}
+.book{margin:10px 0 14px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.book .hd{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:6px}
+.book svg{display:block;width:100%;height:58px}
+.grp2{margin:14px 0 4px;display:flex;gap:10px;align-items:center}
+.grp2 img{width:34px;height:44px;object-fit:cover;border-radius:3px;border:1px solid var(--line)}
+.grp2 .pg{font-weight:700}.grp2 .f{color:var(--muted);font-size:12.5px}
+.kwic{display:grid;grid-template-columns:62px minmax(0,1fr) auto minmax(0,1fr);gap:0 10px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px}
+.kwic>div{padding:3px 0;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden}
+.kwic .loc{color:var(--muted);font-size:12px;padding-top:5px}
+.kwic .l{text-align:right;text-overflow:ellipsis;direction:rtl}
+.kwic .m{font-weight:700;background:var(--hit);padding:3px 4px;border-radius:3px}
+.kwic .r{text-overflow:ellipsis}
+.expect{font-size:12.5px;color:var(--muted)}
+/* Dissect */
+.dgrid{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;padding:14px 20px;overflow:auto;flex:1}
+.panelc{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.panelc h3{margin:0 0 2px;font-size:14px}
+table.k{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+table.k th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:right;font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line)}
+table.k th:first-child,table.k td:first-child{text-align:left}
+table.k td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right}
+table.k td.w{font-family:ui-monospace,Menlo,monospace}
+.kb{display:inline-block;position:relative;width:110px;height:10px;vertical-align:middle;background:var(--chip);border-radius:3px}
+.kb i{position:absolute;top:0;height:10px;border-radius:3px}
+.kb i.v{background:var(--bar)}.kb i.a{background:#2b5fd9aa}.kb i.b{background:#b07d00aa}
+.kb i.rg{background:transparent;border-left:1.5px solid var(--ink);border-right:1.5px solid var(--ink);height:10px;opacity:.6}
+/* gold */
+.gold{flex:1;display:flex;flex-direction:column;align-items:center;padding:20px;gap:14px;overflow:auto}
+.gold .prog{width:min(900px,100%);display:flex;justify-content:space-between;font-size:13px}
+.gold .pbar{width:min(900px,100%);height:4px;background:var(--chip);border-radius:2px}.gold .pbar i{display:block;height:4px;width:15%;background:var(--gold);border-radius:2px}
+.crop{width:min(900px,100%);aspect-ratio:785/50;background-image:url(../../../data/panels/f1r_l.jpg);background-size:143.06% auto;background-position:60.65% 13.7%;border-radius:8px;position:relative;box-shadow:0 2px 12px #0003}
+.crop .box{position:absolute;border:2px solid #e5484d;border-radius:4px}
+.crop .gap{position:absolute;border-left:2px dashed #e5484d}
+.q2{width:min(900px,100%);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.q2 h3{margin:0 0 4px;font-size:15px}
+.choices{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.choice{border:1px solid var(--line);border-radius:8px;padding:8px 14px;min-height:44px;display:flex;align-items:center;gap:10px;background:var(--bg);font-family:ui-monospace,Menlo,monospace;font-size:17px}
+.choice kbd{font-family:-apple-system,system-ui,sans-serif;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--muted)}
+.choice.alt{font-family:-apple-system,system-ui,sans-serif;font-size:14px}
+.choice.picked{border-color:var(--gold);background:var(--gold-soft)}
+/* phone */
+.mobile-only{display:none!important}
+@media (max-width:760px){
+  .top{height:auto;flex-wrap:wrap;padding:8px 12px;gap:6px}
+  .top select,.top .opt{display:none}
+  .tabs{margin-left:auto}
+  .rd-bar{height:auto;flex-wrap:wrap;padding:6px 12px}
+  .rd-bar .meta{flex:1 1 100%;order:3;font-size:12.5px}
+  .rd-bar .wide{display:none}
+  .rd-body{flex-direction:column}
+  .stage{flex:none;height:250px;padding:8px 54px}
+  .stage .navb{width:40px;height:64px}
+  .tx{width:auto;border-left:0;border-top:1px solid var(--table-line);flex:1}
+  .tx-head{padding:10px 12px 8px}
+  .tx-head .facts{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tx.wide{width:auto}
+  .tx::before{content:'';display:block;width:40px;height:4px;border-radius:2px;background:var(--table-line);margin:6px auto 0}
+  .tx-body{padding:6px 12px 12px}
+  .ln .t{font-size:14px}
+  .strip{display:none}
+  .card{left:8px!important;right:8px;width:auto;top:auto!important;bottom:8px;position:fixed;border-radius:14px 14px 10px 10px}
+  .sq{padding:10px 12px}
+  .facets{display:none}
+  .sbody{flex-direction:column}
+  .res{padding:10px 12px}
+  .kwic{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);font-size:13px}
+  .kwic .loc{display:none}
+  .dgrid{grid-template-columns:1fr;padding:10px 12px}
+  .mobile-only{display:flex!important}
+  .desk-only{display:none!important}
+  .il .rows{grid-template-columns:58px auto}
+}
+
+/* Dissect workbench (nodes) */
+.lab{flex:1;display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.labbar{display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.labbar .title{font-weight:700}
+.labbar .tries{font-size:12.5px;color:var(--muted)}
+.lock{border-color:var(--gold);color:var(--gold)}
+.labbody{flex:1;display:flex;min-height:0}
+.canvas{flex:1;position:relative;overflow:hidden;background-color:var(--bg);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:18px 18px}
+.canvas svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.node{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 2px 10px #0001;font-size:12.5px;overflow:visible}
+.node.sel{outline:2px solid var(--gold);outline-offset:1px}
+.node .nh{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--line);font-weight:600;font-size:12.5px}
+.node .nh i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.node .nh .k{margin-left:auto;font-weight:400;color:var(--muted);font-size:11px}
+.node .nb{padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.node .row2{display:flex;justify-content:space-between;gap:8px}.node .row2 span:first-child{color:var(--muted)}
+.node .pv{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:var(--bg);border-radius:6px;padding:6px 8px;line-height:1.5}
+.node .pv .lc{color:var(--muted)}
+.port{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--panel);border:2px solid var(--muted)}
+.port.in{left:-6px}.port.out{right:-6px}
+.c-src{background:#3f9d6b}.c-tr{background:#2b5fd9}.c-ms{background:#b07d00}.c-ref{background:#8e4ec6}.c-out{background:#646b73}.c-split{background:#c2410c}
+.fprow{display:grid;grid-template-columns:150px 1fr 92px;gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line)}
+.fprow:first-of-type{border-top:0}
+.fprow .nm{font-size:12px}.fprow .nm small{display:block;color:var(--muted);font-size:10.5px}
+.fprow .verdict{font-size:11px;color:var(--muted);text-align:right}
+.fprow .verdict b{font-weight:600;color:var(--ink)}
+.track{position:relative;height:22px}
+.track .band{position:absolute;top:8px;height:6px;border-radius:3px}
+.track .band.lang{background:#8e4ec655}.track .band.you{background:var(--accent);height:2px;top:10px;opacity:.7}.track .band.vms{background:#b07d0066}
+.track .dot{position:absolute;top:5px;width:12px;height:12px;border-radius:50%;transform:translateX(-6px);border:2px solid var(--panel)}
+.track .dot.you{background:var(--accent)}.track .dot.vm{background:#b07d00;border-radius:2px;transform:translateX(-6px) rotate(45deg);width:10px;height:10px;top:6px}
+.fplegend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-bottom:4px}
+.fplegend span::before{content:'';display:inline-block;width:10px;height:6px;border-radius:3px;margin-right:4px;vertical-align:1px;background:var(--c)}
+.fphead{font-size:12.5px;margin:2px 0 6px;padding:6px 8px;border-radius:6px;background:var(--gold-soft)}
+.insp{width:330px;flex:none;border-left:1px solid var(--line);background:var(--panel);padding:14px 16px;overflow:auto;font-size:13px}
+.insp h3{margin:0 0 6px;font-size:14px}
+.insp .opt{display:flex;gap:8px;align-items:flex-start;padding:7px 8px;border:1px solid var(--line);border-radius:8px;margin:6px 0}
+.insp .opt.on{border-color:var(--gold);background:var(--gold-soft)}
+.insp .opt .r{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted);flex:none;margin-top:2px}
+.insp .opt.on .r{border-color:var(--gold);background:radial-gradient(var(--gold) 45%,transparent 50%)}
+.insp .opt small{display:block;color:var(--muted)}
+.insp .sec{margin-top:14px}
+.addbar{position:absolute;left:16px;bottom:16px;display:flex;gap:6px}
+.palette{position:absolute;left:16px;bottom:62px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;display:grid;grid-template-columns:repeat(2,auto);gap:4px 14px;font-size:12px;box-shadow:0 4px 16px #0002}
+.palette span{display:flex;align-items:center;gap:6px;padding:3px 4px}.palette i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.stack{display:none}
+@media (max-width:760px){
+  .canvas,.insp,.addbar,.palette{display:none}
+  .stack{display:flex;flex-direction:column;gap:0;padding:12px;overflow:auto;flex:1}
+  .stack .node{position:relative;left:auto!important;top:auto!important;width:auto!important}
+  .stack .port{display:none}
+  .stack .link{align-self:center;width:2px;height:18px;background:var(--line);position:relative}
+  .stack .plus{align-self:center;font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:99px;padding:2px 10px;margin:2px 0}
+  .fprow{grid-template-columns:1fr;gap:2px}.fprow .verdict{text-align:left}
+  .labbar{padding:8px 12px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <span class="brand">Voynich Viewer<span class="ver">v1.5</span></span>
+  <nav class="tabs"><span>3D</span><span id="t-read">Reader</span><span id="t-text">Text</span><span>Info</span></nav>
+  <span class="sp"></span>
+  <span class="muted opt desk-only">Order</span>
+  <select aria-label="Order"><option>Current binding (folio order)</option></select>
+  <span class="btn opt desk-only">★</span><span class="btn opt">Your work</span><span class="btn opt desk-only">?</span>
+</header>
+<main id="main" style="flex:1;display:flex;flex-direction:column;min-height:0"></main>
+<script>
+const P = new URLSearchParams(location.search);
+const SCREEN = P.get('s') || 'reader', THEME = P.get('theme') || 'light', GLYPH = P.get('font') === 'glyph';
+let E2V = null;
+document.documentElement.dataset.theme = THEME;
+const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[c]);
+const NAME = {ZL:'Zandbergen–Landini',GC:'Claston',IT:'Takahashi',FG:'FSG',CD:'Currier',LU:'Stolfi',LV:'Grove',LT:'Tiltman',LL:'Latham',LK:'Petersen',RF:'RF1',VT:'voynichese.com'};
+const SHORT = {ZL:'ZL',GC:'Claston',IT:'Takahashi',FG:'FSG',CD:'Currier',LU:'Stolfi',RF:'RF1',VT:'v-ese.com'};
+const VOTERS = ['ZL','GC','IT','FG','CD','LU','LV','LT','LL','LK'];
+Promise.all([fetch('data.json').then(r => r.json()), fetch('eva2v101.json').then(r => r.json())]).then(([D, M]) => {
+  E2V = M; E2V.keys = Object.keys(M).sort((a, b) => b.length - a.length);
+  window.D = D;
+  const main = document.getElementById('main');
+  document.getElementById(['search', 'dissect', 'lab'].includes(SCREEN) ? 't-text' : 't-read').classList.add('on');
+  if (SCREEN === 'reader' || SCREEN === 'card' || SCREEN === 'inter') main.innerHTML = reader(D);
+  if (SCREEN === 'search') main.innerHTML = search(D);
+  if (SCREEN === 'dissect') main.innerHTML = dissect(D);
+  if (SCREEN === 'gold') main.innerHTML = gold(D);
+  if (SCREEN === 'lab') main.innerHTML = lab(D);
+  if (SCREEN === 'card') placeCard();
+  document.body.dataset.ready = '1';
+});
+/* ---------- Reader text panel ---------- */
+function toV(e) {   // Eva -> Claston's v101 codes, glyph by glyph (longest match)
+  let o = '', i = 0;
+  while (i < e.length) { const k = E2V.keys.find(k => e.startsWith(k, i)); if (k) { o += E2V[k]; i += k.length; } else { o += e[i]; i++; } }
+  return o;
+}
+function lineHTML(rec, evaOnly) {
+  let out = '', word = '', eva = '', wi = 0;
+  const g = GLYPH && !evaOnly;
+  let evaHTML = '';
+  const flush = () => { if (word) { out += `<span class="w${g ? ' st' : ''}${rec.id === 'f1r.2' && wi === 6 && SCREEN === 'card' ? ' sel' : ''}" data-w="${wi}"${g ? ` role="text" aria-label="${esc(eva)}"` : ''}>${g ? `<span class="gl" aria-hidden="true">${word}</span><span class="ev" aria-hidden="true">${evaHTML}</span>` : word}</span>`; wi++; word = ''; eva = ''; evaHTML = ''; } };
+  for (const t of rec.toks) {
+    if (t.g !== undefined) {
+      const contested = ['tie', 'plur', 'none'].includes(t.st);
+      const shown = g ? esc(toV(t.g)) : esc(t.g); eva += t.g;
+      word += contested ? `<span class="c" title="readings differ">${shown}</span>` : shown;
+      evaHTML += esc(t.g);
+    } else if (t.s === 'all' || t.s === 'most') { flush(); out += ' '; }
+    else if (t.s === 'unc') { word += `<span class="us" aria-label="uncertain space">·</span>`; evaHTML += '·'; }
+  }
+  flush();
+  return out;
+}
+function reader(D) {
+  const recs = D.reader;
+  let body = '<div class="grp caps" style="color:var(--table-muted)">Paragraphs</div>';
+  let para = true;
+  if (SCREEN === 'inter') body = interlinear(D);
+  else recs.forEach(r => {
+    const n = r.id.split('.')[1];
+    body += `<div class="ln${para ? ' pstart' : ''}${r.id === 'f1r.2' ? ' cur' : ''}"><span class="no" title="${r.id}">${n}</span><span class="t">${lineHTML(r)}</span></div>`;
+    para = r.type === 'Pt';
+  });
+  const nw = 6;
+  return `<section class="reader">
+  <div class="rd-bar"><span class="btn">‹</span><span class="btn">›</span><span class="where">f1r</span>
+    <span class="meta">Quire 1 · bifolium 1|8 · Botanical · Scribe 1 · Currier A · opening 1 of 117</span><span class="sp" style="flex:1"></span>
+    <span class="btn wide">Unfold</span><span class="btn wide">Labels</span><span class="btn wide">Scribes</span><span class="btn wide">Go to…</span><span class="btn on">Text</span><span class="btn wide">Grid</span></div>
+  <div class="rd-body">
+    <div class="stage"><span class="navb l">‹</span><div style="position:relative;height:100%;display:flex;align-items:center"><img id="pg" src="../../../data/panels/f1r_l.jpg" alt="f1r"></div><span class="navb r">›</span></div>
+    <aside class="tx${SCREEN === 'inter' ? ' wide' : ''}" aria-label="Text of f1r">
+      <div class="tx-head">
+        <h2>f1r <span class="muted" style="font-weight:400;font-size:13px;color:var(--table-muted)">28 lines · <u>${nw} transcribers</u></span></h2>
+        <div class="facts">Scribe 1 · Currier A · Botanical, text only · Quire 1</div>
+        <div class="tx-ctl">
+          <span class="seg"><span class="${SCREEN === 'inter' ? '' : 'on'}">Lines</span><span class="${SCREEN === 'inter' ? 'on' : ''}">Interlinear</span></span>
+          <span class="tsel">Consensus ▾</span>
+          <span class="seg"><span class="${GLYPH ? '' : 'on'}">Eva</span><span class="${GLYPH ? 'on' : ''}" style="font-family:${GLYPH ? 'inherit' : 'inherit'}">Glyphs</span></span>
+          <span class="tsearch desk-only">Search the book <kbd>/</kbd></span><span class="tsel mobile-only" aria-label="Search the book">Search</span>
+        </div>
+      </div>
+      <div class="tx-body${GLYPH ? ' glyph' : ''}" id="txb">${body}
+        <div class="tx-foot">The consensus of ${nw} transcriptions, aligned and voted glyph by glyph (<a href="#">how</a>). Transcriptions by René Zandbergen &amp; Gabriel Landini, Glen Claston, Takeshi Takahashi, the First Study Group, Prescott Currier, Jorge Stolfi and others, from <a href="#">voynich.nu</a> (CC0).</div></div>
+    </aside>
+  </div>
+  <div class="strip desk-only">${Array.from({length: 117}, (_, i) => `<i class="${i === 0 ? 'cur' : ''}"></i>`).join('')}</div>
+</section>`;
+}
+function placeCard() {
+  const w = document.querySelector('.ln.cur .w[data-w="6"]');
+  const r = w.getBoundingClientRect();
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<span class="x">✕</span>
+    <div class="hdr"><span class="big">are</span><span class="muted">f1r.2, word 7 · consensus</span></div>
+    <div class="agree" aria-label="agreement per glyph"><span title="a: 6 of 6"></span><span class="lo" title="r: 4 of 6"></span><span class="lo" title="e: 2 of 5"></span></div>
+    <table>
+      <tr><td class="r">are</td><td>Takahashi</td><td class="n">1</td></tr>
+      <tr><td class="r">ase</td><td>Zandbergen–Landini</td><td class="n">1</td></tr>
+      <tr><td class="r">a&#8203;is</td><td>Claston <span class="muted">(v101 <span class="mono">Ais</span>: its <span class="mono">A</span> sits between a and o)</span></td><td class="n">1</td></tr>
+      <tr><td class="r">ary</td><td>Stolfi</td><td class="n">1</td></tr>
+      <tr><td class="r">ar</td><td>FSG</td><td class="n">1</td></tr>
+      <tr><td class="r">ar?</td><td>Currier <span class="muted">(last glyph unreadable)</span></td><td class="n">1</td></tr>
+      <tr class="ref"><td class="r">ais</td><td>RF1, Zandbergen's merge</td><td class="n"></td></tr>
+      <tr class="ref"><td class="r">are</td><td>voynichese.com</td><td class="n"></td></tr>
+    </table>
+    <div class="votes">2nd glyph: <b>r</b> 4 · s 1 · i 1 (majority). 3rd glyph: <b>e</b> 2 · s 1 · y 1 · none 1 (most votes, not a majority).</div>
+    <div class="acts"><span class="btn">Only here in the book</span><span class="btn">Interlinear</span><span class="btn">Photo crop</span><span class="btn">Copy f1r.2</span></div>`;
+  const host = document.querySelector('.reader');
+  host.style.position = 'relative';
+  const hr = host.getBoundingClientRect();
+  card.style.left = Math.min(hr.width - 376, Math.max(8, r.left - hr.left - 230)) + 'px';
+  card.style.top = (r.bottom - hr.top + 8) + 'px';
+  host.appendChild(card);
+}
+/* ---------- Interlinear ---------- */
+function interlinear(D) {
+  let html = `<div class="legend"><span><b>Bold</b>: consensus</span><span>dim: same as consensus</span><span><span class="mono" style="background:var(--tgold);color:#1b1916;border-radius:2px;padding:0 2px">x</span> differs</span><span><span class="mono">,</span> uncertain space</span><span><span class="mono">‿</span> joined where others split</span><span><span class="mono">-</span> gap</span></div>`;
+  const spOf = v => v === '.' || v === '-' ? ' ' : v === ',' ? ',' : '';
+  for (const id of ['f1r.1', 'f1r.2', 'f1r.3', 'f1r.4']) {
+    const cols = D.cols[id]; if (!cols) continue;
+    const wits = ['ZL','GC','IT','FG','CD','LU'].filter(n => cols.some(c => c.rd[n] !== undefined));
+    const refs = ['RF','VT'];
+    const widths = cols.map(c => Math.max(1, (c.c || '').length, ...Object.values(c.rd).map(s => (s || '').length)));
+    const consSep = c => { const v = Object.entries(c.sp).filter(([n]) => VOTERS.includes(n)).map(([, v]) => v === '.' || v === '-' ? 1 : v === ',' ? .5 : 0); if (!v.length) return ''; const s = v.reduce((a, b) => a + b, 0) / v.length; const m = Object.values(c.sp).filter(v => v === ',').length; return s >= 2/3 ? ' ' : (s > 1/3 || m >= 2) ? ',' : ''; };
+    const slot = cols.map((c, i) => i > 0 && Object.values(c.sp).some(v => v));
+    const row = n => cols.map((c, i) => {
+      let pre = '';
+      if (slot[i]) {
+        const cs = consSep(c), s = n === 'cons' ? cs : (c.rd[n] === undefined ? cs : spOf(c.sp[n]));
+        const shown = s || '‿';
+        pre = n === 'cons' ? (cs || '<span class="d">‿</span>') : (s === cs ? `<span class="d">${shown === ' ' ? ' ' : shown}</span>` : `<span class="xs">${shown === ' ' ? '␣' : shown}</span>`);
+      }
+      const r = n === 'cons' ? c.c : (c.rd[n] ?? null);
+      if (r === null) return pre + ' '.repeat(widths[i]);
+      const pad = `<span class="d">${'-'.repeat(widths[i] - r.length)}</span>`;
+      if (n === 'cons') return pre + esc(r) + pad;
+      return pre + (r === c.c ? `<span class="d">${esc(r)}</span>` : `<span class="x">${esc(r || '-')}</span>`) + `<span class="d">${'-'.repeat(Math.max(0, widths[i] - Math.max(1, r.length)))}</span>`;
+    }).join('');
+    const bars = cols.map((c, i) => {
+      const pre = slot[i] ? ' ' : '';
+      const v = wits.filter(n => c.rd[n] !== undefined); const ag = v.filter(n => c.rd[n] === c.c).length / Math.max(1, v.length);
+      return pre + `<i class="${ag < 1 ? 'lo' : ''}" style="height:${Math.max(2, Math.round(8 * ag))}px;width:${widths[i]}ch"></i>`;
+    }).join('');
+    html += `<div class="il"><div class="lab"><span>${id}</span><span>${wits.length} transcribers</span></div><div class="rows">
+      <div class="who cons">Consensus</div><div class="seq cons">${row('cons')}</div>
+      <div></div><div class="bars">${bars}</div>
+      ${wits.map(n => `<div class="who">${SHORT[n]}</div><div class="seq">${row(n)}</div>`).join('')}
+      <div class="sep"></div>
+      ${refs.map(n => `<div class="who ref">${SHORT[n]}</div><div class="seq ref">${row(n)}</div>`).join('')}
+    </div></div>`;
+  }
+  return html;
+}
+/* ---------- Search ---------- */
+function search(D) {
+  const N = D.n2; const total = N.totals.cons, lo = Math.min(...Object.values(N.totals)), hi = Math.max(...Object.values(N.totals));
+  const pages = D.strip; const max = Math.max(...pages.map(p => p[2])); const on = new Map(N.strip.map(p => [p[0], p[1]]));
+  const W = 1000, bw = W / pages.length;
+  let svg = `<svg viewBox="0 0 ${W} 58" preserveAspectRatio="none" aria-label="Hits across the book">`;
+  let lastQ = null, lastX = -99;
+  pages.forEach((p, i) => {
+    const m = D.meta[p[0]] || {}; const x = i * bw;
+    if (m.q !== lastQ) { svg += `<line x1="${x}" x2="${x}" y1="0" y2="58" stroke="var(--line)" stroke-width="1"/>`; if (x - lastX > 22) { svg += `<text x="${x + 2}" y="9" font-size="8" fill="var(--muted)">Q${m.q ?? ''}</text>`; lastX = x; } lastQ = m.q; }
+    if (!p[1]) svg += `<rect x="${x}" y="14" width="${bw - .6}" height="44" fill="var(--held)"/>`;
+    else if (p[2]) { const h = 6 + 38 * Math.sqrt(p[2] / max); const mine = on.get(p[0]); svg += `<rect x="${x}" y="${58 - h}" width="${Math.max(1.4, bw - .8)}" height="${h}" fill="${mine ? 'var(--gold)' : 'var(--bar)'}" rx=".5"/>`; }
+  });
+  svg += '</svg>';
+  const label = { scr: k => k.includes(',') ? 'Scribes ' + k.split(',').sort().join(' and ') : 'Scribe ' + k, sec: k => k, L: k => k === '?' ? 'not assigned' : k, q: k => 'Quire ' + k, type: k => ({P:'Paragraphs',L:'Labels',C:'Rings',R:'Radii'})[k] || k };
+  const fac = (title, key) => { const all = key === 'scr' ? D.facets.scr : N.facets[key]; return `<div class="facet"><div class="caps">${title}</div>${all.slice(0, 6).map(([k, n, a, b]) => { const act = key === 'scr' && k === '2'; const dim = key === 'scr' && !act; return `<div class="row${act ? ' on' : ''}" style="${dim ? 'opacity:.55' : ''}"><span>${esc(label[key](k))}${act ? ' ✕' : ''}</span><span><span class="n">${n.toLocaleString('en')}</span> <span class="rg">${a === b ? '' : a + '–' + b}</span></span><span class="barbg"><i style="width:${100 * n / all[0][1]}%"></i></span></div>`; }).join('')}</div>`; };
+  const sorted = N.hits.slice().sort((x, y) => (x[3] === '') - (y[3] === '') || x[3].localeCompare(y[3]));
+  const res = `<div class="kwic">${sorted.slice(0, 16).map(h => `<div class="loc">${h[0]}</div><div class="l">${esc(h[1])}</div><div class="m">${esc(h[2])}</div><div class="r">${esc(h[3])}</div>`).join('')}</div>`;
+  return `<section class="textv">
+  <div class="sq">
+    <div class="subtabs"><span class="on">Search</span><span>Dissect</span></div>
+    <div class="qrow"><div class="qbox" role="textbox" aria-label="Search query">qok<span class="op">*</span><span class="cur"></span><span class="q desk-only">plain Eva · * ? [kt] &lt;gallows&gt; ^ $ - _ ~ /regex/</span></div><span class="btn" style="min-height:44px" title="Glyph palette">Glyphs</span></div>
+    <div class="echo">Words that <b>begin with qok</b>, in the <b>consensus</b> reading, counting uncertain spaces <b>either way</b>, across the <b>whole book</b>, narrowed to <b>Scribe 2</b>.</div>
+    <div class="opts"><span class="pill"><span class="k">Reading</span> <b>Consensus</b> ▾</span><span class="pill"><span class="k">Spaces</span> <b>either way</b> ▾</span><span class="pill"><span class="k">Match</span> <b>exact Eva</b> ▾</span><span class="pill"><span class="k">Near</span> <b>off</b> ▾</span><span class="pill"><span class="k">Pages</span> <b>whole book</b> ▾</span><span class="pill mobile-only">Filters · 1 ▾</span></div>
+  </div>
+  <div class="sbody">
+    <aside class="facets">${fac('Scribe (Davis)', 'scr')}${fac('Section', 'sec')}${fac('Currier language', 'L')}${fac('Quire', 'q')}${fac('Kind of text', 'type')}</aside>
+    <div class="res">
+      <div class="sum"><span class="count">${total.toLocaleString('en')} words</span><span class="muted">${lo.toLocaleString('en')}–${hi.toLocaleString('en')} across Zandbergen–Landini, Claston and Takahashi · on ${N.pages} pages · of ${D.totals.cons.toLocaleString('en')} before narrowing</span>
+        <span class="acts desk-only"><span class="btn">Save</span><span class="btn">Export ▾</span><span class="btn">Copy loci</span></span></div>
+      <div class="chain"><span class="muted">Steps</span><span class="step">qok*</span>›<span class="step">Scribe 2 ✕</span>›<span class="step">sorted by the word after ✕</span></div>
+      <div class="book"><div class="hd"><span><b>Across the book</b> · current binding · one bar per page · <span style="color:var(--gold)">■</span> Scribe 2 <span style="color:var(--bar)">■</span> other hits</span><span class="muted desk-only"><u>+ compare with another search</u></span></div>${svg}</div>
+      ${res}
+    </div>
+  </div>
+</section>`;
+}
+/* ---------- Dissect ---------- */
+function dissect(D) {
+  const K = D.keyness; const maxLL = Math.max(...K.rows.map(r => r[5]));
+  const rows = K.rows.slice(0, 12).map(r => {
+    const [w, a, b, ll, lo, hi] = r; const fav = a > b ? 'a' : 'b';
+    return `<tr><td class="w">${esc(w)}</td><td>${a.toFixed(1)}</td><td>${b.toFixed(1)}</td><td><span class="kb"><i class="${fav}" style="left:0;width:${100 * ll / maxLL}%"></i><i class="rg" style="left:${100 * lo / maxLL}%;width:${Math.max(1, 100 * (hi - lo) / maxLL)}%"></i></span> ${Math.round(ll)}</td><td class="muted">${Math.round(lo)}–${Math.round(hi)}</td></tr>`;
+  }).join('');
+  // position chart
+  const pr = D.prof; const Wd = 520, Ht = 210, pad = 30; const xs = i => pad + i * (Wd - pad - 10) / (pr.length - 1); const ys = v => Ht - 24 - v * (Ht - 44) / 30;
+  const band = (k) => { const top = pr.map((r, i) => `${xs(i)},${ys(r[k + 2])}`).join(' '); const bot = pr.map((r, i) => `${xs(i)},${ys(r[k + 1])}`).reverse().join(' '); return top + ' ' + bot; };
+  const line = (k) => pr.map((r, i) => `${xs(i)},${ys(r[k])}`).join(' ');
+  let chart = `<svg viewBox="0 0 ${Wd} ${Ht}" style="width:100%;height:auto" aria-label="qo- words by position in line">`;
+  [0, 10, 20, 30].forEach(v => chart += `<line x1="${pad}" x2="${Wd - 10}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${pad - 6}" y="${ys(v) + 4}" font-size="10" text-anchor="end" fill="var(--muted)">${v}%</text>`);
+  pr.forEach((r, i) => chart += `<text x="${xs(i)}" y="${Ht - 6}" font-size="10" text-anchor="middle" fill="var(--muted)">${r[0] > 0 ? r[0] : r[0]}</text>`);
+  chart += `<line x1="${(xs(4) + xs(5)) / 2}" x2="${(xs(4) + xs(5)) / 2}" y1="10" y2="${Ht - 20}" stroke="var(--line)" stroke-dasharray="3 3"/>`;
+  chart += `<polygon points="${band(1)}" fill="#2b5fd933"/><polyline points="${line(1)}" fill="none" stroke="#2b5fd9" stroke-width="2"/>`;
+  chart += `<polygon points="${band(4)}" fill="#b07d0033"/><polyline points="${line(4)}" fill="none" stroke="#b07d00" stroke-width="2"/>`;
+  chart += `<text x="${xs(9) - 4}" y="${ys(pr[9][1]) + 14}" font-size="11" text-anchor="end" fill="#2b5fd9">Currier A</text><text x="${xs(2)}" y="${ys(pr[2][4]) - 8}" font-size="11" text-anchor="middle" fill="#b07d00">Currier B</text></svg>`;
+  return `<section class="textv">
+  <div class="sq">
+    <div class="subtabs"><span>Search</span><span class="on">Dissect</span></div>
+    <div class="opts" style="align-items:center"><span>Compare</span><span class="pill" style="border-color:#2b5fd9"><b>Currier A</b> ▾</span><span>with</span><span class="pill" style="border-color:#b07d00"><b>Currier B</b> ▾</span><span class="muted">in</span><span class="pill"><b>paragraph text</b> ▾</span><span class="muted">on</span><span class="pill"><b>my page set (147)</b> ▾</span><span class="pill"><span class="k">Spaces</span> <b>as transcribed</b> ▾</span></div>
+    <div class="echo" style="margin-bottom:0">${K.na.toLocaleString('en')} words against ${K.nb.toLocaleString('en')} words. Every number is the consensus; the bracket is its range across the consensus, Zandbergen–Landini, Claston and Takahashi.</div>
+  </div>
+  <div class="dgrid">
+    <div class="panelc"><h3>Words that set them apart</h3><div class="muted" style="font-size:12.5px;margin-bottom:6px">Per 1,000 words. Keyness is log-likelihood; above about 15 the difference is unlikely to be chance.</div>
+      <table class="k"><thead><tr><th>Word</th><th>A ‰</th><th>B ‰</th><th>Keyness</th><th>Range</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="panelc"><h3>Where <span class="mono">qo-</span> words sit in their line</h3><div class="muted" style="font-size:12.5px;margin-bottom:6px">Share of words starting <span class="mono">qo</span> at each position, counted from the start (1–5) and from the end (−5 to −1). Bands: range across transcriptions.</div>${chart}
+      <div class="muted" style="font-size:12.5px">The band at −1 is narrower than the gap between A and B, so the difference does not depend on whose transcription you read.</div></div>
+  </div>
+</section>`;
+}
+
+/* ---------- Dissect workbench ---------- */
+function lab(D) {
+  const F = D.fp;
+  const range = (k, ks) => { const v = ks.map(x => F[x][k]); return [Math.min(...v), Math.max(...v)]; };
+  const VE = ['vms_eva_cons', 'vms_eva_ZL', 'vms_eva_GC', 'vms_eva_IT'], VS = ['vms_sta_cons', 'vms_sta_ZL', 'vms_sta_GC', 'vms_sta_IT'], LG = ['latin', 'italian', 'english'];
+  const props = [
+    ['h2', 'Character entropy', 'bits per glyph, given the one before', 1.8, 3.6, 2],
+    ['rep', 'Same word twice in a row', '% of words', 0, 1.2, 2],
+    ['sd', 'Spread of word lengths', 'standard deviation, glyphs', 1.2, 2.8, 2],
+    ['len', 'Average word length', 'glyphs', 3.4, 6.0, 2],
+    ['zipf', 'Zipf slope', 'how word frequencies fall', -1.2, -0.6, 2],
+    ['ttr', 'Vocabulary richness', 'different words in 10,000', 0.1, 0.45, 3],
+  ];
+  let langLike = 0;
+  const rows = props.map(([k, nm, sub, lo, hi, dp]) => {
+    const pos = v => `${Math.max(0, Math.min(100, 100 * (v - lo) / (hi - lo)))}%`;
+    const [la, lb] = range(k, LG), [va, vb] = range(k, VE), [ya, yb] = range(k, VS), you = F.vms_sta_cons[k], vm = F.vms_eva_cons[k];
+    const inLang = ya <= lb + 1e-9 && yb >= la - 1e-9, inVms = ya <= vb + 1e-9 && yb >= va - 1e-9;   // your range overlaps the band
+    if (inLang) langLike++;
+    const verdict = inLang && inVms ? 'both ranges' : inLang ? '<b>language</b> range' : inVms ? '<b>manuscript</b> range' : 'neither';
+    const fmt = v => v.toFixed(dp);
+    return `<div class="fprow"><div class="nm">${nm}<small>${sub}</small></div>
+      <div class="track" title="languages ${fmt(la)}–${fmt(lb)} · manuscript ${fmt(va)}–${fmt(vb)} · yours ${fmt(you)} (${fmt(ya)}–${fmt(yb)})">
+        <span class="band lang" style="left:${pos(la)};width:calc(${pos(lb)} - ${pos(la)} + 4px)"></span>
+        <span class="band vms" style="left:${pos(va)};width:calc(${pos(vb)} - ${pos(va)} + 4px)"></span>
+        <span class="band you" style="left:${pos(ya)};width:calc(${pos(yb)} - ${pos(ya)} + 2px)"></span>
+        <span class="dot vm" style="left:${pos(vm)}"></span><span class="dot you" style="left:${pos(you)}"></span></div>
+      <div class="verdict">${fmt(you)} · ${verdict}</div></div>`;
+  }).join('');
+  const fp = `<div class="fplegend"><span style="--c:#8e4ec655">Latin, Italian, English</span><span style="--c:#b07d0066">the manuscript, 4 transcriptions</span><span style="--c:var(--accent)">your output</span></div>
+    <div class="fphead">Counting glyphs instead of letters raises character entropy from <b>${F.vms_eva_cons.h2.toFixed(2)}</b> to <b>${F.vms_sta_cons.h2.toFixed(2)}</b> bits (${range('h2', VS).map(v => v.toFixed(2)).join('–')} across transcriptions), still far below the languages (${range('h2', LG).map(v => v.toFixed(2)).join('–')}). Words get shorter; repeats and word frequencies don't change.</div>${rows}`;
+  const strip = `<div style="height:8px;border-radius:3px;background:repeating-linear-gradient(90deg,#3f9d6b 0 3px,transparent 3px 4px)"></div>`;
+  const nodes = [
+    {id: 'src', x: 24, y: 28, w: 250, c: 'c-src', t: 'Source', k: 'text', body: `<div class="row2"><span>Pages</span><span>my set · 147</span></div><div class="row2"><span>Text</span><span>paragraphs</span></div><div class="row2"><span>Reading</span><span>consensus</span></div><div class="row2"><span>Uncertain spaces</span><span>as spaces</span></div><div>${strip}</div><div class="muted">26,099 words · spread from ZL, GC, IT</div>`},
+    {id: 'split', x: 24, y: 262, w: 250, c: 'c-split', t: 'Fit · check', k: 'split', body: `<div class="row2"><span>Fit on</span><span>quires 1–12</span></div><div class="row2"><span>Check on</span><span>quires 13–20</span></div><div class="muted">Check results stay hidden until you lock the graph.</div><div class="row2"><span>→ fit</span><span>🔒 check</span></div>`},
+    {id: 'tr', x: 318, y: 240, w: 262, c: 'c-tr', t: 'Count glyphs, not letters', k: 'transform', body: `<div class="muted">Zandbergen's STA: ch, sh, iin, ckh… count as one glyph.</div><div class="pv"><span class="lc">f1r.1</span> f·a·ch·y·s y·k·a·l a·r<br><span class="lc">f1r.2</span> s·o·r·y ckh·a·r o·r·y</div><div class="row2"><span>Glyphs per word</span><span>3.93 (was 4.82)</span></div>`},
+    {id: 'ref', x: 318, y: 520, w: 262, c: 'c-ref', t: 'Languages', k: 'reference', body: `<div>Latin · Pliny, <i>Naturalis historia</i></div><div>Italian · Dante, <i>Commedia</i></div><div>English · King James Bible</div><div class="muted">Public-domain texts, 10,000–20,000 words each</div>`},
+    {id: 'fp', x: 626, y: 22, w: 456, c: 'c-ms', t: 'Fingerprint', k: 'compare', sel: true, body: fp},
+  ];
+  const portY = {src: 70, split: 60, tr: 60, ref: 60, fp: 90};
+  const edge = (a, b, ya, yb, dash) => { const A = nodes.find(n => n.id === a), B = nodes.find(n => n.id === b); const x1 = A.x + A.w + 6, y1 = A.y + ya, x2 = B.x - 6, y2 = B.y + yb; const dx = Math.max(40, (x2 - x1) / 2); return `<path d="M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}" fill="none" stroke="${dash ? 'var(--muted)' : '#9aa0a6'}" stroke-width="2" ${dash ? 'stroke-dasharray="5 5"' : ''}/>`; };
+  const ports = n => n.id === 'src' ? `<span class="port" style="left:${n.w / 2 - 5}px;bottom:-6px"></span>`
+    : n.id === 'split' ? `<span class="port" style="left:${n.w / 2 - 5}px;top:-6px"></span><span class="port out" style="top:55px"></span>`
+    : `<span class="port in" style="top:${portY[n.id] - 5}px"></span><span class="port out" style="top:${portY[n.id] - 5}px"></span>`;
+  const nodeHTML = n => `<div class="node${n.sel ? ' sel' : ''}" style="left:${n.x}px;top:${n.y}px;width:${n.w}px">${ports(n)}
+    <div class="nh"><i class="${n.c}"></i>${n.t}<span class="k">${n.k}</span></div><div class="nb">${n.body}</div></div>`;
+  const S = nodes.find(n => n.id === 'src'), P = nodes.find(n => n.id === 'split');
+  const down = `<path d="M${S.x + S.w / 2},${S.y + 196} L${P.x + P.w / 2},${P.y - 6}" stroke="#9aa0a6" stroke-width="2" fill="none"/>`;
+  const svg = `<svg class="edges">${down}${edge('split', 'tr', 60, 60)}${edge('tr', 'fp', 60, 90)}${edge('ref', 'fp', 60, 130)}</svg>`;
+  const order = ['src', 'split', 'tr', 'ref', 'fp'];
+  const stack = order.map((id, i) => nodeHTML(nodes.find(n => n.id === id)) + (i < order.length - 1 ? '<span class="link"></span>' : '')).join('') + '<span class="plus">+ Add a step</span>';
+  return `<section class="lab">
+  <div class="sq" style="padding-bottom:0;border-bottom:0"><div class="subtabs"><span>Search</span><span class="on">Dissect</span></div></div>
+  <div class="labbar"><span class="title">Does counting glyphs change the fingerprint? ▾</span><span class="tries">4 tries on the fit pages · not locked</span><span style="flex:1"></span>
+    <span class="btn lock">Lock and check</span><span class="btn desk-only">Templates ▾</span><span class="btn desk-only">Share</span><span class="btn">Save</span></div>
+  <div class="labbody">
+    <div class="canvas">${svg}${nodes.map(nodeHTML).join('')}
+      <div class="addbar"><span class="btn">+ Add node</span><span class="btn">− 100% +</span></div>
+      <div class="palette"><span><i class="c-src"></i>Source</span><span><i class="c-tr"></i>Transform</span><span><i class="c-split"></i>Fit · check</span><span><i class="c-ms"></i>Measure</span><span><i class="c-ref"></i>Reference</span><span><i class="c-out"></i>View · export</span></div>
+    </div>
+    <div class="stack">${stack}</div>
+    <aside class="insp"><h3>Fingerprint</h3><div class="muted">Where a text falls on six properties the Voynich text is known for, against the manuscript itself and against real languages.</div>
+      <div class="sec"><b>What are you testing?</b>
+        <div class="opt on"><span class="r"></span><span>Just measuring<small>Show where it falls; no target.</small></span></div>
+        <div class="opt"><span class="r"></span><span>A decoding into a language<small>The output should look like a language. Counts how many of the six it matches.</small></span></div>
+        <div class="opt"><span class="r"></span><span>A model that writes Voynich-like text<small>The output should look like the manuscript.</small></span></div></div>
+      <div class="sec"><b>Compared on</b><div class="muted">20,000 words of each text, or all there is. The manuscript's band is its range across the consensus, Zandbergen–Landini, Claston and Takahashi.</div></div>
+      <div class="sec"><b>Tries</b><div class="muted">Every version you run on the fit pages counts. With 4 tries, a 1-in-20 coincidence is unlikely; with 40, expect two. Lock the graph to see the check pages once.</div></div>
+      <div class="sec muted" style="font-size:12px">Nothing here says a reading is right. There is no answer key.</div></aside>
+  </div>
+</section>`;
+}
+/* ---------- Gold-set settling ---------- */
+function gold(D) {
+  return `<section class="textv"><div class="gold">
+    <div class="prog"><span><b>Settle readings</b> · line 37 of 240 · <span class="mono">f1r.2</span></span><span class="muted">Keys 1–6 choose · 0 can't tell · ↵ next · ⌫ back</span></div>
+    <div class="pbar"><i></i></div>
+    <div class="crop" role="img" aria-label="f1r line 2, cropped from Yale's photograph"><div class="box" style="left:58.4%;top:16%;width:5.6%;height:72%"></div><div class="gap" style="left:24.9%;top:10%;height:80%"></div></div>
+    <div class="q2"><h3>What is written in the red box?</h3><div class="muted">The readings in random order, without saying who read them. Choose what you see, type another, or say you can't tell.</div>
+      <div class="choices"><span class="choice"><kbd>1</kbd>ary</span><span class="choice picked"><kbd>2</kbd>are</span><span class="choice"><kbd>3</kbd>ar</span><span class="choice"><kbd>4</kbd>ase</span><span class="choice"><kbd>5</kbd>ais</span><span class="choice alt"><kbd>6</kbd>Something else…</span><span class="choice alt"><kbd>0</kbd>Can't tell</span></div></div>
+    <div class="q2"><h3>Is there a word break at the dashed line, between <span class="mono">or</span> and <span class="mono">y</span>?</h3>
+      <div class="choices"><span class="choice alt"><kbd>Y</kbd>Yes, a space</span><span class="choice alt"><kbd>N</kbd>No space</span><span class="choice alt"><kbd>0</kbd>Can't tell</span></div></div>
+    <div class="muted" style="font-size:12.5px;width:min(900px,100%)">Your answers stay in this browser until you export them. Lines are chosen by scribe, section and kind of text.</div>
+  </div></section>`;
+}
+</script>
+</body>
+</html>
