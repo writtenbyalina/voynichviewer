@@ -34,6 +34,31 @@ export const Data = {
   page(page) { return load(`pages/${encodeURIComponent(page)}.json`); },
 };
 
+/* The glyph font (Voynich VV, Claston's v101 font finished for Text: tools/font): the characters that draw each STA
+   glyph, and, for a transcriber's reading (which the data keeps in Eva), the commonest glyph for each Eva letter. */
+const chOf = code => (Data.glyphs[code] && Data.glyphs[code].ch) || "?";
+let EVA_GLYPH = null;
+function evaGlyphs(eva) {
+  if (!EVA_GLYPH) {
+    const best = new Map();
+    const rank = c => /[0-9]/.test(c[1]) ? +c[1] : 10;   // the plain member of a family first (A1, K2), then the rest
+    for (const [code, g] of Object.entries(Data.glyphs)) {
+      if (!/^[a-z?]+$/.test(g.eva)) continue;
+      const b = best.get(g.eva);
+      if (!b || rank(code) < rank(b) || (rank(code) === rank(b) && code < b)) best.set(g.eva, code);
+    }
+    for (const [code, e] of Object.entries(Data.meta.rare_eva)) best.set(e, code);
+    best.set("@221;", "Aa"); best.set("@222;", "Ab");
+    EVA_GLYPH = { best, keys: [...best.keys()].sort((a, b) => b.length - a.length) };
+  }
+  let out = "";
+  for (let i = 0; i < eva.length;) {
+    const k = EVA_GLYPH.keys.find(k => eva.startsWith(k, i));
+    if (k) { out += chOf(EVA_GLYPH.best.get(k)); i += k.length; } else { out += eva[i]; i++; }
+  }
+  return out;
+}
+
 /* What each kind of locus is called. IVTFF's locus types: P paragraph text, L labels, C text along a circle, R text
    along a radius. */
 const KINDS = { P: ["Paragraphs", "line", "lines"], L: ["Labels", "label", "labels"], C: ["Rings", "ring", "rings"],
@@ -205,6 +230,7 @@ const T = {
   reading: "cons",   // whose reading the lines show: the consensus, or a transcriber's code
   loaded: new Map(),   // page -> its data, for the pages on show
   marks: store.get("text:marks", "quiet"),
+  font: store.get("text:font", "eva"),   // "eva" or "glyphs"
   query: "",   // the address's options after "text?", kept for what reads them
 
   /* Fill the panel for the pages on show, unless they are the ones already there. */
@@ -212,7 +238,7 @@ const T = {
     const el = $("#rd-text");
     if (!el || el.hidden || !R.spreads) return;
     const shown = this.shown();
-    const key = JSON.stringify([shown.map(x => x.page), this.marks, this.reading]);
+    const key = JSON.stringify([shown.map(x => x.page), this.marks, this.reading, this.font]);
     if (el === this.el && key === this.onShow) return;
     this.el = el; this.onShow = key;
     const gen = ++this.gen;
@@ -261,11 +287,14 @@ const T = {
     marks.value = this.marks;
     const reading = h("select", { class: "tx-sel tx-reading", "aria-label": "Whose reading",
       onchange: e => { this.reading = e.target.value; this.closeCard(); this.sync(); setHash(); } });
+    const fonts = h("div", { class: "tx-seg", role: "group", "aria-label": "Show the text as" },
+      [["eva", "Eva", "The text in Eva letters, names for the shapes"], ["glyphs", "Glyphs", "The text in the manuscript's own glyphs, with their Eva under each word"]]
+        .map(([v, t, title]) => h("button", { "data-font": v, title, "aria-pressed": String(this.font === v), onclick: () => this.setFont(v) }, t)));
     el.replaceChildren(
       h("div", { class: "tx-grip", role: "separator", tabindex: "0", "aria-label": "Resize the text panel",
         "aria-orientation": "vertical" }),
       h("div", { class: "tx-head" },
-        h("div", { class: "tx-ctl" }, reading, marks,
+        h("div", { class: "tx-ctl" }, fonts, reading, marks,
           h("button", { class: "tx-x", title: "Close the text (T)", "aria-label": "Close the text", onclick: () => TextUI.toggle(false) }, "✕"))),
       h("div", { class: "tx-body", tabindex: "-1" }));
     this.grip($(".tx-grip", el), el);
@@ -288,6 +317,14 @@ const T = {
         if (this.card && !this.card.pinned && !e.relatedTarget?.closest?.(".tx-card")) this.leaveT = setTimeout(() => this.card && !this.card.pinned && this.closeCard(), 250);
       });
     }
+  },
+
+  setFont(v) {
+    this.font = v;
+    store.set("text:font", v);
+    for (const b of $$(".tx-seg button", this.el)) b.setAttribute("aria-pressed", String(b.dataset.font === v));
+    this.closeCard(false);
+    this.sync();
   },
 
   /* Drag the panel's edge to make it wider (beside the pages) or taller (below them, on a phone); arrow keys too. */
@@ -353,6 +390,7 @@ const T = {
     if (!kids.some(k => k.classList.contains("tx-page")))
       kids.unshift(h("p", { class: "tx-msg" }, shown.length ? "No text on these pages." : "No text here: these leaves are lost."));
     kids.push(this.credits());
+    body.classList.toggle("glyph", this.font === "glyphs");
     body.replaceChildren(...kids);
     body.scrollTop = 0;
     const want = R.focus && $$(".tx-page", body).find(el => short(el.dataset.page) === short(R.focus));
@@ -411,8 +449,12 @@ const T = {
     ws.forEach((w, i) => {
       if (i) out.push(rd[i - 1].next === "." ? " " : "");
       const t = rd[i].text, dif = differs(rd, ws, i);
-      const el = h("span", { class: `w${dif ? " mk" : ""}`, "data-o": w.off, "data-e": w.eva },
-        dif ? h("span", { class: "c" }, t.replace(/\./g, " ").replace(/,/g, "·") || "–") : t);
+      const shownT = t.replace(/\./g, " ").replace(/,/g, "·") || "–";
+      const el = this.font === "glyphs"
+        ? h("span", { class: `w st${dif ? " mk" : ""}`, "data-o": w.off, "data-e": w.eva },
+            h("span", { class: "gl", "aria-hidden": "true" }, dif ? h("span", { class: "c" }, evaGlyphs(shownT)) : evaGlyphs(shownT)),
+            h("span", { class: "ev" }, shownT))
+        : h("span", { class: `w${dif ? " mk" : ""}`, "data-o": w.off, "data-e": w.eva }, dif ? h("span", { class: "c" }, shownT) : t);
       if (i < ws.length - 1 && rd[i].next !== ".") el.append(h("span", { class: rd[i].next === "," ? "us" : "jn", title: rd[i].next === "," ? "uncertain space" : `${SHORT[who]} writes this and the next as one word` }, rd[i].next === "," ? "," : ""));
       if (dif) { el.tabIndex = 0; el.setAttribute("aria-label", `${t || "nothing"}: the consensus reads ${w.eva}`); }
       out.push(el);
@@ -424,6 +466,7 @@ const T = {
      (drawn as a dot, copied as a comma); gap marks between glyphs or words. */
   textOf(loc) {
     const mk = marksOf(loc, this.marks);
+    const glyph = this.font === "glyphs";
     const ws = words(loc), out = [];
     ws.forEach((w, wi) => {
       if (wi) {
@@ -431,30 +474,32 @@ const T = {
         if (est) out.push(h("span", { class: "dj", title: SAY[est] }));
         out.push(st ? h("span", { class: "gm", title: GAP_SAY[st] }, " ") : " ");
       }
-      const el = h("span", { class: "w", "data-o": w.off, "data-e": w.eva });
+      const el = h("span", { class: `w${glyph ? " st" : ""}`, "data-o": w.off, "data-e": w.eva });
+      const gl = glyph ? h("span", { class: "gl", "aria-hidden": "true" }) : el;   // where the glyphs go
       const why = new Set();
       let run = null, runSt = null;
-      const flush = () => { if (run) el.append(runSt ? h("span", { class: `c c-${runSt}` }, run) : run); run = null; };
+      const flush = () => { if (run) gl.append(runSt ? h("span", { class: `c c-${runSt}` }, run) : run); run = null; };
       for (const t of w.toks) {
         const gst = t !== w.toks[0] && !t.sep && mk.gap.get(t.off), est = mk.empty.get(t.off);
         if (gst || est) {
           flush();
-          el.append(h("span", { class: "dj", title: est ? SAY[est] : GAP_SAY[gst] }));
+          gl.append(h("span", { class: "dj", title: est ? SAY[est] : GAP_SAY[gst] }));
           why.add(est ? SAY[est] : GAP_SAY[gst]);
         }
         if (t.sep) {
           flush();
-          el.append(h("span", { class: "us", title: GAP_SAY.u }, ","));
+          gl.append(h("span", { class: "us", title: GAP_SAY.u }, ","));
           why.add(GAP_SAY.u);
           continue;
         }
         const st = mk.glyph.get(t.off) || null;
         if (st !== runSt) flush();
         runSt = st;
-        run = (run || "") + t.eva;
+        run = (run || "") + (glyph ? chOf(t.code) : t.eva);
         if (st) why.add(SAY[st]);
       }
       flush();
+      if (glyph) el.append(gl, h("span", { class: "ev" }, w.toks.map(t => t.sep ? h("span", { class: "us" }, ",") : t.eva)));
       if (why.size) {
         el.classList.add("mk");
         el.tabIndex = 0;
@@ -524,7 +569,8 @@ const T = {
     const occ = h("span", { class: "muted tx-occ" }, "counting…");
     const card = h("div", { class: "tx-card", role: "dialog", "aria-label": `${w.eva}, in ${id}`, tabindex: "-1" },
       h("button", { class: "tx-cx", "aria-label": "Close", title: "Close (Esc)", onclick: () => this.closeCard() }, "✕"),
-      h("div", { class: "tx-ch" }, h("span", { class: "tx-big" }, w.eva.replace(/,/g, "·")), h("span", { class: "muted" }, `${id}, word ${wi + 1} · ${verdict}`)),
+      h("div", { class: "tx-ch" }, this.font === "glyphs" ? h("span", { class: "tx-bigg", "aria-hidden": "true" }, w.toks.map(t => t.sep ? " " : chOf(t.code)).join("")) : "",
+        h("span", { class: "tx-big" }, w.eva.replace(/,/g, "·")), h("span", { class: "muted" }, `${id}, word ${wi + 1} · ${verdict}`)),
       h("div", { class: "tx-agree", role: "img", "aria-label": bar.map(b => `${b.t.eva} ${Math.round(b.share * 100)}%`).join(", ") },
         bar.map(b => h("span", { class: b.share < 1 ? "lo" : "", style: { width: `${b.t.len}ch` }, title: `${b.t.eva}: ${Math.round(b.share * 100)}% of the votes` }))),
       h("table", {}, h("tbody", {},

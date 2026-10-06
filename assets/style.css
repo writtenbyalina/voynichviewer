@@ -776,6 +776,8 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 #v-read [hidden] { display: none !important; }   /* the grid hides the open book, its note and its strip */
 
 /* ---------- Text panel (text.js) ---------- */
+/* Voynich VV: Glen Claston's public-domain v101 font, finished for Text (tools/font); fetched only in glyph mode */
+@font-face { font-family: "Voynich VV"; src: url("fonts/voynich-vv.woff2") format("woff2"); font-display: swap; }
 .tx { --tx-gold: #f3c35c; position: relative; width: var(--tx-w, clamp(320px, 33vw, 456px)); flex: none;
   display: flex; flex-direction: column; min-height: 0; background: #221e1a; border-left: 1px solid var(--table-line); }
 .tx[hidden] { display: none; }
@@ -818,7 +820,7 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .tx .c-m { text-decoration-style: dotted; text-decoration-thickness: 1px; }
 /* an uncertain space: its comma, drawn as a gold dot (copying gives the comma) */
 .tx .us { position: relative; display: inline-block; width: .55em; color: transparent; }
-.tx .us::after { content: "·"; position: absolute; left: 0; right: 0; text-align: center; color: var(--tx-gold); font-weight: 700; }
+.tx .us::after { content: "·"; position: absolute; left: 0; right: 0; text-align: center; color: var(--tx-gold); font: 700 14.5px/inherit -apple-system, system-ui, sans-serif; }
 /* where some wrote a space and the consensus has none, or a glyph only some read */
 .tx .dj { display: inline-block; width: 0; height: .75em; vertical-align: -.05em; border-left: 1.5px solid var(--tx-gold); margin: 0 1px; opacity: .85; }
 /* a space not everyone wrote */
@@ -873,3 +875,15 @@ p.tx-votes { padding: 0; color: var(--muted); }
 .tx-btn { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--radius);
   background: #fff; color: var(--ink); text-decoration: none; font-size: 13px; }
 .tx-btn:hover { border-color: #aaa; }
+.tx-seg { display: inline-flex; border: 1px solid var(--table-line); border-radius: var(--radius); overflow: hidden; }
+.tx-ctl .tx-seg button { border: none; border-radius: 0; min-height: 30px; padding: 2px 10px; }
+.tx-ctl .tx-seg button[aria-pressed=true] { background: var(--table-ink); color: var(--table); }
+/* glyph mode: each word in the manuscript's glyphs, its Eva under it */
+.tx-body.glyph .ln .t { line-height: 1.2; word-spacing: 0; }
+.tx-body.glyph .ln .no { line-height: 36px; }
+.tx .w.st { display: inline-flex; flex-direction: column; align-items: center; vertical-align: top; margin: 0 .5em 6px 0; }
+.tx .w.st .gl { font: 26px/36px "Voynich VV", serif; user-select: none; -webkit-user-select: none; white-space: nowrap; }
+.tx .w.st .gl .c { text-underline-offset: 7px; }
+.tx .w.st .ev { font: 11.5px/1.2 ui-monospace, Menlo, monospace; color: var(--table-muted); }
+.tx .w.st .gl .us { width: .35em; }
+.tx-bigg { font: 34px/1 "Voynich VV", serif; }
