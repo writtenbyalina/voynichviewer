@@ -95,9 +95,11 @@ class Data(unittest.TestCase):
                     self.assertGreaterEqual(total, len(voting - silent) + 0.5 * len(voting & silent) - 0.01, (l["id"], u))
 
     def test_unanimous_lines_have_nothing_to_mark(self):
-        for l in page("f10r")["loci"]:
+        for l in page("f10r")["loci"]:     # a unanimous column is kept only if someone abstained or a reference differs
             for u in l["u"]:
-                self.assertTrue(u[2] != "u" or u[4:], u)
+                text = l["c"][u[0]:u[0] + u[1]]
+                self.assertTrue(u[2] != "u" or any(w == 0 for _, w, _ in u[3])
+                                or any(v != text for v in (u[4] if u[4:] else {}).values()), u)
 
     def test_glyph_font_draws_every_consensus_glyph(self):
         glyphs = json.loads((DATA / "glyphs.json").read_text())["glyphs"]
@@ -125,6 +127,27 @@ class Data(unittest.TestCase):
             self.assertEqual(len(json.loads(f.read_text())["lines"]), n, f.name)
         self.assertEqual({f.stem for f in (DATA / "w").glob("*.json")},
                          set(vote.ORDER) | set(vote.REFERENCE))
+
+    def test_readings_rebuild_every_transcribers_line(self):
+        """The site rebuilds each transcriber's reading from the page files (assets/text.js); it must give their own
+        line back, wherever the build did not keep that line as it is (x, a line that lines up only roughly)."""
+        import shutil
+        import subprocess
+        if not shutil.which("node"):
+            self.skipTest("needs node")
+        out = json.loads(subprocess.run(["node", str(HERE / "check_readings.mjs")], capture_output=True, text=True,
+                                        check=True).stdout)
+        self.assertGreater(out["checked"], 30000)
+        self.assertEqual(out["wrong"], [])
+
+    def test_few_lines_line_up_only_roughly(self):
+        n = collections.Counter()
+        for f in (DATA / "pages").glob("*.json"):
+            for l in json.loads(f.read_text())["loci"]:
+                for w in l.get("x", {}):
+                    n[w] += 1
+        self.assertEqual(n["ZL"], 0)
+        self.assertLess(sum(n.values()), 300)
 
     def test_sizes(self):
         self.assertLess((DATA / "index.json").stat().st_size, 400_000)
@@ -158,6 +181,19 @@ class Vote(unittest.TestCase):
         r = vote.locus({"ZL": "A1Z1", "GC": "A1C1", "IT": "A1C2"})
         rows = {t: w for t, w, _ in r["u"][0][3]}
         self.assertEqual(rows["?"], 0)
+
+    def test_an_abstainer_is_kept_where_the_rest_agree(self):
+        r = vote.locus({"ZL": "A1C1", "GC": "A1C1", "IT": "A1Z1"})
+        self.assertEqual(r["c"], "or")
+        rows = {who: (t, w) for t, w, who in r["u"][0][3]}
+        self.assertEqual(rows["IT"], ("?", 0))
+
+    def test_a_glyph_only_one_reads_is_kept(self):
+        r = vote.locus({"ZL": "A1C1", "GC": "A1C1", "IT": "A1C2C1"})
+        self.assertEqual(r["c"], "or")
+        extra = [u for u in r["u"] if u[1] == 0]
+        self.assertEqual(len(extra), 1)
+        self.assertIn(["s", 1.0, "IT"], extra[0][3])
 
     def test_in_between_glyph_votes_family_only(self):
         r = vote.locus({"ZL": "A1", "GC": "Aa", "IT": "A3"})

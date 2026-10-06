@@ -2,7 +2,7 @@
 """Build Text's data from the transliterations: the consensus of every locus, with every reading kept.
 
   python3 tools/text/fetch.py          # once: the pinned inputs, into tools/text/cache
-  python3 tools/text/build.py          # writes data/text/{meta,index,witnesses}.json and data/text/pages/*.json
+  python3 tools/text/build.py          # writes data/text/{meta,index}.json, data/text/w/*.json, data/text/pages/*.json
 
 The method is docs/TEXT.md section 3; the steps are in align.py and vote.py, the costs in costs.json (costs.py). Per
 page, each locus holds:
@@ -11,13 +11,17 @@ page, each locus holds:
   c              the consensus in Eva, with IVTFF's '.' (space) and ',' (uncertain space)
   g              the same glyphs as STA codes, for the glyph font (data/text/glyphs.json)
   w              the voters that cover this locus, in the order ties follow
-  u              columns that are not unanimous: [offset in c, length, status, [[reading, votes, "voters"], ...],
-                 {reference: reading}]; status u(nanimous, kept for a reference that differs), m(ajority),
-                 p(lurality), t(ie), s(ingle voter), n(one); votes 0 = present but not voting (unreadable, in-between)
-  s              gaps that are not unanimous: [offset in c, status, "ZL,GC.IT0..."]: each voter's and reference's own
+  u              columns that are not everyone's: [offset in c, length, status, [[reading, votes, "voters"], ...],
+                 {reference: reading}]; status u(nanimous, kept where someone did not vote or a reference differs),
+                 m(ajority), p(lurality), t(ie), s(ingle voter), n(one); votes 0 = present but not voting (unreadable,
+                 in-between). A column the consensus leaves out (most read nothing there) is zero wide, and ends with
+                 the gap before it, "IT.FG0", from those who read a glyph there
+  s              gaps that are not everyone's: [offset in c, status, "ZL,GC.IT0..."]: each voter's and reference's own
                  mark, '.' space, ',' uncertain, '-' drawing break, '0' none; status a(ll), m(ost), u(ncertain),
                  d(oubted), f(ew), n(one)
   r              every witness's line as written, in its own alphabet
+  x              (only where needed) the lines that line up with the others only roughly, so that rebuilding them
+                 from u and s (readings.py) would not give them back: {witness: line in basic Eva}
 index.json lists every locus as [id, type, consensus, paragraph starts here (1/0)]; w/<witness>.json holds that
 witness's lines in basic Eva, in the index's order ("" where it has none), for Search's "every transcriber".
 """
@@ -30,6 +34,7 @@ from pathlib import Path
 
 import align
 import sta
+import readings
 import vote
 from corpus import ALPHABET, NAMES, Corpus
 
@@ -60,6 +65,11 @@ def main():
         ps, pe = sta.para_marks(C.zln[key].text if key in C.zln else zl.text)
         loc = {"id": zl.id, "t": zl.type, "loc": zl.loc, "ps": ps, "pe": pe, "c": r["c"], "g": r["g"], "w": r["w"],
                "u": r["u"], "s": r["s"], "r": C.own_lines(key)}
+        # lines that line up with the others only roughly: the site shows them as they are (readings.py)
+        rough = {n: eva_line(t) for n, t in sorted(wits.items())
+                 if (n in r["w"] or n in vote.REFERENCE) and not readings.matches(readings.reading_of(loc, n), eva_line(t))}
+        if rough:
+            loc["x"] = rough
         pages.setdefault(key[0], []).append(loc)
         index.append([zl.id, zl.type, r["c"], int(ps)])
         stats.update(r["stats"])

@@ -47,6 +47,11 @@ def readings(w: align.Wit, idxs: list[int]):
     return out
 
 
+def marks_str(marks: dict) -> str:
+    """Each transcriber's mark at a gap, as stored: ZL.GC,IT0 (a space, an uncertain space, none)."""
+    return "".join(f"{n}{marks[n] or '0'}" for n in ORDER + REFERENCE if n in marks)
+
+
 def gap_status(s: float, marks: int) -> str:
     if s == 1:
         return "all"
@@ -98,8 +103,11 @@ def locus(witnesses: dict[str, str]) -> dict:
     # columns -> the consensus text, dropping columns that most read as nothing
     c, g, units, gaps, stats = "", "", [], [], collections.Counter()
     pend = None
+    seen = {}       # each transcriber's mark at the gap after their last glyph, across columns the consensus leaves out
     for marks, tally, who, codes_of, abstain, refs in raw_units:
         vmarks = {n: v for n, v in marks.items() if n in VOTERS}
+        before = dict(marks)
+        seen.update(marks)
         if vmarks:
             s = sum(SPACE[v] for v in vmarks.values()) / len(vmarks)
             if pend is None or s > pend[0]:
@@ -117,29 +125,33 @@ def locus(witnesses: dict[str, str]) -> dict:
                 pick = tops[0]
                 status = ("unan" if len(tally) == 1 and len(voted) > 1 else "single" if len(voted) == 1
                           else "maj" if best > total / 2 else "plur")
-        if pick == () and status in ("unan", "maj", "single"):
-            continue                                    # most read nothing here
         rows = [[shown(codes_of[k]), round(v, 2), " ".join(n for n, _, _ in who[k])] for k, v in tally.most_common()]
         rows += [[shown(codes), 0, n] for n, codes in abstain]
-        if pick == ():                                  # nothing wins a tie or the most votes: the column is kept in
-            stats["glyph." + status] += 1               # the record, writes nothing, and its gap joins the next one
-            units.append([len(c), 0, status[0], rows] + ([refs] if refs else []))
+        if pick == ():
+            # Nothing wins here: the consensus writes nothing and the gap joins the next one. The column stays in the
+            # record, zero wide, unless everyone read nothing: someone's extra glyph is a reading too.
+            # (it keeps the gap before it too, from those who read something here; the gap after is the next one's)
+            if status != "unan" or abstain or any(refs.values()):
+                units.append([len(c), 0, status[0], rows, refs, marks_str(before)])
+            if status in ("tie", "plur"):
+                stats["glyph." + status] += 1
             continue
         if c and pend:
             s0, m0 = pend
             st = gap_status(s0, sum(1 for n, v in m0.items() if n in VOTERS and v == ","))
             stats["gap." + st] += 1
             sep = SEPARATOR[st]
-            ref_differs = any((SPACE[m0[n]] > 0) != (sep != "") for n in REFERENCE if n in m0)
-            if st not in ("all", "none") or ref_differs:
-                gaps.append([len(c), st[0], "".join(f"{n}{m0[n] or '0'}" for n in ORDER + REFERENCE if n in m0)])
+            # the marks kept are each transcriber's own at this gap: after a glyph only they read, the one after it
+            if st not in ("all", "none") or any(("." if v == "-" else v) != sep for v in seen.values()):
+                gaps.append([len(c), st[0], marks_str(seen)])
             c += SEPARATOR[st]
             g += SEPARATOR[st]
         pend = None
+        seen = {}
         stats["glyph." + status] += 1
         codes = codes_of.get(pick, ()) if pick is not None else ("Z1",)
         text = shown(codes) if pick is not None else "?"
-        if status != "unan" or any(v != text for v in refs.values()):
+        if status != "unan" or abstain or any(v != text for v in refs.values()):   # all agree, and nobody abstained
             units.append([len(c), len(text), status[0], rows] + ([refs] if refs else []))
         c += text
         g += "".join(codes)
