@@ -301,6 +301,7 @@ const T = {
         "aria-orientation": "vertical" }),
       h("div", { class: "tx-head" },
         h("div", { class: "tx-ctl" }, views, fonts, reading, marks,
+          h("a", { class: "tx-srch", href: `#text/${encodeURIComponent(S.order)}/search`, title: "Search the whole book's text (/)" }, "Search"),
           h("button", { class: "tx-x", title: "Close the text (T)", "aria-label": "Close the text", onclick: () => TextUI.toggle(false) }, "✕"))),
       h("div", { class: "tx-step", hidden: true, role: "navigation", "aria-label": "Search results" }),
       h("div", { class: "tx-body", tabindex: "-1" }));

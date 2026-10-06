@@ -222,7 +222,9 @@ const T = {
     }
     const who = st.in === "all" ? Data.meta.voters.map(v => v.code) : [st.in];
     const opts = { sp: st.sp, eq: st.eq, near: +st.near };
+    const t0 = performance.now();
     const r = await Worker_.run({ q: st.q, opts, who });
+    this.ms = performance.now() - t0;   // how long the search took, for the benchmark (tests/text.spec.js)
     if (gen !== this.gen) return;
     if (r.error) { this.fail(r.mine ? r.error : "The search failed (" + r.error + ")."); return; }
     const lines = {};

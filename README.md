@@ -20,6 +20,14 @@ Site: [voynichviewer.com](https://voynichviewer.com).
   opening you are on, the next two and the one behind), so zooming in is sharp at once; not where zooming in gains
   little, as on many phones, nor when the browser asks to save data. **▦ Grid** (key O) shows every page at once,
   quire by quire, with buttons for each section and for your bookmarks.
+- **Text** in the Reader (key T): the text of the pages beside them, the consensus of up to twelve independent
+  transcriptions voted glyph by glyph, with every reading kept. Marks show where the vote is split; any word opens a
+  card with each transcriber's reading; the panel can show one transcriber's reading instead, every transcriber line
+  by line (Interlinear, key I), or the manuscript's own glyphs (Voynich VV, Glen Claston's font, finished here).
+- **Text tab** (key /): search the whole book's text with a small query language (whole words, `*` and `?`, joins
+  within and across words, repeated words, regular expressions, filters such as `scribe:2`), narrow the results by
+  scribe, section, language, quire and kind of text, see the hits page by page in any order, open a result in the
+  Reader, export results as CSV or IVTFF, and save searches and page sets in Your work.
 - **Bookmarks**: the ☆ in a page's corner (Reader), next to a page (3D), or key B; ★ at the top lists them. Name them,
   and go to one: 3D and the Reader both follow.
 - **Info**: credits, a plain-language guide, Davis's research (her 2025 post in brief, the Folio order tables built
@@ -36,13 +44,14 @@ The 🐞 button (top right) shows how to report a bug or suggest a feature. The 
 
 ## Your work is kept in the browser
 
-There is no server and no account. Crops are kept in IndexedDB; your own orders and bookmarks in localStorage and, as a
-second copy, in IndexedDB. **Your work** (top right) exports all of it as a small progress file and imports it again, in this browser or
+There is no server and no account. Crops are kept in IndexedDB; your own orders, bookmarks, saved searches and page
+sets in localStorage and, as a second copy, in IndexedDB. **Your work** (top right) exports all of it as a small progress file and imports it again, in this browser or
 another one (the page images are cut again from Yale's photographs on import).
 
 3D and the Reader follow the same place: the page you are on in the Reader is the sheet picked out in 3D, and the sheet
 or opening you pick in 3D is where the Reader opens. Every view has its own URL (`#read/<order>/<page>`, `#three/<order>/<view>`), so a
-view can be bookmarked or shared.
+view can be bookmarked or shared. The Reader's text panel adds `/text` (`#read/beinecke/1r/text?r=GC` for Claston's
+reading), and a search is `#text/<order>/search?q=qok*&steps=scribe:2`.
 
 ## Run it locally
 
@@ -63,6 +72,11 @@ assets/app.js           the Reader, Info (with the Folio order tables), the orde
 assets/work.js          your work: crops (cut in the browser), your own orders, export and import
 assets/arrange.js       the Rearrange panel of the 3D view
 assets/view3d.js        the 3D view (ES module, loaded when the 3D tab first opens)
+assets/text.js          the Reader's text panel, the word card and the interlinear (ES module, loaded when the text opens)
+assets/search.js        the Text tab: search, facets, the book strip, export (ES module)
+assets/query.js         the search query language: parse, say back in words, compile to a regular expression
+assets/search-worker.js runs the searches off the page's thread
+assets/fonts/voynich-vv.woff2   Voynich VV: Glen Claston's public-domain v101 font, with rare glyphs and kerning added
 assets/privacy.js       the cookie strip and consent; loads Microsoft Clarity only after "Accept"
 assets/style.css
 assets/vendor/          three.js r184 (MIT)
@@ -75,6 +89,14 @@ data/panels/            two JPEGs per panel face: _l (1400 px tall) and _s (300 
                         page at full size from Yale instead
 data/seams.json         where the paper starts on a foldout's hinge panel: its photograph shows the stacked edges of the
                         book on the side the flaps hang, and the unfolded Reader lets the flap overlap them
+data/text/               the text (built by tools/text/build.py): pages/<page>.json (every line's consensus, its
+                        split votes and gaps, and each transcriber's own line), index.json (every line's consensus, for
+                        search), w/<code>.json (one transcriber's lines), meta.json (credits, method, page list),
+                        glyphs.json (which font character draws each glyph)
+tools/text/             the text pipeline: fetch.py (the pinned transcriptions), build.py, report.py, test_text.py;
+                        the method is docs/TEXT.md section 3
+tools/font/             builds Voynich VV from Claston's font (build_font.py), with test_font.py
+docs/TEXT.md            the design of Text: sources, method, data, query language, screens, tests
 tools/import_from_scout.py   refreshes data/codex.json and data/panels/ from a local Voynich Scout checkout
 tools/seams.py          measures those bands from data/panels/ and rewrites data/seams.json (run it after an import)
 CNAME                   the custom domain for GitHub Pages
@@ -145,5 +167,10 @@ you can also turn on "Cookie consent", so that Clarity itself waits for the cons
 - Collation, scribes and sections: Lisa Fagin Davis,
   ["Voynich Codicology"](https://manuscriptroadtrip.wordpress.com/2025/01/19/voynich-codicology/) (2025).
 - Foldout structure: René Zandbergen, [voynich.nu](https://www.voynich.nu/). Illustration type and Currier language:
-  the page variables of his ZL transliteration (the text itself is not used).
+  the page variables of his ZL transliteration.
+- Text: transcriptions by René Zandbergen and Gabriel Landini, Glen Claston, Takeshi Takahashi, the First Study Group
+  (William Friedman), Prescott Currier and Mary D'Imperio, Jorge Stolfi, John Grove, John Tiltman, Don Latham, Karl
+  Kluge (from Theodore Petersen's copy), Mike Roe and Denis Mardle, from René Zandbergen's
+  [voynich.nu](https://www.voynich.nu/transcr.html) (CC0) and the Landini–Stolfi interlinear.
+- Glyph font: Glen Claston's Voynich font (2005, public domain; UTF-8 fix by William Porquet), as Voynich VV.
 - 3D: [three.js](https://threejs.org) (MIT licence, `assets/vendor/three.LICENSE`).

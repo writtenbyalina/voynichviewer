@@ -791,7 +791,9 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 @media (max-width: 760px) { .tx-ctl { gap: 4px; } .tx-ctl select { flex: 1 1 120px; font-size: 13px; } }
 .tx-ctl select option { color: var(--ink); background: #fff; }
 .tx-ctl button:hover, .tx-ctl select:hover { border-color: var(--table-muted); }
-.tx-ctl .tx-x { margin-left: auto; min-width: 32px; padding: 0 8px; }
+.tx-ctl .tx-x { min-width: 32px; padding: 0 8px; }
+.tx-ctl .tx-srch { margin-left: auto; color: var(--table-ink); border: 1px solid var(--table-line); border-radius: var(--radius); min-height: 32px; padding: 0 10px; display: inline-flex; align-items: center; text-decoration: none; font-size: 13px; }
+.tx-ctl .tx-srch:hover { border-color: var(--table-muted); }
 .tx-body { flex: 1; min-height: 0; overflow: auto; padding: 4px 16px 16px; outline: none; }
 .tx-msg { color: var(--table-muted); padding: 12px 0; margin: 0; }
 .tx-page + .tx-page, .tx-folded + .tx-page { border-top: 1px solid var(--table-line); margin-top: 14px; }
@@ -1009,7 +1011,7 @@ p.tx-votes { padding: 0; color: var(--muted); }
 .sx-more { margin: 10px 0; }
 @media (max-width: 760px) {
   .sx-top { padding: 10px 12px 6px; }
-  .sx-row button.sx-glyphs-b { display: none; }
+  .sx-row button { padding: 4px 10px; }
   .sx-opts { gap: 6px; }
   .sx-opt { flex: 1 1 140px; }
   .sx-opt select { flex: 1; max-width: none; min-width: 0; }

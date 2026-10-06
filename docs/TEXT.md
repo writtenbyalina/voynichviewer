@@ -314,37 +314,50 @@ UV-only line on f17r, and f1r's marginal alphabet (removed from ZL in 2025). The
 
 ## 4. Data files and sizes
 
-Built offline by `tools/text/` (Python, like `tools/seams.py`), committed as JSON, loaded lazily. Sizes measured on the
-DEV prototype and scaled ×1.49 to the whole book.
+Built offline by `tools/text/` (Python, like `tools/seams.py`), committed as JSON, loaded lazily. Sizes are as built
+for the whole book.
 
-| File | Loaded | Holds | Raw / gzip (est.) |
+| File | Loaded | Holds | Raw / gzip (as built) |
 |---|---|---|---|
-| `data/text/meta.json` | when Text first opens | witnesses, credits, method version, input checksums, page facts, gaps | ~15 KB / 4 KB |
-| `data/text/pages/<page>.json` | with that page's text | every locus: consensus, non-unanimous columns and gaps with votes and names, each witness's own line | avg 14 KB / **2.3 KB**, max 51 KB |
-| `data/text/index.json` | on first search | consensus text of every locus, with locus ids and page facts | ~300 KB / **93 KB** |
-| `data/text/witnesses.json` | when "every transcriber" or a single transcriber is chosen | each voter's text | ~1.4 MB / 250 KB |
+| `data/text/meta.json` | when the text first opens | voters and references with coverage, credits, method version, input checksums, the pages with text, rare glyphs | 9 KB / 3 KB |
+| `data/text/glyphs.json` | with meta | which Voynich VV character draws each STA glyph | 17 KB / 4 KB |
+| `data/text/pages/<page>.json` | with that page's text | every locus: consensus, the columns and gaps that are not everyone's with votes and names, each witness's own line | avg 19 KB / **4.3 KB**, max 91 KB |
+| `data/text/index.json` | on the first search, or a card's count | every locus as [id, type, consensus, paragraph start] | 339 KB / **95 KB** |
+| `data/text/w/<code>.json` | when Search reads one transcriber, or any; ZL, GC and IT for the ranges | one witness's lines in basic Eva, in the index's order | 1.7 MB / 523 KB for all 14 |
 
-One locus in a page file:
+The page files are larger than estimated (4.3 KB gzipped, against 2.3) because they keep every witness's own line in
+its own alphabet (`r`), and every column where anyone differs, so that each witness's reading can be rebuilt.
+
+One locus in a page file (shortened):
 
 ```json
-{"id":"f1r.2","t":"P0","c":"sory.ckhar.or,y.kair.chtaiin.shar.are.cthar.cthar.dan",
- "u":[[31,1,"m",[["a",4,"ZL GC IT CD"],["o",2,"FG LU"]]],
-      [35,1,"m",[["r",4,"IT FG CD LU"],["s",1,"ZL"],["i",1,"GC"]]],
-      [36,1,"p",[["e",2,"ZL IT"],["s",1,"GC"],["",1,"FG"],["y",1,"LU"]]], …],
- "s":[[13,"u","ZL, GC, IT. CD. FG LU"], …],
- "w":{"ZL":"sory.ckhar.or,y.kair.chtaiin.shar.ase.cthar.cthar,dan","GC":"…","RF":"…","VT":"…"},
- "n":{"GC":"soy9.Hay.oy,9.hacy.1kam.2ay.Ais.Kay.Kay.8aN"}}
+{"id":"f1r.2","t":"P0","loc":"+","ps":false,"pe":false,
+ "c":"sory.ckhar.or,y.kair.chtaiin.shar.are.cthar.cthar.dan",
+ "g":"C2A1C1A2.U1A3C1.A1C1,A2.Q1A3F3.K1Q2A3G1.L1A3C1.A3C1J1.U2A3C1.U2A3C1.B1A3E2",
+ "w":["ZL","GC","IT","FG","CD","LU"],
+ "u":[[34,1,"u",[["a",5.0,"ZL IT FG CD LU"],["@221;",0,"GC"]],{"RF":"@221;","VT":"a"}],
+      [35,1,"m",[["r",4.0,"IT FG CD LU"],["s",1.0,"ZL"],["i",1.0,"GC"]],{"RF":"i","VT":"r"}],
+      [36,1,"p",[["e",2.0,"ZL IT"],["s",1.0,"GC"],["",1.0,"FG"],["y",1.0,"LU"],["?",0,"CD"]],{"RF":"s","VT":"e"}], …],
+ "s":[[13,"u","ZL,GC,IT.FG0CD.LU0RF0VT."], …],
+ "r":{"ZL":"sory.ckhar.or,y.kair.chtaiin.shar.ase.cthar.cthar,dan","GC":"soy9.Hay.oy,9.hacy.1kam.2ay.Ais.Kay.Kay.8aN", …}}
 ```
+
+`u` keeps every column that is not everyone's: split votes, a column everyone agrees on but where someone could not
+vote (CD's `?`), and, zero wide, a glyph only some read, with their space before it. `s` keeps every gap where anyone's
+mark differs from the consensus. From these the site rebuilds each witness's reading (`readingOf` in
+`assets/text.js`, `tools/text/readings.py`); a test runs it over every line of every witness and gets their own line
+back. Where a witness's line lines up with the others only roughly (192 of about 34,000 lines, none of ZL's), the
+build keeps the line itself in `x`, and the site shows it as it is, unmarked.
 
 `c` is Eva with IVTFF's own `.` and `,`, so it can be copied straight into other tools. Offsets point into `c`. Only
 columns and gaps that are not unanimous are stored. `n` keeps native strings for alphabets other than Eva. Stable IDs
 are the IVTFF locus (`f1r.2`) and, for a glyph, RF1's page + locus + character index. Nothing is normalised away:
 `[a:b]`, `{}`, `?`, `,`, `@nnn;` and `<->` survive in `w`.
 
-**Speed.** A page's text is 2.3 KB gzipped, against about 500 KB for its photograph (f1r). The index (93 KB) parses in well
-under a second on a mid-range phone. Queries run in a Web Worker over one concatenated string with locus offsets;
-whole-word queries on 300 KB take a few milliseconds. The 50 ms budget leaves room for regex and near matches. The
-benchmark runs on a throttled Pixel 7 profile in Playwright.
+**Speed.** A page's text is 4.3 KB gzipped, against about 500 KB for its photograph (f1r). Searches run in a module
+Web Worker (`assets/search-worker.js`) over the lines of the index, so a slow pattern never holds the page up: the tab
+stops the worker after six seconds and says so. Whole-word and wildcard queries over the whole book take a few
+milliseconds; `tests/text.spec.js` fails any of a set of typical queries that takes 500 ms or more.
 
 **Pipeline** (`tools/text/`): `ivtff.py` is copied from `~/voynich/src`, as asked. Then `sta.py` (STA and aaa tables),
 `lsi.py` (interlinear → STA), `align.py`, `vote.py` and `build.py`, with tests: the IT round trip ≥ 5,208/5,215, locus
