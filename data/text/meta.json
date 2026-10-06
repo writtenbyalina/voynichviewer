@@ -1,0 +1,225 @@
+{
+ "method": "1",
+ "about": "The consensus of independent transcriptions of the Voynich Manuscript, built by tools/text/build.py; the method is docs/TEXT.md section 3.",
+ "credit": "Transcriptions by René Zandbergen and Gabriel Landini, Glen Claston, Takeshi Takahashi, the First Study Group (William Friedman), Prescott Currier and Mary D'Imperio, Jorge Stolfi, John Grove, John Tiltman, Don Latham, Karl Kluge (from Theodore Petersen's copy), Mike Roe and Denis Mardle, from René Zandbergen's voynich.nu (CC0) and the Landini-Stolfi interlinear.",
+ "voters": [
+  {
+   "code": "ZL",
+   "name": "René Zandbergen & Gabriel Landini",
+   "alphabet": "Extended Eva",
+   "loci": 5385
+  },
+  {
+   "code": "GC",
+   "name": "Glen Claston",
+   "alphabet": "v101",
+   "loci": 5366
+  },
+  {
+   "code": "IT",
+   "name": "Takeshi Takahashi",
+   "alphabet": "Eva",
+   "loci": 5214
+  },
+  {
+   "code": "FG",
+   "name": "First Study Group (Friedman)",
+   "alphabet": "FSG",
+   "loci": 4060
+  },
+  {
+   "code": "CD",
+   "name": "Prescott Currier & Mary D'Imperio",
+   "alphabet": "Currier",
+   "loci": 2196
+  },
+  {
+   "code": "LU",
+   "name": "Jorge Stolfi",
+   "alphabet": "Eva",
+   "loci": 1989
+  },
+  {
+   "code": "LV",
+   "name": "John Grove",
+   "alphabet": "Eva",
+   "loci": 1918
+  },
+  {
+   "code": "LT",
+   "name": "John Tiltman",
+   "alphabet": "Eva",
+   "loci": 566
+  },
+  {
+   "code": "LL",
+   "name": "Don Latham",
+   "alphabet": "Eva",
+   "loci": 205
+  },
+  {
+   "code": "LP",
+   "name": "Theodore Petersen (via Karl Kluge)",
+   "alphabet": "Eva",
+   "loci": 209
+  },
+  {
+   "code": "LR",
+   "name": "Mike Roe",
+   "alphabet": "Eva",
+   "loci": 31
+  },
+  {
+   "code": "LX",
+   "name": "Denis Mardle",
+   "alphabet": "Eva",
+   "loci": 37
+  }
+ ],
+ "references": [
+  {
+   "code": "RF",
+   "name": "RF1, Zandbergen's merge of ZL and GC",
+   "loci": 5385
+  },
+  {
+   "code": "VT",
+   "name": "voynichese.com (Takahashi)",
+   "loci": 5206
+  }
+ ],
+ "loci": 5385,
+ "pages": 227,
+ "voters_per_locus": {
+  "1": 5,
+  "2": 54,
+  "3": 55,
+  "4": 1142,
+  "5": 2554,
+  "6": 1465,
+  "7": 110
+ },
+ "columns": {
+  "maj": 10729,
+  "none": 29,
+  "plur": 499,
+  "single": 82,
+  "tie": 1010,
+  "unan": 144189
+ },
+ "gaps": {
+  "all": 29614,
+  "doubt": 1898,
+  "few": 1318,
+  "most": 2521,
+  "none": 113922,
+  "unc": 1878
+ },
+ "rare_eva": {
+  "Eb": "@172;",
+  "Xb": "@140;",
+  "Xc": "@223;",
+  "Xd": "@170;",
+  "Xf": "@169;",
+  "Xg": "@163;",
+  "Xl": "@211;",
+  "Xn": "@147;",
+  "Xo": "@187;"
+ },
+ "costs_fit_on": {
+  "pages": 147,
+  "sha256": "f83421a26eccf443040ca28db9b4e12a370e7f7aab89a1cc3e329bd16338115b"
+ },
+ "inputs": [
+  {
+   "name": "ZL3b-n.txt",
+   "sha256": "bf5b6d4ac1e3a51b1847a9c388318d609020441ccd56984c901c32b09beccafc",
+   "url": "https://www.voynich.nu/data/ZL3b-n.txt"
+  },
+  {
+   "name": "GC2a-n.txt",
+   "sha256": "b09570cb6c993bc2d87134d115e60a978650a8a6495483ddbb1f6005a586096f",
+   "url": "https://www.voynich.nu/data/GC2a-n.txt"
+  },
+  {
+   "name": "IT2a-n.txt",
+   "sha256": "7f27a8b0feed8f6de0a99900df6bf912dd1d295c38e5f830bac8b41c3f536fb5",
+   "url": "https://www.voynich.nu/data/IT2a-n.txt"
+  },
+  {
+   "name": "VT0e-n.txt",
+   "sha256": "e13ba5e073cae54722bc095db8eb9a1aa9c7105f45a70f66a0aad236077f2426",
+   "url": "https://www.voynich.nu/data/VT0e-n.txt"
+  },
+  {
+   "name": "CD2a-n.txt",
+   "sha256": "edc18e6de699c50d575925d4f469685ccbbe22c9755b9b8a3b002f83253cbde5",
+   "url": "https://www.voynich.nu/data/CD2a-n.txt"
+  },
+  {
+   "name": "FG2a-n.txt",
+   "sha256": "a1460a05ff610a406e62b4095a8f8e88c04653c1ef4aa5ad6428ddb1ac01fe06",
+   "url": "https://www.voynich.nu/data/FG2a-n.txt"
+  },
+  {
+   "name": "RF1b-e.txt",
+   "sha256": "e7d3238e35743e06c63367a933909ec37b1e2de7ada3a1b449447eafa1918782",
+   "url": "https://www.voynich.nu/data/RF1b-e.txt"
+  },
+  {
+   "name": "LSI_ivtff_0d.txt",
+   "sha256": "3f3f2af18cde10efe75c582f49b07b651c3397022fcbfa5854fecc424c121afa",
+   "url": "https://www.voynich.nu/data/beta/LSI_ivtff_0d.txt"
+  },
+  {
+   "name": "ZL3b.txt",
+   "sha256": "8438ba1c45f47fe1d06b5262cbcdf60ce69158a0edbd4dd802612896f3217e2a",
+   "url": "https://www.voynich.nu/data/sta/ZL3b.txt"
+  },
+  {
+   "name": "GC2a_0.txt",
+   "sha256": "b39cabbd9c8c8a098bfa9f76e0649291d17d77e1cb4fb0a3351ff7bdc832ace3",
+   "url": "https://www.voynich.nu/data/sta/GC2a_0.txt"
+  },
+  {
+   "name": "IT2a.txt",
+   "sha256": "215f2d05690828c00bd4ae00d6201df31050adcd81601343b142ae91b9dfeee4",
+   "url": "https://www.voynich.nu/data/sta/IT2a.txt"
+  },
+  {
+   "name": "VT0e.txt",
+   "sha256": "9903667b8b1c3daa062cbd635bbf0b7ffc644ee92eb292a1f115b976049c3df1",
+   "url": "https://www.voynich.nu/data/sta/VT0e.txt"
+  },
+  {
+   "name": "RF1b.txt",
+   "sha256": "81c331b7d8e76761e27d350c3b37ccfbe192848e6c8a227bcb5d40fb29259b17",
+   "url": "https://www.voynich.nu/data/sta/RF1b.txt"
+  },
+  {
+   "name": "FG2a.txt",
+   "sha256": "3a66b0e9cd7b156191bfaf0b5a0a4efdaf019e8ee9e9364305bca4c12932fa4c",
+   "url": "https://www.voynich.nu/data/sta/FG2a.txt"
+  },
+  {
+   "name": "CD2a_0.txt",
+   "sha256": "5c86a82bc99f5329c498aeb3009ee6ebfbe819ec435948e3b9503ce9101ef79d",
+   "url": "https://www.voynich.nu/data/sta/CD2a_0.txt"
+  },
+  {
+   "name": "STA-aaa.bit",
+   "sha256": "622621463ff2973ff456b02f0b46ba99fef8ad9103c464e44427762863e3cb64",
+   "url": "https://www.voynich.nu/software/bitrans/STA-aaa.bit"
+  },
+  {
+   "name": "STA-Eva_Bint.bit",
+   "sha256": "3c39164a76781ab781b5fbce2bcf75cee3183013a8d994d0463b2aa8f113a289",
+   "url": "https://www.voynich.nu/software/bitrans/STA-Eva_Bint.bit"
+  },
+  {
+   "name": "STA1R.bit",
+   "sha256": "3e895365ee1b4375faa280acaa785ad84bb113e9f8af2c321127c215e9998c39",
+   "url": "https://www.voynich.nu/software/bitrans/STA1R.bit"
+  }
+ ]
+}
