@@ -47,20 +47,22 @@ class Data(unittest.TestCase):
     def test_every_zl_locus_is_there(self):
         self.assertEqual(len(self.index), 5385)
         self.assertEqual(self.meta["pages"], 227)
-        types = collections.Counter(t[0] for _, t, _ in self.index)
+        types = collections.Counter(row[1][0] for row in self.index)
         self.assertEqual(dict(types), {"P": 4130, "L": 1029, "C": 84, "R": 142})
-        self.assertTrue(any(i.startswith("fRos.") for i, _, _ in self.index))
+        self.assertTrue(any(row[0].startswith("fRos.") for row in self.index))
+        self.assertEqual(sum(row[3] for row in self.index), sum(1 for f in (DATA / "pages").glob("*.json")
+                                                                 for l in json.loads(f.read_text())["loci"] if l["ps"]))
 
     def test_index_matches_pages(self):
         by_page = collections.defaultdict(list)
-        for i, t, c in self.index:
+        for i, t, c, _ in self.index:
             by_page[i.rsplit(".", 1)[0]].append((i, t, c))
         for p, rows in by_page.items():
             self.assertEqual([(l["id"], l["t"], l["c"]) for l in page(p)["loci"]], rows, p)
 
     def test_word_tokens_near_published(self):
-        n = sum(len([w for w in c.replace(",", ".").split(".") if w]) for _, _, c in self.index)
-        m = sum(len([w for w in c.replace(",", "").split(".") if w]) for _, _, c in self.index)
+        n = sum(len([w for w in row[2].replace(",", ".").split(".") if w]) for row in self.index)
+        m = sum(len([w for w in row[2].replace(",", "").split(".") if w]) for row in self.index)
         self.assertTrue(36000 < m < (m + n) / 2 < n < 41000, (m, n))
 
     def test_worked_lines(self):
@@ -106,6 +108,13 @@ class Data(unittest.TestCase):
                     if code not in glyphs:
                         missing[code] += 1
         self.assertEqual(dict(missing), {})
+
+    def test_witness_files_follow_the_index(self):
+        n = len(self.index)
+        for f in (DATA / "w").glob("*.json"):
+            self.assertEqual(len(json.loads(f.read_text())["lines"]), n, f.name)
+        self.assertEqual({f.stem for f in (DATA / "w").glob("*.json")},
+                         set(vote.ORDER) | set(vote.REFERENCE))
 
     def test_sizes(self):
         self.assertLess((DATA / "index.json").stat().st_size, 400_000)

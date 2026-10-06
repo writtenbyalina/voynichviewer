@@ -18,6 +18,8 @@ page, each locus holds:
                  mark, '.' space, ',' uncertain, '-' drawing break, '0' none; status a(ll), m(ost), u(ncertain),
                  d(oubted), f(ew), n(one)
   r              every witness's line as written, in its own alphabet
+index.json lists every locus as [id, type, consensus, paragraph starts here (1/0)]; w/<witness>.json holds that
+witness's lines in basic Eva, in the index's order ("" where it has none), for Search's "every transcriber".
 """
 from __future__ import annotations
 
@@ -59,7 +61,7 @@ def main():
         loc = {"id": zl.id, "t": zl.type, "loc": zl.loc, "ps": ps, "pe": pe, "c": r["c"], "g": r["g"], "w": r["w"],
                "u": r["u"], "s": r["s"], "r": C.own_lines(key)}
         pages.setdefault(key[0], []).append(loc)
-        index.append([zl.id, zl.type, r["c"]])
+        index.append([zl.id, zl.type, r["c"], int(ps)])
         stats.update(r["stats"])
         cover[len(r["w"])] += 1
         for n, t in wits.items():
@@ -71,12 +73,18 @@ def main():
         (OUT / "pages" / f"{page}.json").write_text(
             json.dumps({"page": page, "vars": C.pages.get(page, {}), "loci": loci}, ensure_ascii=False,
                        separators=(",", ":")) + "\n")
-    ids = [i for i, _, _ in index]
+    ids = [i for i, *_ in index]
     (OUT / "index.json").write_text(json.dumps({"method": METHOD, "loci": index}, ensure_ascii=False,
                                                separators=(",", ":")) + "\n")
-    (OUT / "witnesses.json").write_text(json.dumps(
-        {"method": METHOD, "order": ids, "w": {n: [lines.get(i, "") for i in ids] for n, lines in sorted(wit_lines.items())}},
-        ensure_ascii=False, separators=(",", ":")) + "\n")
+    (OUT / "w").mkdir(exist_ok=True)
+    for old in (OUT / "w").glob("*.json"):
+        old.unlink()
+    for n, lines in sorted(wit_lines.items()):       # one file per witness, so Search loads only those it needs
+        (OUT / "w" / f"{n}.json").write_text(json.dumps({"method": METHOD, "witness": n, "lines": [lines.get(i, "") for i in ids]},
+                                                        ensure_ascii=False, separators=(",", ":")) + "\n")
+    old = OUT / "witnesses.json"
+    if old.exists():
+        old.unlink()
     inputs = json.loads((HERE / "inputs.json").read_text())["files"]
     costs = json.loads((HERE / "costs.json").read_text())
     coverage = {n: len(v) for n, v in wit_lines.items()}

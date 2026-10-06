@@ -120,11 +120,11 @@ def compare(cons: dict, other: dict, name: str):
 
 def main():
     sta.learn_rare_eva()
-    W = json.loads((DATA / "witnesses.json").read_text())
-    order = W["order"]
-    idx = {lid: c for lid, _, c in json.loads((DATA / "index.json").read_text())["loci"]}
+    index = json.loads((DATA / "index.json").read_text())["loci"]
+    order = [row[0] for row in index]
+    idx = {row[0]: row[2] for row in index}
     meta = json.loads((DATA / "meta.json").read_text())
-    lines = {n: dict(zip(order, ls)) for n, ls in W["w"].items()}
+    lines = {f.stem: dict(zip(order, json.loads(f.read_text())["lines"])) for f in (DATA / "w").glob("*.json")}
     sections = section_of()
     C = Corpus()
     rf_inbetween = {lid for lid in order
@@ -229,7 +229,7 @@ def main():
               f"lines with the same glyphs, {pct(zi['words_compared'] - zi['words_differ'], zi['words_compared'])} of "
               f"ZL's words (its uncertain spaces as spaces). Counting word breaks too, only "
               f"{pct(zi['lines_identical'], zi['loci'])} of lines are identical.")
-    types = collections.Counter(t[0] for _, t, _ in json.loads((DATA / "index.json").read_text())["loci"])
+    types = collections.Counter(row[1][0] for row in index)
     md.append("- Loci by type (Zandbergen: P 4,130, L 1,029, C 84, R 142): " +
               ", ".join(f"{k} {v:,}" for k, v in sorted(types.items())) + ".")
     md.append("- Word tokens: about 38,000 expected; see 'Words in the consensus' above.")
