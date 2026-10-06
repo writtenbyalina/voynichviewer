@@ -787,7 +787,8 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .tx-ctl { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .tx-ctl select, .tx-ctl button { background: transparent; color: var(--table-ink); border: 1px solid var(--table-line);
   border-radius: var(--radius); min-height: 32px; }
-.tx-ctl select { padding: 4px 6px; max-width: 100%; }
+.tx-ctl select { padding: 4px 6px; max-width: 100%; min-width: 0; flex: 0 1 auto; }
+@media (max-width: 760px) { .tx-ctl { gap: 4px; } .tx-ctl select { flex: 1 1 120px; font-size: 13px; } }
 .tx-ctl select option { color: var(--ink); background: #fff; }
 .tx-ctl button:hover, .tx-ctl select:hover { border-color: var(--table-muted); }
 .tx-ctl .tx-x { margin-left: auto; min-width: 32px; padding: 0 8px; }
@@ -847,6 +848,7 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .tx .jn::after { content: "‿"; color: var(--tx-gold); }
 .tx-none, .tx-rough { color: var(--table-muted); font-family: -apple-system, system-ui, sans-serif; font-size: 13px; }
 .tx-reading { max-width: 190px; }
+@media (max-width: 760px) { .tx-reading { max-width: none; } }
 /* the card: one word as each transcriber reads it */
 .tx-card { position: absolute; z-index: 30; width: min(380px, calc(100% - 16px)); background: var(--panel); color: var(--ink);
   border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); padding: 12px 14px 12px;
@@ -887,3 +889,33 @@ p.tx-votes { padding: 0; color: var(--muted); }
 .tx .w.st .ev { font: 11.5px/1.2 ui-monospace, Menlo, monospace; color: var(--table-muted); }
 .tx .w.st .gl .us { width: .35em; }
 .tx-bigg { font: 34px/1 "Voynich VV", serif; }
+/* the interlinear: the panel widens for study */
+@media (min-width: 761px) { .tx.wide { width: var(--tx-w, min(780px, 58%)); } }
+.tx-legend { font-size: 12px; color: var(--table-muted); margin: 8px 0 4px; }
+.tx-legend p { margin: 6px 0; }
+.tx-legend summary { cursor: pointer; min-height: 28px; display: flex; align-items: center; }
+.tx-legend b { color: var(--table-ink); }
+.tx-legend .x { font-family: ui-monospace, Menlo, monospace; background: var(--tx-gold); color: #1b1916; border-radius: 2px; padding: 0 2px; }
+.tx-legend fieldset { border: 1px solid var(--table-line); border-radius: var(--radius); margin: 0; padding: 4px 8px 6px; display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.tx-legend legend { padding: 0 4px; }
+.tx-legend label { display: inline-flex; align-items: center; gap: 4px; color: var(--table-ink); min-height: 28px; cursor: pointer; }
+.tx-legend .tx-coll { flex-basis: 100%; }
+.tx-body.inter .ln { grid-template-columns: 30px minmax(0, 1fr); margin-top: 8px; }
+.tx .il { display: grid; grid-template-columns: max-content max-content; gap: 0 10px; overflow-x: auto; padding-bottom: 4px; }
+.tx .il .who { font-size: 11.5px; color: var(--table-muted); white-space: nowrap; line-height: 21px; text-align: right; position: sticky; left: 0; background: #221e1a; z-index: 1; padding-right: 4px; }
+.tx .il .who.cons { color: var(--table-ink); font-weight: 600; }
+.tx .il .seq { font: 13.5px/21px ui-monospace, Menlo, monospace; white-space: pre; }
+.tx .il .seq.cons { font-weight: 700; }
+.tx .il .seq .d { color: var(--table-muted); opacity: .6; font-weight: 400; }
+.tx .il .seq .x { color: #1b1916; background: var(--tx-gold); border-radius: 2px; }
+.tx .il .seq .xs { background: rgba(243, 195, 92, .4); border-radius: 2px; }
+.tx .il .seq .us-c { color: var(--tx-gold); }
+.tx .il .seq.ref, .tx .il .who.ref { opacity: .75; }
+.tx .il .seq.rough, .tx .il .seq.alike { color: var(--table-muted); font-family: -apple-system, system-ui, sans-serif; font-size: 12px; white-space: normal; }
+.tx .il .seq.rough { font-family: ui-monospace, Menlo, monospace; white-space: pre; }
+.tx .il .bars { font: 13.5px/8px ui-monospace, Menlo, monospace; white-space: pre; height: 10px; display: flex; align-items: flex-end; }
+.tx .il .bars i { display: inline-block; flex: none; background: #8a7f6e; border-radius: 1px; }
+.tx .il .bars i.lo { background: var(--tx-gold); }
+.tx .il .bars i.sp { width: 1ch; height: 0; background: none; }
+.tx .il .sep { grid-column: 1 / -1; border-top: 1px dashed var(--table-line); margin: 3px 0; }
+.tx .il .w { cursor: pointer; }

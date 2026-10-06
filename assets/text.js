@@ -231,6 +231,9 @@ const T = {
   loaded: new Map(),   // page -> its data, for the pages on show
   marks: store.get("text:marks", "quiet"),
   font: store.get("text:font", "eva"),   // "eva" or "glyphs"
+  view: store.get("text:view", "lines"),   // "lines" or "inter" (interlinear: every transcriber, column by column)
+  hide: new Set(store.get("text:hide", [])),   // transcribers' rows hidden in the interlinear
+  collapse: store.get("text:collapse", false),   // interlinear: lines everyone reads alike show the consensus only
   query: "",   // the address's options after "text?", kept for what reads them
 
   /* Fill the panel for the pages on show, unless they are the ones already there. */
@@ -238,7 +241,7 @@ const T = {
     const el = $("#rd-text");
     if (!el || el.hidden || !R.spreads) return;
     const shown = this.shown();
-    const key = JSON.stringify([shown.map(x => x.page), this.marks, this.reading, this.font]);
+    const key = JSON.stringify([shown.map(x => x.page), this.marks, this.reading, this.font, this.view, [...this.hide], this.collapse]);
     if (el === this.el && key === this.onShow) return;
     this.el = el; this.onShow = key;
     const gen = ++this.gen;
@@ -279,10 +282,10 @@ const T = {
 
   /* the panel's frame: its head with the settings, and the body that scrolls */
   frame(el) {
-    const marks = h("select", { class: "tx-sel", "aria-label": "Marks in the text",
+    const marks = h("select", { class: "tx-sel tx-marks", "aria-label": "Marks in the text", title: "Mark the text where the transcribers' vote is split, wherever anyone differs, or nowhere",
       onchange: e => { this.marks = e.target.value; store.set("text:marks", this.marks); this.sync(); } },
-      h("option", { value: "quiet" }, "Marks: where the vote is split"),
-      h("option", { value: "every" }, "Marks: every disagreement"),
+      h("option", { value: "quiet" }, "Marks: split votes"),
+      h("option", { value: "every" }, "Marks: every difference"),
       h("option", { value: "none" }, "Marks: none"));
     marks.value = this.marks;
     const reading = h("select", { class: "tx-sel tx-reading", "aria-label": "Whose reading",
@@ -290,11 +293,14 @@ const T = {
     const fonts = h("div", { class: "tx-seg", role: "group", "aria-label": "Show the text as" },
       [["eva", "Eva", "The text in Eva letters, names for the shapes"], ["glyphs", "Glyphs", "The text in the manuscript's own glyphs, with their Eva under each word"]]
         .map(([v, t, title]) => h("button", { "data-font": v, title, "aria-pressed": String(this.font === v), onclick: () => this.setFont(v) }, t)));
+    const views = h("div", { class: "tx-seg", role: "group", "aria-label": "Lines or interlinear" },
+      [["lines", "Lines", "The text, line by line (I)"], ["inter", "Interlinear", "Every transcriber under the consensus, glyph by glyph (I)"]]
+        .map(([v, t, title]) => h("button", { "data-view": v, title, "aria-pressed": String(this.view === v), onclick: () => this.setView(v) }, t)));
     el.replaceChildren(
       h("div", { class: "tx-grip", role: "separator", tabindex: "0", "aria-label": "Resize the text panel",
         "aria-orientation": "vertical" }),
       h("div", { class: "tx-head" },
-        h("div", { class: "tx-ctl" }, fonts, reading, marks,
+        h("div", { class: "tx-ctl" }, views, fonts, reading, marks,
           h("button", { class: "tx-x", title: "Close the text (T)", "aria-label": "Close the text", onclick: () => TextUI.toggle(false) }, "✕"))),
       h("div", { class: "tx-body", tabindex: "-1" }));
     this.grip($(".tx-grip", el), el);
@@ -319,10 +325,17 @@ const T = {
     }
   },
 
+  setView(v) {
+    this.view = v;
+    store.set("text:view", v);
+    for (const b of $$(".tx-seg button[data-view]", this.el)) b.setAttribute("aria-pressed", String(b.dataset.view === v));
+    this.closeCard(false);
+    this.sync();
+  },
   setFont(v) {
     this.font = v;
     store.set("text:font", v);
-    for (const b of $$(".tx-seg button", this.el)) b.setAttribute("aria-pressed", String(b.dataset.font === v));
+    for (const b of $$(".tx-seg button[data-font]", this.el)) b.setAttribute("aria-pressed", String(b.dataset.font === v));
     this.closeCard(false);
     this.sync();
   },
@@ -389,8 +402,13 @@ const T = {
     }
     if (!kids.some(k => k.classList.contains("tx-page")))
       kids.unshift(h("p", { class: "tx-msg" }, shown.length ? "No text on these pages." : "No text here: these leaves are lost."));
+    if (this.view === "inter") kids.unshift(this.legend(here));
     kids.push(this.credits());
-    body.classList.toggle("glyph", this.font === "glyphs");
+    const inter = this.view === "inter";
+    this.el.classList.toggle("wide", inter);
+    for (const x of $$(".tx-seg [data-font], .tx-reading, .tx-ctl select:not(.tx-reading)", this.el)) x.disabled = inter;
+    body.classList.toggle("glyph", this.font === "glyphs" && !inter);
+    body.classList.toggle("inter", inter);
     body.replaceChildren(...kids);
     body.scrollTop = 0;
     const want = R.focus && $$(".tx-page", body).find(el => short(el.dataset.page) === short(R.focus));
@@ -436,7 +454,113 @@ const T = {
     return h("div", { class: `ln${loc.ps && i ? " ps" : ""}`, "data-id": loc.id },
       h("button", { class: "no", title: `${loc.id}: click to copy`, "aria-label": `Line ${loc.id}, copy its name`,
         onclick: () => copy(loc.id) }, n),
-      h("span", { class: "t" }, this.reading === "cons" ? this.textOf(loc) : this.readingText(loc, this.reading)));
+      this.view === "inter" ? this.interOf(loc) : h("span", { class: "t" }, this.reading === "cons" ? this.textOf(loc) : this.readingText(loc, this.reading)));
+  },
+
+  /* ---- the interlinear: the consensus, an agreement bar, then each transcriber, column by column ---- */
+  legend(here) {
+    const who = Data.meta.voters.filter(v => here.has(v.code)).concat(Data.meta.references.filter(v => here.has(v.code)));
+    const set = () => { store.set("text:hide", [...this.hide]); this.sync(); };
+    const shownN = who.filter(v => !this.hide.has(v.code)).length;
+    const d = h("details", { class: "tx-legend", ontoggle: e => { this.legendOpen = e.target.open; } },
+      h("summary", {}, `Key, and rows: ${shownN} of ${who.length} transcriptions shown${this.collapse ? ", lines read alike shortened" : ""}`),
+      h("p", {}, h("b", {}, "Bold"), " the consensus · dim: as the consensus · ", h("span", { class: "x" }, "x"), " differs · ",
+        h("span", { class: "mono" }, "-"), " nothing here · ", h("span", { class: "mono" }, ","), " uncertain space · ",
+        h("span", { class: "mono" }, "‿"), " joined where others break"),
+      h("fieldset", {}, h("legend", {}, "Rows"),
+        who.map(v => h("label", {}, h("input", { type: "checkbox", checked: !this.hide.has(v.code),
+          onchange: e => { e.target.checked ? this.hide.delete(v.code) : this.hide.add(v.code); set(); } }), " ", SHORT[v.code])),
+        h("label", { class: "tx-coll" }, h("input", { type: "checkbox", checked: this.collapse,
+          onchange: e => { this.collapse = e.target.checked; store.set("text:collapse", this.collapse); this.sync(); } }), " Shorten lines everyone reads alike")));
+    d.open = !!this.legendOpen;
+    return d;
+  },
+  /* the columns of a locus: glyphs everyone reads alike one by one, the columns the data keeps whole, and the zero-wide
+     ones (a glyph only some read); each with the gap before it */
+  columns(loc) {
+    const { unitAt, emptyAt, gapAt } = lookup(loc);
+    const tokAt = new Map();
+    words(loc).forEach((w, wi) => w.toks.forEach(t => { if (!t.sep) tokAt.set(t.off, { t, wi }); }));
+    const c = loc.c, cols = [];
+    let gap = null, wi = 0;
+    for (let i = 0; i <= c.length;) {
+      for (const u of emptyAt.get(i) || []) { cols.push({ o: i, len: 0, cons: "", u, wi, gap: null, before: u[5] || "" }); }
+      if (i === c.length) break;
+      const ch = c[i];
+      if (ch === "." || ch === ",") { gap = { o: i, cons: ch }; if (ch === ".") wi++; i++; continue; }
+      if (!gap && i > 0 && gapAt.has(i)) gap = { o: i, cons: "" };
+      const u = unitAt.get(i), tk = tokAt.get(i);
+      const len = u ? u[1] : tk ? tk.t.len : 1;
+      cols.push({ o: i, len, cons: c.slice(i, i + len), u, wi: tk ? tk.wi : wi, gap });
+      gap = null;
+      i += len;
+    }
+    return cols;
+  },
+  interOf(loc) {
+    const cols = this.columns(loc), { gapAt } = lookup(loc);
+    const rows = loc.w.filter(n => !this.hide.has(n)), refs = ["RF", "VT"].filter(n => present(loc, n) && !this.hide.has(n));
+    const cell = (col, n) => n === "cons" ? col.cons : col.u ? unitReading(col.u, n, col.cons) : col.cons;
+    const gapOf = (col, n) => {
+      if (col.len === 0) { const m = (col.before.match(new RegExp((n === "cons" ? "^$" : n) + "([.,\\-0])")) || [])[1]; return m == null ? null : m === "0" ? "" : m === "-" ? "." : m; }
+      if (!col.gap) return null;
+      if (n === "cons") return col.gap.cons;
+      const g = gapAt.get(col.gap.o);
+      return g && n in g.marks ? g.marks[n] : col.gap.cons;
+    };
+    const slot = cols.map((col, k) => k > 0 && (col.gap || (col.len === 0 && col.before)));
+    const width = cols.map(col => Math.max(1, col.cons.length, ...rows.concat(refs).map(n => (loc.x && n in loc.x) ? 0 : cell(col, n).length)));
+    const ws = words(loc);
+    const alike = loc.w.every(n => !(loc.x && n in loc.x) && ws.every((w, i) => !differs(readingOf(loc, n), ws, i)));
+    const share = col => { if (!col.u) return 1; const tot = col.u[3].reduce((a, r) => a + r[1], 0); const won = col.u[3].filter(r => r[0] === col.cons).reduce((a, r) => a + r[1], 0); return tot ? won / tot : 0; };
+    const seq = n => {
+      const out = [];
+      cols.forEach((col, k) => {
+        if (slot[k]) {
+          const cg = col.len === 0 ? "" : col.gap ? col.gap.cons : "", m = gapOf(col, n);
+          const show = v => v === "." ? " " : v === "," ? "," : "‿";
+          if (n === "cons") out.push(cg === "." ? " " : cg === "," ? h("span", { class: "us-c" }, ",") : h("span", { class: "d" }, "‿"));
+          else out.push(m == null || m === cg ? h("span", { class: "d" }, show(m ?? cg)) : h("span", { class: "xs", title: m === "." ? "a space here" : m === "," ? "an uncertain space here" : "no space here" }, m === "." ? "␣" : show(m)));
+        }
+        const t = cell(col, n), pad = "-".repeat(width[k] - t.length);
+        if (n === "cons") out.push(t, pad ? h("span", { class: "d" }, pad) : "");
+        else if (t === col.cons) out.push(h("span", { class: "d" }, t + pad));
+        else out.push(h("span", { class: "x" }, t || "-"), pad.length > (t ? 0 : 1) ? h("span", { class: "d" }, pad.slice(t ? 0 : 1)) : "");
+      });
+      return out;
+    };
+    // the consensus row in words, so that a click opens a word's card
+    const consRow = () => {
+      let cur = null, curW = -1;
+      const wrapped = [];
+      cols.forEach((col, k) => {
+        if (col.wi !== curW || !cur) {
+          if (slot[k]) wrapped.push(seqSlot(k));
+          cur = h("span", { class: `w${ws[col.wi] && this.diffWord(loc, col.wi) ? " mk" : ""}`, "data-o": ws[col.wi] ? ws[col.wi].off : 0, "data-e": ws[col.wi] ? ws[col.wi].eva : "" });
+          curW = col.wi;
+          wrapped.push(cur);
+        } else if (slot[k]) cur.append(seqSlot(k));
+        const t = col.cons, pad = "-".repeat(width[k] - t.length);
+        cur.append(t, pad ? h("span", { class: "d" }, pad) : "");
+      });
+      return wrapped;
+    };
+    const seqSlot = k => { const col = cols[k], cg = col.len === 0 ? "" : col.gap ? col.gap.cons : ""; return cg === "." ? " " : cg === "," ? h("span", { class: "us-c" }, ",") : h("span", { class: "d" }, "‿"); };
+    const bars = cols.flatMap((col, k) => [slot[k] ? h("i", { class: "sp" }) : "", h("i", { class: share(col) < 1 ? "lo" : "", style: { width: width[k] + "ch", height: Math.max(2, Math.round(8 * share(col))) + "px" } })]);
+    const grid = h("div", { class: "il" },
+      h("div", { class: "who cons" }, "Consensus"), h("div", { class: "seq cons" }, consRow()),
+      h("div", { "aria-hidden": "true" }), h("div", { class: "bars", "aria-hidden": "true" }, bars));
+    if (!(this.collapse && alike)) {
+      for (const n of rows) grid.append(h("div", { class: "who" }, SHORT[n]), (loc.x && n in loc.x) ? h("div", { class: "seq rough", title: ROUGH }, "≈ " + loc.x[n]) : h("div", { class: "seq" }, seq(n)));
+      if (refs.length) grid.append(h("div", { class: "sep" }));
+      for (const n of refs) grid.append(h("div", { class: "who ref" }, SHORT[n]), (loc.x && n in loc.x) ? h("div", { class: "seq ref rough", title: ROUGH }, "≈ " + loc.x[n]) : h("div", { class: "seq ref" }, seq(n)));
+    } else grid.append(h("div", { class: "who" }), h("div", { class: "seq alike" }, `${rows.length} transcriber${rows.length === 1 ? "" : "s"}, all alike`));
+    return grid;
+  },
+  /* whether anyone reads consensus word i otherwise */
+  diffWord(loc, i) {
+    const ws = words(loc);
+    return loc.w.some(n => !(loc.x && n in loc.x) && differs(readingOf(loc, n), ws, i));
   },
 
   /* a transcriber's own reading of a locus, word by word of the consensus, marked where it differs */
@@ -655,6 +779,7 @@ const T = {
 
   key(e) {
     if ((e.key === "n" || e.key === "N") && !e.altKey) { this.step(e.shiftKey ? -1 : 1); return true; }
+    if (e.key === "i" || e.key === "I") { this.setView(this.view === "inter" ? "lines" : "inter"); return true; }
     if (e.key === "Escape" && this.card) { this.closeCard(); return true; }
     return false;
   },
