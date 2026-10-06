@@ -1803,6 +1803,7 @@ const Info = {
         ["colours", "The colours"], ["views", "Three ways to look"], ["yours", "Make it your own"]]],
       ["Lisa Fagin Davis's research", [["blog", "“Voynich Codicology” in brief"], ["quires", "Folio order: her quire diagrams"], ["history", "Her history of the book"],
         ["singulions", "The 2026 proposal"]]],
+      ["Reading the text", [["text", "Letters for shapes"], ["consensus", "One text from many"], ["search", "Searching the text"], ["transcribers", "Who made the text"]]],
       ["Reference", [["sure", "Known or guessed?"], ["notes", "Notes on single sheets"], ["words", "Words used here"], ["sources", "Sources"], ["privacy", "Privacy and cookies"]]]];
     const cite = k => this.cite(k);
     const blogUrl = D.orders.sources.LFD2025blog.url, yaleUrl = D.orders.sources.Yale.url;
@@ -1988,6 +1989,38 @@ const Info = {
           "Davis and Layfield call it a hypothesis: until the text can be read, the order cannot be confirmed. They tested only quires 13 and 20. In her Toronto lecture (", cite("LFD2025talk"), ") Davis also described work in progress on using the shrinking waterstains in the early quires to recover their original nesting, with no firm results yet (", cite("Pelling2025"), "). Nick Pelling argues that LSA similarity is a prompt for codicology rather than codicological evidence."),
         h("p", {}, "The top sequences, with quire 9 re-sewn, are in the Order menu as ", h("b", {}, "Davis: complete proposed order"), ". To try the runner-up, choose that order, open ", h("button", { class: "linkish", onclick: () => this.go("yours") }, "Rearrange"), " in 3D and drag quire 13's sheets into the order 76|83, 77|82, 79|80, 75|84, 78|81.")),
 
+      // ---------------------------------------------------------------- reading the text (text.js, search.js)
+      h("div", { class: "info-part" }, "Reading the text"),
+      this.sec("text", "Letters for shapes",
+        h("p", {}, "Nobody can read the manuscript's writing, but people can still study it. To do that, they copy it out glyph by glyph (a ", h("b", {}, "glyph"), " is one written shape) into letters a computer can count and search. A copy like that is a ", h("b", {}, "transcription"), "."),
+        h("p", {}, "Most transcriptions use ", h("b", {}, "Eva"), ", an alphabet René Zandbergen and Gabriel Landini made for the manuscript in the 1990s. Each Eva letter is a name for a shape, picked because it looks a little like it: ", h("i", {}, "o"), " is a small circle, ", h("i", {}, "ch"), " two joined c's, ", h("i", {}, "k"), " and ", h("i", {}, "t"), " are tall loops called gallows. ",
+          h("b", {}, "The letters are not sounds."), " “daiin” is a way of writing down which shapes are on the page, not a word anyone knows how to say."),
+        h("p", {}, "In the Reader, press ", h("kbd", {}, "T"), " (or the Text button) to see the text of the pages beside them. The ", h("b", {}, "Glyphs"), " switch shows it in the manuscript's own shapes, each word with its Eva underneath. ",
+          this.link("#read/beinecke/1r/text", "Try it on the first page"))),
+      this.sec("consensus", "One text from many",
+        h("p", {}, "Copying unknown glyphs is hard, and careful people disagree: is this an ", h("i", {}, "a"), " or an ", h("i", {}, "o"), "? Is that a space between two words, or just a wider gap? So the viewer does not pick one transcription. It lines up as many as twelve independent ones, glyph by glyph, and lets each person vote once on every glyph and every space. The reading with the most votes is the ", h("b", {}, "consensus"), ", and that is the text you see."),
+        h("ul", {},
+          h("li", {}, "A ", h("b", {}, "dotted gold underline"), " marks a glyph where the vote is split: a tie, or no reading with more than half the votes. You can ask for every disagreement to be marked, or none."),
+          h("li", {}, "A ", h("b", {}, "gold dot"), " between glyphs is an ", h("b", {}, "uncertain space"), ": about half of the transcribers wrote a space there. Searches count it either way unless you say otherwise."),
+          h("li", {}, h("b", {}, "Click any word"), " to see how each person read it, and the votes. Nothing is thrown away: every reading is kept, and you can read the page as any one transcriber read it instead. The ", h("b", {}, "Interlinear"), " (", h("kbd", {}, "I"), ") shows them all under each other."),
+          h("li", {}, "A tie goes to the transcriber who covered most of the book, and stays marked as a tie. Where someone could not read a glyph, or Glen Claston wrote one of his in-between glyphs (“a circle-type glyph, not saying which”), they do not vote on it."),
+          h("li", {}, "Two well-known versions are shown for comparison but do not vote, because they are built from others: RF1, Zandbergen's merge of his own and Claston's, and the text of voynichese.com, which is Takahashi's.")),
+        h("p", {}, "The consensus is a tool, not the truth: the truth is the parchment. The method is written out in full, with worked examples, in the viewer's design notes (docs/TEXT.md).")),
+      this.sec("search", "Searching the text",
+        h("p", {}, "The ", h("b", {}, "Text"), " tab (or ", h("kbd", {}, "/"), " anywhere) searches the whole book. Type Eva; the line under the box says back what it understood."),
+        h("dl", { class: "info-dl" },
+          ...[["qokeedy", "the word qokeedy"], ["qok*  *dy  *ke*", "words beginning, ending or with something inside (* is any glyphs)"], ["ch?dy", "? is any one glyph"],
+            ["[kt]eedy", "either glyph"], ["<gallows>edy", "a kind of glyph: <gallows>, <bench>, <pedestal>, <loop>, <unread>"], ["chol daiin", "two words in a row"],
+            ["dy-qo  dy_qo  dy~qo", "joined, across a word break, or either"], ["^qo*  *dy$", "first or last in a line"], ["A A", "the same word twice in a row"],
+            ["/qo[kt]e+dy/", "a regular expression over each line"], ["scribe:2  lang:B  section:balneo  quire:13  in:label  page:f75r-f84v", "filters"]]
+            .flatMap(([t, d]) => [h("dt", { class: "mono" }, t), h("dd", {}, d)])),
+        h("p", {}, "Counts come with a range, like “826 · 817–826”: the same search in the three fullest transcriptions (Zandbergen & Landini's, Claston's, Takahashi's), so you can see how much a count depends on who did the copying. The strip of bars is the book in the order chosen at the top; the narrowing on the left, the saved searches and the exports keep to what you have chosen. ",
+          this.link("#text/beinecke/search?q=qok*", "Try qok*"))),
+      this.sec("transcribers", "Who made the text",
+        h("p", {}, "The text is the work of the people who transcribed the manuscript, over eighty years: René Zandbergen and Gabriel Landini; Glen Claston; Takeshi Takahashi; the First Study Group led by William Friedman; Prescott Currier and Mary D'Imperio; Jorge Stolfi; John Grove; John Tiltman; Don Latham; Theodore Petersen (from Karl Kluge's copy); Mike Roe; and Denis Mardle."),
+        h("p", {}, "Their transcriptions come from René Zandbergen's ", h("a", { href: "https://www.voynich.nu/transcr.html", target: "_blank", rel: "noopener" }, "voynich.nu"), ", which makes them available under the CC0 licence, and from the Landini–Stolfi interlinear file. Zandbergen also wrote the alphabet the viewer compares them in (his STA). The viewer's own work is the lining up and the vote; any mistake in that is the viewer's."),
+        h("p", {}, "The glyphs are drawn with ", h("b", {}, "Voynich VV"), ": Glen Claston's Voynich font (2005, given to the public domain; William Porquet fixed it for Unicode), with 89 rare glyphs added for this viewer from Claston's own shapes.")),
+
       // ---------------------------------------------------------------- reference
       h("div", { class: "info-part" }, "Reference"),
       this.sec("sure", "Known or guessed?",
@@ -2012,11 +2045,15 @@ const Info = {
             ["Foliation", "The numbers written on the leaves (here in the 1600s)."], ["Binding", "How the quires are sewn together, and so the order of the pages."],
             ["Foldout", "A sheet with extra panels that fold in."], ["Collation", "A description of how a book's quires are made up."],
             ["Scribe, hand", "A handwriting. Davis finds five."], ["Currier A / B", "The two flavours of the writing, with different favourite words and spellings."],
-            ["Paleography", "The study of old handwriting."], ["Codicology", "The study of how books are physically made."]].flatMap(([t, d]) => [h("dt", {}, t), h("dd", {}, d)]))),
+            ["Paleography", "The study of old handwriting."], ["Codicology", "The study of how books are physically made."],
+            ["Glyph", "One written shape of the manuscript's script."], ["Transcription", "The manuscript's writing copied out into letters, glyph by glyph."],
+            ["Eva", "The alphabet of Latin letters most transcriptions use: names for shapes, not sounds."],
+            ["Line (locus)", "One line or label of text, numbered as transcriptions number them: f1r.2 is the second line of 1r."],
+            ["Consensus", "The reading most transcribers agree on, glyph by glyph."]].flatMap(([t, d]) => [h("dt", {}, t), h("dd", {}, d)]))),
 
       this.sec("sources", "Sources",
         h("ul", { class: "info-src" }, Object.keys(D.orders.sources).map(k => h("li", {}, cite(k)))),
-        h("p", { class: "small muted" }, "Scribes and section names: Davis. Illustration type and Currier language: the page labels of Zandbergen's transliteration file; the viewer never uses the transliterated text. 3D drawing: three.js (MIT licence)."),
+        h("p", { class: "small muted" }, "Scribes and section names: Davis. Illustration type and Currier language: the page labels of Zandbergen's transliteration file. The text: the transcriptions on voynich.nu and the Landini–Stolfi interlinear (see “Who made the text”). 3D drawing: three.js (MIT licence)."),
         h("p", { class: "small muted" }, `Voynich Viewer ${APP_VERSION} is an independent project. It is not made or endorsed by Yale University or by Lisa Fagin Davis.`)),
 
       this.privacySec());
@@ -2028,7 +2065,10 @@ const Info = {
             h("a", { href: yaleUrl, target: "_blank", rel: "noopener" }, "See the manuscript at Yale"))),
         h("div", { class: "credit" }, h("span", { class: "ci", "aria-hidden": "true" }, "✎"),
           h("div", {}, h("b", {}, "The research belongs to Lisa Fagin Davis."), " The collation, the five scribes, the section names and the reconstructions of the book's order shown here are her work. ",
-            h("a", { href: blogUrl, target: "_blank", rel: "noopener" }, "Read “Voynich Codicology”")))),
+            h("a", { href: blogUrl, target: "_blank", rel: "noopener" }, "Read “Voynich Codicology”"))),
+        h("div", { class: "credit" }, h("span", { class: "ci", "aria-hidden": "true" }, "Aa"),
+          h("div", {}, h("b", {}, "The text belongs to its transcribers."), " Transcriptions by René Zandbergen and Gabriel Landini, Glen Claston, Takeshi Takahashi, the First Study Group (William Friedman), Prescott Currier and Mary D'Imperio, Jorge Stolfi, John Grove, John Tiltman, Don Latham, Karl Kluge (from Theodore Petersen's copy), Mike Roe and Denis Mardle, from René Zandbergen's voynich.nu (CC0) and the Landini–Stolfi interlinear. ",
+            h("a", { href: "https://www.voynich.nu/transcr.html", target: "_blank", rel: "noopener" }, "See voynich.nu")))),
       h("div", { class: "info-cols" }, tocEl, body));
   },
 };

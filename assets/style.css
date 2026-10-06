@@ -580,7 +580,7 @@ dialog.work-dlg { width: min(620px, 94vw); max-height: 86vh; overflow: auto; pad
 
 /* ---------- Info: credits, contents, Davis's research ---------- */
 .info-wrap { max-width: 1120px; }
-.info-credits { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 18px; }
+.info-credits { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin: 0 0 18px; }
 .info-credits .credit { display: flex; gap: 10px; align-items: flex-start; background: #fbf6ea; border: 1px solid #e6d6a8;
   border-left: 4px solid #d99a00; border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.45; }
 .info-credits .credit b { display: block; font-size: 15px; margin-bottom: 2px; }
@@ -1041,3 +1041,4 @@ p.tx-votes { padding: 0; color: var(--muted); }
 .sx-saved { display: inline-flex; align-items: center; padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; color: var(--ink); text-decoration: none; font-family: -apple-system, system-ui, sans-serif; }
 .work-list .mono { font-family: ui-monospace, Menlo, monospace; }
 @media (max-width: 760px) { .sx-acts { margin-left: 0; } }
+.info-dl dt.mono { font-family: ui-monospace, Menlo, monospace; font-weight: 600; }
