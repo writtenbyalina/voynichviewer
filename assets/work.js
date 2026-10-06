@@ -847,10 +847,67 @@ const Bookmarks = {
   },
 };
 
+// ================================================================ your searches and page sets (the Text tab)
+/* A saved search is the Text tab's address, named; a page set is a named list of pages that searches can keep to
+   (Pages, or set:name in a query). Both are kept like bookmarks: in this browser twice over, and in the progress file. */
+const Saved = {
+  searches: [], sets: [],
+  load() {
+    const raw = store.get("text:searches", []), sets = store.get("text:sets", []);
+    this.searches = (Array.isArray(raw) ? raw : []).map(x => this.cleanSearch(x)).filter(Boolean);
+    this.sets = (Array.isArray(sets) ? sets : []).map(x => this.cleanSet(x)).filter(Boolean);
+  },
+  id: p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+  cleanSearch(x) {
+    if (!x || typeof x !== "object" || typeof x.hash !== "string" || !/^#text\/[^/]*\/search/.test(x.hash)) return null;
+    return { id: typeof x.id === "string" && x.id ? x.id : this.id("s-"), name: String(x.name || "").trim().slice(0, 80) || "Search",
+             hash: x.hash.slice(0, 2000), created: x.created || new Date().toISOString() };
+  },
+  cleanSet(x) {
+    if (!x || typeof x !== "object" || !Array.isArray(x.pages)) return null;
+    const pages = [...new Set(x.pages.filter(p => PAGE_SHEET.has(p)))];
+    const name = String(x.name || "").trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+    if (!pages.length || !name) return null;
+    return { id: typeof x.id === "string" && x.id ? x.id : this.id("p-"), name, pages, created: x.created || new Date().toISOString() };
+  },
+  persist() {
+    store.set("text:searches", this.searches);
+    store.set("text:sets", this.sets);
+    IDB.put("work", "searches", this.searches).catch(() => {});
+    IDB.put("work", "pagesets", this.sets).catch(() => {});
+    Work.changed();
+    if (TextTab.mod) TextTab.mod.savedChanged();
+  },
+  async restore() {
+    let a = null, b = null;
+    try { [a, b] = await Promise.all([IDB.get("work", "searches"), IDB.get("work", "pagesets")]); } catch { /* no IndexedDB */ }
+    if (Array.isArray(a) && a.length && !store.get("text:searches", []).length) store.set("text:searches", a);
+    if (Array.isArray(b) && b.length && !store.get("text:sets", []).length) store.set("text:sets", b);
+    this.load();
+  },
+  addSearch(name, hash) {
+    const x = this.cleanSearch({ name, hash });
+    if (!x) return null;
+    this.searches.push(x);
+    this.persist();
+    return x;
+  },
+  removeSearch(id) { this.searches = this.searches.filter(x => x.id !== id); this.persist(); },
+  setNamed(name) { return this.sets.find(x => x.name === String(name).toLowerCase()); },
+  putSet(name, pages) {
+    const x = this.cleanSet({ name, pages, id: this.setNamed(name)?.id });
+    if (!x) return null;
+    this.sets = this.sets.filter(y => y.name !== x.name).concat(x);
+    this.persist();
+    return x;
+  },
+  removeSet(id) { this.sets = this.sets.filter(x => x.id !== id); this.persist(); },
+};
+
 // ================================================================ your work: export and import
 const Work = {
   dlg: null, asked: false,
-  async init() { await Crops.init(); await MyOrders.restore(); await Bookmarks.restore(); },
+  async init() { await Crops.init(); await MyOrders.restore(); await Bookmarks.restore(); await Saved.restore(); },
   changed() {
     store.set("workChanged", Date.now());
     this.keep();
@@ -887,11 +944,11 @@ const Work = {
     const file = h("input", { type: "file", accept: ".json,application/json", hidden: true, onchange: e => this.importFile(e.target.files[0]) });
     d.append(
       h("div", { class: "work-head" }, h("h3", {}, "Your work"), h("button", { class: "ghost", "aria-label": "Close", onclick: () => d.close() }, "✕")),
-      h("p", {}, "Your crops, your own orders and your bookmarks are saved in this browser as you go. They stay on this computer only, and clearing the browser's data deletes them. ",
+      h("p", {}, "Your crops, your own orders, your bookmarks and your searches are saved in this browser as you go. They stay on this computer only, and clearing the browser's data deletes them. ",
         h("b", {}, "Export"), " a progress file to keep a copy, or to carry on in another browser; ", h("b", {}, "import"), " it there."),
       IDB.db ? "" : h("p", { class: "warn" }, "This browser is not letting the viewer store data (a private window?). Your work lasts until you close the page, so export it before you go."),
       h("div", { class: "work-acts" },
-        h("button", { class: "primary", onclick: () => this.exportFile(), disabled: !crops.length && !orders.length && !Bookmarks.list.length || null }, "⬇ Export progress file"),
+        h("button", { class: "primary", onclick: () => this.exportFile(), disabled: !crops.length && !orders.length && !Bookmarks.list.length && !Saved.searches.length && !Saved.sets.length || null }, "⬇ Export progress file"),
         h("button", { onclick: () => file.click() }, "⬆ Import a progress file…"), file),
       h("h4", {}, `Your orders (${orders.length})`),
       orders.length ? h("ul", { class: "work-list" }, orders.map(o => h("li", {},
@@ -905,6 +962,18 @@ const Work = {
       h("h4", {}, `Your bookmarks (${Bookmarks.list.length})`),
       Bookmarks.list.length ? h("div", { class: "work-chips" }, Bookmarks.sorted().map(b => h("button", { title: `Go to ${short(b.page)}`, onclick: () => { d.close(); Bookmarks.go(b); } }, `★ ${b.name}`)))
         : h("p", { class: "muted" }, "None yet. Press B on any page, or use ★ at the top."),
+      h("h4", {}, `Your searches (${Saved.searches.length})`),
+      Saved.searches.length ? h("ul", { class: "work-list" }, Saved.searches.map(x => h("li", {},
+        h("a", { class: "linkish", href: x.hash, onclick: () => d.close() }, x.name),
+        h("span", { class: "work-row-acts" },
+          h("button", { onclick: async () => { const t = await askText("Rename this search", { value: x.name, ok: "Rename" }); if (t) { x.name = t.slice(0, 80); Saved.persist(); } } }, "Rename"),
+          h("button", { onclick: () => Saved.removeSearch(x.id) }, "Delete")))))
+        : h("p", { class: "muted" }, "None yet. In the Text tab, search, then press Save."),
+      h("h4", {}, `Your page sets (${Saved.sets.length})`),
+      Saved.sets.length ? h("ul", { class: "work-list" }, Saved.sets.map(x => h("li", {},
+        h("span", { class: "mono" }, `set:${x.name}`), h("span", { class: "muted" }, ` ${x.pages.length} page${x.pages.length === 1 ? "" : "s"}`),
+        h("span", { class: "work-row-acts" }, h("button", { onclick: async () => { if (await askYes(`Delete the page set “${x.name}”?`, "Searches that use it will search the whole book.", "Delete", true)) Saved.removeSet(x.id); } }, "Delete")))))
+        : h("p", { class: "muted" }, "None yet. In the Text tab, Pages → New page set, to keep searches to pages you choose."),
       h("h4", {}, `Your crops (${crops.length})`),
       crops.length ? h("div", { class: "work-chips" }, crops.map(k => h("button", { class: Crops.pending.has(k) ? "busy" : "", title: Crops.pending.has(k) ? "Being cut from Yale's photograph…" : "Open in the crop editor",
         onclick: () => { d.close(); CropEditor.open(k); } }, short(pageName(Crops.segs(k)[0]))))) : h("p", { class: "muted" }, "None yet. Hover over a page in the Reader and click ✂ Crop, or use the ✂ buttons in 3D."),
@@ -914,10 +983,13 @@ const Work = {
   },
 
   exportFile() {
-    const data = { app: "voynich-viewer", version: 1, exported: new Date().toISOString(),
+    // version 2 adds searches and page sets; a version-1 file still imports as it always did
+    const data = { app: "voynich-viewer", version: 2, exported: new Date().toISOString(),
       crops: Object.fromEntries([...Crops.mine].map(([k, r]) => [k, { quad: r.quad, rotate: r.rotate }])),
       orders: MyOrders.list.map(({ id, title, from, gatherings, unplaced, updated }) => ({ id, title, from, gatherings, unplaced, updated })),
-      bookmarks: Bookmarks.list.map(({ id, page, name, at }) => ({ id, page, name, at })), viewer: APP_VERSION };
+      bookmarks: Bookmarks.list.map(({ id, page, name, at }) => ({ id, page, name, at })),
+      searches: Saved.searches.map(({ id, name, hash, created }) => ({ id, name, hash, created })),
+      pagesets: Saved.sets.map(({ id, name, pages, created }) => ({ id, name, pages, created })), viewer: APP_VERSION };
     const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" })),
       download: `voynich-viewer-progress-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a); a.click(); a.remove();
@@ -955,7 +1027,21 @@ const Work = {
       Bookmarks.list.push(b); nBm++;
     }
     if (nBm) Bookmarks.persist();
-    toast(`Imported ${nOrders} order${nOrders === 1 ? "" : "s"}, ${keys.length} crop${keys.length === 1 ? "" : "s"} and ${nBm} bookmark${nBm === 1 ? "" : "s"}`);
+    let nS = 0;   // version 2: searches and page sets
+    for (const raw of Array.isArray(data.searches) ? data.searches : []) {
+      const x = Saved.cleanSearch(raw);
+      if (!x || Saved.searches.some(y => y.id === x.id || y.hash === x.hash)) continue;
+      Saved.searches.push(x); nS++;
+    }
+    for (const raw of Array.isArray(data.pagesets) ? data.pagesets : []) {
+      const x = Saved.cleanSet(raw);
+      if (!x || Saved.setNamed(x.name)) continue;
+      Saved.sets.push(x); nS++;
+    }
+    if (nS) Saved.persist();
+    const said = [`${nOrders} order${nOrders === 1 ? "" : "s"}`, `${keys.length} crop${keys.length === 1 ? "" : "s"}`, `${nBm} bookmark${nBm === 1 ? "" : "s"}`];
+    if (nS) said.push(`${nS} search${nS === 1 ? "" : "es"} and page set${nS === 1 ? "" : "s"}`);
+    toast(`Imported ${said.slice(0, -1).join(", ")} and ${said[said.length - 1]}`);
     this.render();
     if (keys.length) Crops.recut(keys);
   },

@@ -1029,3 +1029,15 @@ p.tx-votes { padding: 0; color: var(--muted); }
 .tx-step[hidden] { display: none; }
 .tx-step button, .tx-step a { background: transparent; color: var(--table-ink); border: 1px solid var(--table-line); border-radius: var(--radius); min-height: 30px; min-width: 32px; padding: 2px 8px; text-decoration: none; display: inline-flex; align-items: center; }
 .tx-step .sp { flex: 1; }
+.sx-acts { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+.sx-acts > button, .sx-exp summary { min-height: 32px; font-size: 13px; }
+.sx-exp { position: relative; }
+.sx-exp summary { list-style: none; border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 10px; background: #fff; cursor: pointer; display: flex; align-items: center; }
+.sx-exp summary::-webkit-details-marker { display: none; }
+.sx-exp summary::after { content: " ▾"; color: var(--muted); white-space: pre; }
+.sx-exp-m { position: absolute; right: 0; top: calc(100% + 4px); z-index: 10; display: flex; flex-direction: column; gap: 4px; padding: 6px;
+  background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.12); min-width: 200px; }
+.sx-exp-m button { text-align: left; min-height: 32px; }
+.sx-saved { display: inline-flex; align-items: center; padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; color: var(--ink); text-decoration: none; font-family: -apple-system, system-ui, sans-serif; }
+.work-list .mono { font-family: ui-monospace, Menlo, monospace; }
+@media (max-width: 760px) { .sx-acts { margin-left: 0; } }

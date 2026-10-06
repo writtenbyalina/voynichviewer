@@ -6,7 +6,7 @@
 import { parse, describe, QueryError, CLASSES, QUALIFIERS } from "./query.js";
 import { Data, SHORT, load } from "./text.js";
 
-const DEFAULTS = { q: "", in: "cons", sp: "either", eq: "eva", near: "0", steps: "", sort: "book", cmp: "" };
+const DEFAULTS = { q: "", in: "cons", sp: "either", eq: "eva", near: "0", set: "", steps: "", sort: "book", cmp: "" };
 const FACETS = [
   { key: "scribe", title: "Scribe (Davis)", label: v => v === "–" ? "none given" : `Scribe ${v}` },
   { key: "section", title: "Section", label: v => v },
@@ -127,6 +127,7 @@ const T = {
           sel("sp", "Spaces", [["either", "uncertain either way"], ["space", "uncertain as spaces"], ["none", "ignored"]]),
           sel("eq", "Match", [["eva", "exact Eva"], ["family", "same STA family (a o y, r s, k t…)"]]),
           sel("near", "Near", [["0", "off"], ["1", "within 1 edit"], ["2", "within 2 edits"]]),
+          sel("set", "Pages", [["", "the whole book"]]),
           h("button", { type: "button", class: "sx-cmp-b", onclick: () => this.compareOpen() }, "+ Compare with another search")),
         h("form", { class: "sx-cmp", hidden: true, onsubmit: e => { e.preventDefault(); this.st.cmp = $("#sx-cmp-q").value.trim(); this.go(); } },
           h("label", { for: "sx-cmp-q" }, "Compare with"),
@@ -147,11 +148,50 @@ const T = {
     this.built = true;
   },
   syncControls() {
+    this.fillSets();
     for (const s of $$(".sx-opts select", $("#v-text"))) s.value = this.st[s.dataset.k];
     const cmp = $(".sx-cmp");
     cmp.hidden = !this.st.cmp && !this.cmpOpen;
     $("#sx-cmp-q").value = this.st.cmp;
   },
+  /* the Pages menu: the whole book, your page sets (Your work), and a new one */
+  fillSets() {
+    const sel = $(".sx-opts select[data-k=set]");
+    if (!sel) return;
+    const want = this.st.set;
+    sel.replaceChildren(h("option", { value: "" }, "the whole book"),
+      ...Saved.sets.map(x => h("option", { value: x.name }, `set:${x.name} (${x.pages.length})`)),
+      want && !Saved.setNamed(want) ? h("option", { value: want }, `set:${want} (not in this browser)`) : "",
+      h("option", { value: "+new" }, "New page set…"));
+    sel.value = want;
+    sel.onchange = async e => {
+      if (e.target.value !== "+new") { this.st.set = e.target.value; this.go(); return; }
+      e.target.value = this.st.set;
+      const x = await this.newSet();
+      if (x) { this.st.set = x.name; this.go(); }
+    };
+  },
+  async newSet() {
+    const name = await askText("Name the page set", { placeholder: "e.g. herbal-a", ok: "Next",
+      body: "Searches can keep to it: choose it under Pages, or write set:name in a query. It is kept in this browser and in your progress file." });
+    if (!name) return null;
+    const list = await askText(`Pages in “${name}”`, { placeholder: "f1r f1v f75r-f84v", ok: "Save",
+      body: "Pages and ranges in today's binding, separated by spaces or commas." });
+    if (list == null) return null;
+    await Book.load();
+    const pages = [];
+    for (const t of list.split(/[\s,]+/).filter(Boolean)) {
+      const [a, b] = t.toLowerCase().split("-").map(p => "f" + p.replace(/^f/, ""));
+      const i0 = Book.bound.indexOf(a), i1 = b ? Book.bound.indexOf(b) : i0;
+      if (i0 < 0 || i1 < 0) { toast(`${t} is not a page`); continue; }
+      pages.push(...Book.bound.slice(Math.min(i0, i1), Math.max(i0, i1) + 1));
+    }
+    const x = Saved.putSet(name, pages);
+    if (!x) { toast("A page set needs a name and at least one page"); return null; }
+    toast(`Saved the page set set:${x.name}, ${x.pages.length} page${x.pages.length === 1 ? "" : "s"}`);
+    return x;
+  },
+  savedChanged() { if (this.built) { this.fillSets(); if (!this.st.q) this.empty(); } },
   compareOpen() { this.cmpOpen = true; $(".sx-cmp").hidden = false; $("#sx-cmp-q").focus(); },
   focus() { $("#sx-q")?.focus(); $("#sx-q")?.select(); },
   go() {
@@ -226,7 +266,7 @@ const T = {
   },
   /* the hits that pass the query's filters, then the steps */
   filtered(hits, steps = this.steps()) {
-    const f = this.res.p.filters, lines = this.res.lines;
+    const f = this.st.set ? [...this.res.p.filters, ["set", this.st.set]] : this.res.p.filters, lines = this.res.lines;
     return hits.filter(x => passes(x, f, lines) && steps.every(([k, v]) => Book.of(x.i)[k].includes(v)));
   },
 
@@ -245,6 +285,7 @@ const T = {
       h("p", {}, "Eva letters name the glyphs' shapes, not sounds. ", h("b", {}, "*"), " is any run of glyphs in a word, ", h("b", {}, "?"), " any one glyph, ",
         h("b", {}, "[kt]"), " either glyph. Join parts with ", h("b", {}, "-"), " (no break), ", h("b", {}, "_"), " (a word break) or ", h("b", {}, "~"), " (either). ",
         h("b", {}, "/…/"), " is a regular expression. Filters: ", Object.keys(QUALIFIERS).filter((k, i, a) => a.indexOf(k) === i && k !== "hand" && k !== "language" && k !== "pages").map(k => k + ":").join(" "), "."),
+      Saved.searches.length ? [h("h3", {}, "Your searches"), h("ul", { class: "sx-ex" }, Saved.searches.map(x => h("li", {}, h("a", { class: "sx-chip sx-saved", href: x.hash }, x.name))))] : "",
       h("p", { class: "muted" }, "The text is the consensus of up to twelve transcriptions, voted glyph by glyph (", h("a", { href: "#info/beinecke/text" }, "how"), ").")));
   },
   fail(msg) {
@@ -267,7 +308,7 @@ const T = {
     const all = this.filtered(this.res.hits, []), now = this.filtered(this.res.hits);
     const lines = new Set(now.map(x => x.i)), pages = new Set(now.map(x => Book.pageOf[x.i]));
     const bits = describe(p).map(([k, t]) => k === "b" ? h("b", {}, t) : t);
-    const fs = p.filters.map(([k, v]) => sayFilter(k, v));
+    const fs = (this.st.set ? [...p.filters, ["set", this.st.set]] : p.filters).map(([k, v]) => sayFilter(k, v));
     const rng = this.res.ranges && rangeOf(Object.values(this.res.ranges).map(hs => this.filtered(hs).length));
     $("#sx-echo").replaceChildren(
       h("span", {}, ...bits, fs.length ? ", " + fs.join(", ") : "", ` — in ${SAY_IN(st.in)}, ${SAY_SP[st.sp]}${st.eq === "family" ? ", STA families alike" : ""}`,
@@ -356,7 +397,14 @@ const T = {
     const head = h("div", { class: "sx-res-h" },
       h("span", { class: "sx-cnt" }, hits.length ? `${hits.length.toLocaleString("en")} result${hits.length === 1 ? "" : "s"}` : "No results"),
       h("label", { class: "sx-opt" }, h("span", {}, "Order"), h("select", { onchange: e => { this.st.sort = e.target.value; this.go(); } },
-        Object.entries(SORTS).map(([v, t]) => h("option", { value: v, selected: this.st.sort === v }, t)))));
+        Object.entries(SORTS).map(([v, t]) => h("option", { value: v, selected: this.st.sort === v }, t)))),
+      h("span", { class: "sx-acts" },
+        h("button", { type: "button", onclick: () => this.save(), title: "Keep this search in Your work" }, this.savedAs() ? "★ Saved" : "Save"),
+        h("details", { class: "sx-exp" }, h("summary", {}, "Export"),
+          h("div", { class: "sx-exp-m" },
+            h("button", { type: "button", disabled: !hits.length, onclick: () => this.exportCSV() }, "Results as CSV"),
+            h("button", { type: "button", disabled: !hits.length, onclick: () => this.exportIVTFF() }, "Their lines as IVTFF"),
+            h("button", { type: "button", disabled: !hits.length, onclick: () => this.copyLoci() }, "Copy the list of lines")))));
     const kids = [head];
     if (!hits.length) kids.push(h("p", { class: "sx-none" }, this.res.hits.length ? "Nothing is left after narrowing: remove a step above." : "Nothing matches. Try * for any glyphs, or set Near to find words a glyph or two away."));
     const row = (x, k) => {
@@ -393,6 +441,71 @@ const T = {
     el.replaceChildren(...kids);
     $("#sx-ftog")?.remove();
     head.prepend(h("button", { id: "sx-ftog", type: "button", class: "sx-ftog", onclick: () => $("#sx-facets").classList.add("open") }, "Narrow"));
+  },
+
+  /* ---- keeping and exporting ---- */
+  savedAs() { return Saved.searches.find(x => x.hash === location.hash); },
+  async save() {
+    const had = this.savedAs();
+    if (had) { toast(`Already in Your work as “${had.name}”`, { label: "Rename", fn: () => Work.open() }); return; }
+    const name = await askText("Name this search", { value: this.st.q, ok: "Save", body: "It is kept in Your work, with its settings and steps." });
+    if (!name) return;
+    Saved.addSearch(name, location.hash);
+    toast(`Saved “${name}” in Your work`);
+    this.drawResults();
+  },
+  rows() {
+    return this.list.map(x => {
+      const id = Book.ix[x.i][0], line = this.res.lines[x.who[0]][x.i], pg = Book.pageOf[x.i], o = Book.of(x.i);
+      return { id, pg, o, x, L: line.slice(0, x.s), M: line.slice(x.s, x.s + x.len), R: line.slice(x.s + x.len) };
+    });
+  },
+  fileName(ext) {
+    const slug = this.st.q.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").slice(0, 40) || "search";
+    return `voynich-text-${slug}-${new Date().toISOString().slice(0, 10)}.${ext}`;
+  },
+  download(text, ext, type) {
+    const a = h("a", { href: URL.createObjectURL(new Blob([text], { type })), download: this.fileName(ext) });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    $(".sx-exp")?.removeAttribute("open");
+  },
+  exportCSV() {
+    const q = v => /[",\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+    const head = ["line", "page", "section", "scribe", "language", "quire", "kind", "before", "match", "after", "reading", "transcribers"];
+    const out = [head.join(",")];
+    for (const r of this.rows()) out.push([r.id, r.pg, r.o.section[0], r.o.scribe.join(" "), r.o.lang[0], r.o.quire[0], r.o.kind[0], r.L, r.M, r.R,
+      this.st.in === "all" ? "any transcriber" : this.st.in === "cons" ? "consensus" : this.st.in, r.x.who[0] === "cons" ? "" : r.x.who.join(" ")].map(q).join(","));
+    this.download(out.join("\n") + "\n", "csv", "text/csv");
+    toast(`Saved ${this.list.length.toLocaleString("en")} results as CSV (Eva in IVTFF's notation: . a space, , an uncertain one)`);
+  },
+  /* the lines with results, as IVTFF, from the page files (their locators and page variables) */
+  async exportIVTFF() {
+    const ids = [...new Set(this.list.map(x => x.i))].sort((a, b) => a - b);
+    const pages = [...new Set(ids.map(i => Book.pageOf[i]))];
+    const data = new Map(await Promise.all(pages.map(async p => [p, await load(`pages/${encodeURIComponent(p)}.json`)])));
+    const own = this.st.in !== "cons" && this.st.in !== "all";
+    const out = ["#=IVTFF Eva- 2.0 M 5", `# Lines of the Voynich Manuscript found by the search “${this.st.q}” in Voynich Viewer, ${new Date().toISOString().slice(0, 10)}.`,
+      own ? `# Text: ${Data.names.get(this.st.in)}'s reading, in basic Eva.` : `# Text: the consensus of independent transcriptions (method ${Data.meta.method}, docs/TEXT.md in the viewer's code).`,
+      `# ${Data.meta.credit}`, "#"];
+    let cur = null;
+    for (const i of ids) {
+      const pg = Book.pageOf[i], d = data.get(pg), id = Book.ix[i][0], loc = d.loci.find(l => l.id === id);
+      if (pg !== cur) {
+        cur = pg;
+        out.push(`<${pg}>      <! ${Object.entries(d.vars).map(([k, v]) => `$${k}=${v}`).join(" ")}>`);
+      }
+      const text = own ? this.res.lines[this.st.in][i] : loc.c;
+      out.push(`<${id},${loc.loc}${loc.t}>`.padEnd(19) + (loc.ps ? "<%>" : "") + text + (loc.pe ? "<$>" : ""));
+    }
+    this.download(out.join("\n") + "\n", "txt", "text/plain");
+    toast(`Saved ${ids.length.toLocaleString("en")} lines as IVTFF`);
+  },
+  async copyLoci() {
+    const ids = [...new Set(this.list.map(x => Book.ix[x.i][0]))];
+    try { await navigator.clipboard.writeText(ids.join("\n")); toast(`Copied ${ids.length.toLocaleString("en")} lines`); }
+    catch { this.download(ids.join("\n") + "\n", "txt", "text/plain"); toast("Copying did not work: saved the list as a file"); }
+    $(".sx-exp")?.removeAttribute("open");
   },
 
   /* where a result opens in the Reader: its page, the text panel at its line, and which result it is */
@@ -458,6 +571,7 @@ function passes(x, filters, lines) {
       if (v.includes("end")) return x.s + x.len === line.length;
       return x.s === 0;
     }
+    if (k === "set") { const ps = Saved.setNamed(v); return !!ps && ps.pages.includes(Book.pageOf[x.i]); }
     if (k === "page") {
       const [a, b] = v.split("-").map(p => "f" + p.replace(/^f/, ""));
       const pg = Book.pageOf[x.i];
@@ -476,6 +590,7 @@ function sayFilter(k, v) {
   if (k === "in") return `in ${({ L: "labels", P: "paragraphs", C: "rings", R: "radii" })[KIND_IN[v] || v.toUpperCase()[0]] || v}`;
   if (k === "at") return v.startsWith("para") ? "at the start of a paragraph" : v.includes("end") ? "at the end of a line" : "at the start of a line";
   if (k === "page") return `on ${v.includes("-") ? "pages " + v : v}`;
+  if (k === "set") return Saved.setNamed(v) ? `on the pages of set:${v}` : `on set:${v}, which this browser does not have`;
   return `${k}: ${v}`;
 }
 

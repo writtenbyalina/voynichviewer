@@ -10,7 +10,7 @@
      dy~qo          joined or not                   ^qo*  *dy$     first / last word of a line
      A A            the same word twice in a row (a capital stands for a word; A:qok* says which)
      /qo[kt]e+dy/   a regular expression over the line
-     scribe:2 lang:B section:balneo quire:13 in:label at:para-start page:f75r-f84v      filters */
+     scribe:2 lang:B section:balneo quire:13 in:label at:para-start page:f75r-f84v set:mine      filters */
 
 export const CLASSES = {
   gallows: { re: "(?:k|t|p|f)", say: "a gallows (k t p f)" },
@@ -43,7 +43,7 @@ export function parse(q) {
   for (const tok of rest.split(/\s+/).filter(Boolean)) {
     const qm = tok.match(/^([a-z]+):(.+)$/);
     if (qm && QUALIFIERS[qm[1]]) { out.filters.push([QUALIFIERS[qm[1]], qm[2].toLowerCase()]); continue; }
-    if (qm) throw new QueryError(`“${qm[1]}:” is not a filter. Filters: scribe:, lang:, section:, quire:, in:, at:, page:`);
+    if (qm) throw new QueryError(`“${qm[1]}:” is not a filter. Filters: scribe:, lang:, section:, quire:, in:, at:, page:, set:`);
     if (out.regex) throw new QueryError("After a regular expression only filters can follow");
     out.items.push(token(tok));
   }
