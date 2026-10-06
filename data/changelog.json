@@ -2,6 +2,21 @@
  "about": "What changed on the site, newest first. Shown under the version number (top left). Add an entry for every change people can see and every fix, in the same commit, with the date it went live. kind: new | improved | fixed. The second number of the version goes up with each release; the first with a redesign.",
  "releases": [
   {
+   "version": "1.5",
+   "date": "2026-10-05",
+   "changes": [
+    {"kind": "improved", "text": "The foldouts fold as Lisa Fagin Davis describes them, in 3D and in new drawings on the Info page, and the faces she says touch are marked confirmed."},
+    {"kind": "new", "text": "In 3D you can open a foldout one fold at a time, and in the Reader each flap swings the way it folds."},
+    {"kind": "new", "text": "An Unfold button comes up over the pages wherever there is a foldout, and the strips along the bottom mark foldouts."},
+    {"kind": "fixed", "text": "The Rosettes open as the real sheet does: the right-hand column out, then the whole top half up in one piece."},
+    {"kind": "improved", "text": "Flipping through several pages runs as one smooth riffle, without a pause between leaves."},
+    {"kind": "improved", "text": "In 3D the paper curls round every fold, at the spine and between foldout panels, as thick as the pages, so folded leaves stay joined."},
+    {"kind": "improved", "text": "The list of touching faces beside a 3D sheet is calmer: no badge on every line, just a dot for pairs new to an order and one note under the list."},
+    {"kind": "fixed", "text": "An opened-out foldout now sits in the middle of the view, in the Reader and in 3D, instead of off to one side or off the screen."},
+    {"kind": "fixed", "text": "“Davis: proposed order” (formerly “complete proposed order”) now says plainly that only quires 13 and 20 have a new order of sheets; elsewhere the sheets keep today's sequence."}
+   ]
+  },
+  {
    "version": "1.4",
    "date": "2026-10-04",
    "changes": [

@@ -74,7 +74,7 @@ const SECTION = { H: "Herbal", A: "Astronomical", Z: "Zodiac", B: "Balneological
 let D;                       // codex.json
 const SHEETS = new Map();    // "77|82" -> sheet
 let ORDERS = new Map();      // id -> resolved order
-const APP_VERSION = "1.4";
+const APP_VERSION = "1.5";
 const PAGE_SHEET = new Map();   // "f78v" -> "78|81", every page including lost ones
 const RETIRED = { "davis-blog-2025": "davis" };   // orders taken out of the menu -> the order an old link now opens
 
@@ -122,9 +122,9 @@ function handled(sheet, opts = {}) {
 /* The four page sides of a handled sheet folded at its spine, as read: left leaf front (a recto
    position), left leaf back, right leaf front, right leaf back. Each side lists its panels left to right
    as they lie when the leaf is opened out, which panel is the leaf proper (at the spine), and which
-   panel shows when the leaf is folded up. Assumption (marked in Sources): extra panels roll-fold onto
-   the inside of the sheet, so the back of panel 2 is what shows there when folded; voynich.nu infers
-   this from where the folio numbers were written. */
+   panel shows when the leaf is folded up: the back of panel 2, as extra panels fold onto the inside of
+   the sheet (voynich.nu infers this from where the folio numbers were written). Where Davis found other
+   faces showing (quires 11, 15, 17, 19), 3D takes hers from data/folds.json. */
 function sidesOf(sheet, opts = {}) {
   const v = handled(sheet, opts);
   const { n, spine: s, proper } = v;
@@ -154,6 +154,36 @@ function sidesOf(sheet, opts = {}) {
     });
   }
   return sides;
+}
+
+/* How a folded leaf stacks, given which way each fold goes (ways[j] for the fold before piece j: 1 in, -1 out; data/folds.json).
+   Piece 0, the panel at the spine, lies face up; each next piece lies straight against the one it hangs from, on the
+   side its fold goes, inside whatever already lay there, so a fold in under a panel that faces down tucks the next piece
+   between it and the leaf. Returns each piece's layer (0 is the spine panel's, more is nearer the facing page) and
+   whether its inside face looks that way. 3D and the drawings on the Info page both stack by it. */
+function foldStack(ways) {
+  const stack = [0], up = [1];
+  for (let j = 1; j < ways.length; j++) {
+    const i = stack.indexOf(j - 1);
+    stack.splice(up[j - 1] * ways[j] > 0 ? i + 1 : i, 0, j);
+    up.push(-up[j - 1]);
+  }
+  return { layer: up.map((_, j) => stack.indexOf(j) - stack.indexOf(0)), up: up.map(u => u > 0) };
+}
+
+/* Which way the fold between two neighbouring panels turns, seen from the face whose pictures are named (data/folds.json):
+   1 toward you, -1 away. The record names the sheet's inside panels; from the outside face a fold that goes in turns away.
+   A fold the record doesn't list goes in. */
+function foldWay(sheetId, imgA, imgB) {
+  const f = D.folds?.sheets?.[sheetId]?.folds || {}, sh = SHEETS.get(sheetId);
+  const get = (a, b) => f[`${a}|${b}`] || f[`${b}|${a}`];
+  const backOf = img => {   // the same panel's picture on the inside face
+    for (const [r, row] of (sh?.outside || []).entries()) { const c = row.findIndex(x => x.img === img); if (c >= 0) return sh.inside[r][row.length - 1 - c].img; }
+    return null;
+  };
+  const seenOut = (sh?.outside || []).flat().some(x => x.img === imgA || x.img === imgB);
+  const w = seenOut ? get(backOf(imgA), backOf(imgB)) : get(imgA, imgB);
+  return (w === "out" ? -1 : 1) * (seenOut ? -1 : 1);
 }
 
 /* What a foldout shows folded in the Reader: the panel at the spine of each face (r1 / v1), and nothing of the panels
@@ -365,9 +395,11 @@ function show(view) {
 const R = { order: null, pages: null, spreads: null, at: 0, unfold: { L: false, R: false }, busy: false, newSet: null,
             zoom: 1, zx: 0, zy: 0, settleT: null, dir: 1, aheadT: null,   // the way you are reading (+1 on, -1 back)
             queue: [], moving: null, turning: null, gen: 0, fetchT: null,   // moves waiting for the one in progress; the leaf in the air; bumped when the book is reopened; the timer for fetching the pictures either side
+            chain: false,   // the last leaf landed with more turns waiting: the next lifts at speed, so a run of turns reads as one riffle
             ref: null, refFor: null,   // the page width every plain opening is sized for (see refHalf)
             focus: null };   // the page asked for (Go to, a link, 3D) while its opening is shown; turning the page drops it
 
+const PICS = new Map();   // picture url -> its decoded image, on its way or ready (Reader.pictures)
 const Reader = {
   built: false,
   build() {
@@ -393,6 +425,8 @@ const Reader = {
         // zoomed in: whether the pages on screen are at full size yet (Sharp), over the corner of the pages, so the row
         // under them keeps still
         h("span", { class: "rd-sharp", id: "rd-sharp", role: "status" }),
+        // fold or unfold this opening: over the foot of the pages, only where there is a foldout
+        h("button", { class: "rd-fold", id: "rd-fold", hidden: true, onclick: () => Reader.toggleUnfold() }),
         h("button", { class: "rd-nav prev", "aria-label": "Previous opening", onclick: () => Reader.step(-1) }, "‹"),
         h("button", { class: "rd-nav next", "aria-label": "Next opening", onclick: () => Reader.step(1) }, "›")),
       // one slim row under the pages, the same height on every opening: zoom, then this opening's flags and note (two
@@ -423,7 +457,7 @@ const Reader = {
     if (!this.built) this.build();
     const keep = [at, curPage()].filter(Boolean);   // the page asked for, else the page we were on
     R.focus = null;
-    R.gen++; R.queue = []; R.moving = null; R.busy = false; R.turning = null;   // a turn or move under way belonged to the old book
+    R.gen++; R.queue = []; R.moving = null; R.busy = false; R.turning = null; R.chain = false;   // a turn or move under way belonged to the old book
     R.order = order;
     R.pages = linearize(order, { ghosts: S.ghosts, spine: true });
     R.spreads = [[null, R.pages[0]]];
@@ -516,13 +550,14 @@ const Reader = {
     if (!R.busy) { this.travel(k, focus, still); return; }
     if (Math.abs(dir) === 1) { if (R.queue.length < 6) R.queue.push({ k, focus }); }
     else R.queue = [{ k, focus }];
+    this.pictures(k);   // on their way while the leaf before is still in the air
   },
 
   /* the next move waiting, if the reader is free */
   drain() {
     if (R.busy) return;
     const m = R.queue.shift();
-    if (m) this.travel(m.k, m.focus); else this.prefetch();
+    if (m) this.travel(m.k, m.focus); else { R.chain = false; this.prefetch(); }
   },
 
   async travel(k, focus, still = false) {
@@ -545,8 +580,15 @@ const Reader = {
       this.markStrip();
       this.report();
       setHash();
-      if (flip) await this.turn(from, k, k > from ? 1 : -1, R.queue.length ? 280 : 520);   // turns come quicker when more are waiting
-      else this.render();
+      if (flip) {
+        // A run of turns reads as one riffle: with more waiting, the leaf comes quicker and lands at speed, and the one
+        // after it lifts at speed, so the leaves follow each other without stopping; the last one settles gently.
+        const more = R.queue.length > 0, lifted = R.chain;
+        R.chain = more;
+        for (const d of [1, 2]) this.pictures(k + d * R.dir);   // the pages ahead, the way you are reading
+        await this.turn(from, k, k > from ? 1 : -1, more || lifted ? 300 : 520,
+          lifted ? (more ? "linear" : "cubic-bezier(.2,.6,.3,1)") : more ? "cubic-bezier(.5,0,.8,.5)" : "cubic-bezier(.4,0,.2,1)");
+      } else { R.chain = false; this.render(); }
       if (focus) { await this.reveal(focus, still); if (!same()) return; setHash(); }
     } finally {
       if (same()) { R.busy = false; R.moving = null; this.drain(); }
@@ -575,11 +617,16 @@ const Reader = {
 
   /* the pictures of opening k, decoded and ready (or failed): resolves when none is still on its way */
   pictures(k) {
-    const urls = (R.spreads[k] || []).filter(p => p && !p.lost && p.shown && p.shown.img).map(p => imgUrl(p.shown.img, "l", p.shown.v));
+    const urls = (R.spreads?.[k] || []).filter(p => p && !p.lost && p.shown && p.shown.img).map(p => imgUrl(p.shown.img, "l", p.shown.v));
     return Promise.all(urls.map(src => {
-      const im = new Image();
-      im.src = src;
-      return im.decode ? im.decode().catch(() => {}) : new Promise(r => { im.onload = im.onerror = r; });
+      // each picture is decoded once and held (the last few dozen), so a turn to a page already fetched starts at once
+      if (!PICS.has(src)) {
+        const im = new Image();
+        im.src = src;
+        PICS.set(src, (im.decode ? im.decode().catch(() => {}) : new Promise(r => { im.onload = im.onerror = r; })).then(() => im));
+        if (PICS.size > 48) PICS.delete(PICS.keys().next().value);
+      }
+      return PICS.get(src);
     }));
   },
 
@@ -598,8 +645,10 @@ const Reader = {
     this.setUnfold({ L: on && can(l), R: on && can(r) });
   },
 
-  /* Fold or unfold. The opening shrinks or grows to its new size about the gutter, so the pages you were looking at
-     never jump, while the panels open one after another about their hinges, like a map (closing runs it backwards).
+  /* Fold or unfold. The opening moves and resizes in step with the paper that is open, from the plain opening with its
+     gutter in the middle to the whole foldout in the middle of the stage, so nothing jumps, while the panels open one
+     after another about their hinges, like a map (closing runs it backwards),
+     each turning the way its fold goes (foldWay: toward you where it folds onto the face on show, away where it doesn't).
      Where the folded page is the hinge panel itself, the others are tucked behind it and come out from behind its
      edge. Where it isn't, the folded page lies over the front: it turns outward like a page, starting exactly where
      the folded view had it, and lands as the first panel (the photographs of the two states differ in size, so it
@@ -629,8 +678,12 @@ const Reader = {
       const panels = (dir > 0 ? segs.slice(m + 1) : segs.slice(0, m).reverse()).map(el => ({ el, w: el.offsetWidth }));
       const front = p.shown !== p.segs[p.hinge === "left" ? 0 : p.segs.length - 1];
       const hinge = segs[m], wh = hinge.offsetWidth, ws = Math.round(ph * aspect(p.shown));
-      // stacking: hinge panel 10; over it the first panel when it lies in front, the rest beneath that; else all behind
-      panels.forEach(({ el }, i) => { el.style.zIndex = front ? (i ? 11 + i : 20) : 9 - i; });
+      // which way each fold turns, from the hinge panel outward (data/folds.json)
+      const key = el => el.querySelector("img")?.dataset.key;
+      const chain = [hinge, ...panels.map(q => q.el)];
+      panels.forEach((q, i) => { q.way = foldWay(p.sheet, key(chain[i]), key(chain[i + 1])); });
+      // stacking: hinge panel 10; over it the first panel when it lies in front, and panels that turn toward you; else behind
+      panels.forEach(({ el, way }, i) => { el.style.zIndex = front ? (i ? 11 + i : 20) : way > 0 ? 11 + i : 9 - i; });
       if (front && panels.length) panels[0].el.append(segEl(p.shown, ph, { labels: false, scribes: false, lazy: false, cls: "backface" }));
       page.classList.add("folding");
       return { page, panels, dir, front, hinge, wh, ws, opening: next[side] };
@@ -651,11 +704,11 @@ const Reader = {
       for (const { panels, dir, front, hinge, wh, ws, opening } of sides) {
         const T = opening ? t : 1 - t;   // how open the side is: closing replays opening backwards
         let M = null, off = 0, turn = 0, hidden = false;
-        panels.forEach(({ el, w }, i) => {
+        panels.forEach(({ el, w, way }, i) => {
           const u = prog(T, i);
           const fold = 180 * (1 - u);                            // how far it is folded onto the one before
           if (!front && el.classList.contains("over")) el.style.zIndex = fold > 90 ? 9 : 11;   // over the strip of page edges once past square
-          const d = (i % 2 ? -1 : 1) * (front ? -1 : 1) * dir * fold;   // zig-zag; the first turns toward you if it lies in front
+          const d = -way * dir * fold;   // toward you (in) or away (out), about the panel it hangs from
           let sx = 1;
           if (i === 0) {
             // the front page starts where (and as wide as) the folded view shows it, then becomes the panel by 90°
@@ -737,15 +790,19 @@ const Reader = {
 
   /* page height and where the spread goes for an unfold state: translate (x, y) from the stage centre, scale k, and
      the width of the left page (lw), which puts the gutter at x + k·lw. A plain opening always has its gutter at the
-     middle of the stage and its pages at the same height; a foldout opened up is bigger and sized to itself. */
+     middle of the stage and its pages at the same height. A foldout opened out is as big as the stage lets the whole
+     of it be (never taller than a plain page) and sits in the middle of the stage, so its gutter is off-centre. */
   layout(unfold = R.unfold, at = R.at) {
     const stage = $("#rd-stage");
     const [l, r] = R.spreads[at];
     const L = this.pageParts(l, "L", unfold.L), Rr = this.pageParts(r, "R", unfold.R);
     const plain = !unfold.L && !unfold.R;
-    const half = plain ? this.refHalf() : Math.max(L.w || 0.68, Rr.w || 0.68, this.refHalf());
+    const half = this.refHalf();
     const W = stage.clientWidth - 130, H = stage.clientHeight - 28;
-    const ph = Math.max(80, Math.min(H, W / (2 * half + 0.02)));
+    const php = Math.max(80, Math.min(H, W / (2 * half + 0.02)));   // a plain page
+    // opened out, its fold tab hangs off the outer edge: leave it room beside the arrows at the sides of the stage
+    const TAB = 22;
+    const ph = plain ? php : Math.max(80, Math.min(php, (W - 2 * TAB) / ((L.w || 0.68) + (Rr.w || 0.68) + 0.02)));
     // drawn widths, rounded per panel as segEl rounds them
     const pw = (p, parts, open) => p ? parts.segs.reduce((a, s) => a + Math.round(ph * (s.missing ? 0.68 : aspect(s))), 0) - (open ? seamPx(p, ph) : 0) : Math.round(ph * 0.68);
     const lw = pw(l, L, unfold.L), rw = pw(r, Rr, unfold.R);
@@ -754,10 +811,10 @@ const Reader = {
     if (plain) {   // gutter in the middle; a page wider than the rest shrinks the opening about the gutter rather than moving it
       k = Math.min(1, avail / 2 / (Math.max(lw, rw) + 1));
       x = -k * (lw + 1);
-    } else {       // centre on the gutter (half-widths differ when one side is unfolded); too wide for that: centre the whole thing, scaled to fit
+    } else {       // opened out: the whole of it in the middle of the stage, scaled down if it is still too wide
       const total = lw + rw + 2;
-      k = total > avail ? avail / total : 1;
-      x = k < 1 ? -total * k / 2 : Math.max(-avail / 2, Math.min(-lw - 1, avail / 2 - total));
+      k = Math.min(1, (avail - 2 * TAB) / total);
+      x = -total * k / 2;
     }
     return { l, r, L, Rr, ph, half, lw, k, x, y: -ph * k / 2 };
   },
@@ -919,32 +976,41 @@ const Reader = {
      until the leaf lands on it, so that page changes under the leaf and never before it (a far side with no page is
      held by a matte the colour of the table). Each face is the size of its own page: the leaf starts exactly over the
      page it lifts and lands exactly on the page it covers. Resolves when it has landed. */
-  turn(from, to, dir, ms = 520) {
-    const stage = $("#rd-stage");
+  async turn(from, to, dir, ms = 520, easing = "cubic-bezier(.4,0,.2,1)") {
+    const stage = $("#rd-stage"), gen = R.gen;
     const [ol, or] = R.spreads[from];
     const [nl, nr] = R.spreads[to];
-    this.render();
-    const sp = $(".spread", stage);
-    const pages = $$(".rd-page", sp);
-    const gutter = $(".rd-gutter", sp);
-    if (!pages.length || !gutter) return Promise.resolve();
     const { ph } = this.layout();
     const frontSide = dir > 0 ? or : ol, backSide = dir > 0 ? nl : nr;
     const under = dir > 0 ? ol : or;     // the old page on the far side, which the leaf is about to cover
     const segFor = p => p ? (p.lost ? p.segs[p.hinge === "left" ? 0 : p.segs.length - 1] : p.shown) : null;
     const f = segFor(frontSide), b = segFor(backSide), u = segFor(under);
     const wOf = s => Math.round(ph * (s ? (s.missing ? .68 : aspect(s)) : .68));
+    // each face darkens as the leaf stands up and lightens as it lies down again (.shade), as a turning page does
     const face = (seg, cls) => h("div", { class: `side ${cls}`, style: { width: wOf(seg) + "px" } },
-      seg ? segEl(seg, ph, { labels: S.labels, scribes: S.scribes, lazy: false }) : "");
+      seg ? segEl(seg, ph, { labels: S.labels, scribes: S.scribes, lazy: false }) : "", h("i", { class: "shade" }));
     const w = Math.max(wOf(f), wOf(b));
-    const card = h("div", { class: `turn ${dir > 0 ? "fwd" : "rev"}`, style: { width: w + "px", height: ph + "px",
-      left: (dir > 0 ? gutter.offsetLeft + 2 : gutter.offsetLeft - w) + "px" } }, face(f, "front"), face(b, "back"));
+    const card = h("div", { class: `turn ${dir > 0 ? "fwd" : "rev"}`, style: { width: w + "px", height: ph + "px" } }, face(f, "front"), face(b, "back"));
+    const held = u ? segEl(u, ph, { labels: S.labels, scribes: S.scribes, lazy: false }) : "";
+    // The leaf's own pictures are in hand before anything is drawn, so it is never a blank card. They nearly always
+    // are already (travel waits for the opening's pictures); a busy machine can still drop one between then and now.
+    const late = [card, held].flatMap(el => el ? [...el.querySelectorAll("img")] : []).filter(im => !im.complete);
+    if (late.length) {
+      await Promise.race([Promise.all(late.map(im => im.decode ? im.decode().catch(() => {}) : new Promise(r => { im.onload = im.onerror = r; }))),
+                          new Promise(r => setTimeout(r, 400))]);
+      if (gen !== R.gen) return;   // the book was reopened meanwhile
+    }
+    this.render();
+    const sp = $(".spread", stage);
+    const pages = $$(".rd-page", sp);
+    const gutter = $(".rd-gutter", sp);
+    if (!pages.length || !gutter) return;
+    card.style.left = (dir > 0 ? gutter.offsetLeft + 2 : gutter.offsetLeft - w) + "px";
     // the far side as it was, wide enough to hide the new far page whichever is wider
     const farEl = pages[dir > 0 ? 0 : 1];
     const hold = h("div", { class: `rd-page held ${dir > 0 ? "left" : "right"}`, style: { position: "absolute", top: "-1px", zIndex: 2,
       width: Math.max(u ? wOf(u) : 0, farEl.offsetWidth) + "px", height: (ph + 3) + "px", background: "var(--table)",   // a little over, to hide the page shadow beneath
-      ...(dir > 0 ? { right: `calc(100% - ${gutter.offsetLeft}px)` } : { left: (gutter.offsetLeft + 2) + "px" }) } },
-      u ? segEl(u, ph, { labels: S.labels, scribes: S.scribes, lazy: false }) : "");
+      ...(dir > 0 ? { right: `calc(100% - ${gutter.offsetLeft}px)` } : { left: (gutter.offsetLeft + 2) + "px" }) } }, held);
     sp.classList.add("turning");
     sp.append(card, hold);
     R.turning = {};
@@ -960,7 +1026,8 @@ const Reader = {
         done();
       };
       if (!card.animate) { land(); return; }
-      const swing = { duration: ms, easing: "ease-in-out" };
+      const swing = { duration: ms, easing };
+      for (const sh of card.querySelectorAll(".shade")) sh.animate([{ opacity: 0 }, { opacity: .34, offset: .5 }, { opacity: 0 }], swing);
       // an opening wider than the rest is drawn smaller about the gutter (see layout): the book changes size with the leaf
       // rather than in the instant it lifts
       const ka = this.layout(R.unfold, from).k, kb = this.layout().k;
@@ -972,6 +1039,21 @@ const Reader = {
         { ...swing, fill: "forwards" }).finished.then(land, land);
       setTimeout(land, ms + 1500);   // a document that is not being drawn must not hold the reader for ever
     });
+  },
+
+  /* The button over the foot of the pages that unfolds or folds the opening. It is there only at an opening with a
+     foldout, says how much more there is to see, and draws the eye when you turn to one. */
+  renderFoldBtn(foldable) {
+    const el = $("#rd-fold"); if (!el) return;
+    const [l, r] = R.spreads[R.at], open = R.unfold.L || R.unfold.R, grid = [l, r].some(p => p && p.grid);
+    el.hidden = !foldable;
+    if (!foldable) { el._at = null; return; }
+    const more = [l, r].filter(p => p && !p.lost && !p.grid && p.segs.length > 1).reduce((a, p) => a + p.segs.length - 1, 0);
+    const label = grid ? "Open the whole sheet" : open ? "Fold up" : "Unfold";
+    el.replaceChildren(h("span", { class: "ico", "aria-hidden": "true" }, open ? "⇥⇤" : "⇤⇥"), label,
+      !grid && !open && more ? h("small", {}, `${more} more panel${more === 1 ? "" : "s"}`) : "", h("kbd", {}, "U"));
+    el.title = grid ? "Open the whole Rosettes sheet (U)" : open ? "Fold the foldout back up (U)" : "Unfold this opening's foldout (U)";
+    if (el._at !== R.at) { el._at = R.at; el.classList.remove("arrive"); void el.offsetWidth; el.classList.add("arrive"); }   // turned to a foldout
   },
 
   renderInfo() {
@@ -995,6 +1077,7 @@ const Reader = {
     const foldable = [l, r].some(x => x && !x.lost && (x.segs.length > 1 || x.grid));
     $("#rd-unfold").disabled = !foldable;
     $("#rd-unfold").textContent = (R.unfold.L || R.unfold.R) ? "Fold" : "Unfold";
+    this.renderFoldBtn(foldable);
     $("#rd-prev").disabled = R.at === 0;
     $("#rd-next").disabled = R.at === R.spreads.length - 1;
     const marked = [l, r].filter(p => p && !p.lost).map(p => Bookmarks.of(p.shown.page)).filter(Boolean);
@@ -1022,8 +1105,9 @@ const Reader = {
         const i = R.pages.indexOf(p);
         const spread = i === 0 ? 0 : Math.ceil(i / 2);
         const bm = [p.shown, ...p.segs].map(x => Bookmarks.of(x.page)).find(Boolean);
-        ticks.append(h("button", { class: `t${p.lost ? " lost" : ""}${same ? "" : " moved"}${bm ? " bm" : ""}`, "data-i": i,
-          title: `${bm ? `★ ${bm.name} · ` : ""}${sideLabel(p)} (${qTag(g.quire)})`, onclick: () => Reader.go(spread, 0) }));
+        const fold = !p.lost && (p.segs.length > 1 || p.grid);   // a page that unfolds stands a little taller
+        ticks.append(h("button", { class: `t${p.lost ? " lost" : ""}${same ? "" : " moved"}${bm ? " bm" : ""}${fold ? " fold" : ""}`, "data-i": i,
+          title: `${bm ? `★ ${bm.name} · ` : ""}${sideLabel(p)} (${qTag(g.quire)})${fold ? " · foldout" : ""}`, onclick: () => Reader.go(spread, 0) }));
         idx++;
       }
       strip.append(h("div", { class: `g${g.type === "singulions" ? " sing" : ""}` },
@@ -1711,12 +1795,67 @@ const Info = {
       <g fill="currentColor"><text x="140" y="22" text-anchor="middle" font-size="13" fill="#646b73">${esc(title)}</text>${vs}</g></svg>`;
   },
 
+  /* The foldouts as Davis describes them (data/folds.json). A drawn leaf is its panels in hinge order, [label, from, to],
+     with 0 the spine and 100 the fore-edge. `guess` folds every fold in, which is what the viewer assumed before. */
+  foldWays(id, panels, guess) {
+    const sh = SHEETS.get(id), f = D.folds?.sheets?.[id]?.folds || {};
+    const img = label => sh.inside.flat().find(sg => pageName(sg) === label)?.img;
+    return panels.map(([name], j) => {
+      if (!j || guess) return 1;
+      const prev = panels[j - 1][0], k = name === prev ? img(name) : `${img(prev)}|${img(name)}`;
+      return (f[k] || f[k.split("|").reverse().join("|")]) === "out" ? -1 : 1;
+    });
+  },
+  /* A sheet's folds in words: "72r1–72r2 in, 72r2–72r3 out and the crease in 72r3 in". */
+  foldWords(id) {
+    const sh = SHEETS.get(id), name = img => short(pageName(sh.inside.flat().find(sg => sg.img === img) || { page: img }));
+    const w = Object.entries(D.folds?.sheets?.[id]?.folds || {}).map(([k, way]) =>
+      (k.includes("|") ? k.split("|").map(name).join("–") : `the crease in ${name(k)}`) + " " + way);
+    return w.length > 1 ? w.slice(0, -1).join(", ") + " and " + w.at(-1) : w[0] || "";
+  },
+  /* One folded leaf seen from the head of the book: the spine on the left, the panel at the spine at the bottom, each
+     layer above it nearer the page it faces (dashed). A panel's dark edge is its inside face; a gold fold goes out. */
+  foldSvg(title, panels, ways, facing) {
+    const { layer, up } = foldStack(ways), top = Math.max(...layer) + 1;
+    const X0 = 50, XS = 2.35, GAP = 24, W = 340, H = 56 + top * GAP, base = H - 14;
+    const x = u => X0 + u * XS, y = z => base - z * GAP, mono = 'font-family="ui-monospace, Menlo, monospace"';
+    let s = `<text x="${W / 2}" y="16" text-anchor="middle" font-size="12.5" fill="#646b73">${esc(title)}</text>
+      <line x1="${x(0)}" y1="${y(top) - 6}" x2="${x(0)}" y2="${base + 8}" stroke="#b9ae98" stroke-width="2"/>
+      <text x="${x(0) - 6}" y="${base + 4}" text-anchor="end" font-size="10.5" fill="#646b73">spine</text>
+      <line x1="${x(0)}" y1="${y(top)}" x2="${x(100)}" y2="${y(top)}" stroke="#646b73" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="${x(50)}" y="${y(top) - 7}" text-anchor="middle" font-size="11" ${mono}>${esc(facing)}</text>`;
+    panels.slice(0, -1).forEach(([, from, to], i) => {   // the fold at the end of each panel, round to the next
+      const fx = x(to), ya = y(layer[i]), yb = y(layer[i + 1]), r = Math.abs(ya - yb) / 2, out = ways[i + 1] < 0;
+      const rx = to > from ? r : Math.min(r, Math.max(3, fx - x(0) - 2));   // a fold just off the spine is drawn narrow, clear of it
+      s += `<path d="M${fx},${ya} A${rx},${r} 0 0 ${(to > from) === (ya > yb) ? 0 : 1} ${fx},${yb}" fill="none" stroke="${out ? "#d99a00" : "#8a7a5c"}" stroke-width="${out ? 4 : 2}"/>`;
+    });
+    panels.forEach(([name, from, to], i) => {
+      const x1 = x(Math.min(from, to)), w = Math.abs(to - from) * XS, yy = y(layer[i]);
+      const t = `${short(name)} ${up[i] ? "↑" : "↓"}`, tw = t.length * 6.7 + 10, lx = x1 + Math.min(w / 2, Math.max(tw / 2 + 4, w * .3));
+      s += `<rect x="${x1}" y="${yy - 3}" width="${w}" height="6" fill="#f3ead6" stroke="#8a7a5c" stroke-width="1"/>
+        <rect x="${x1}" y="${up[i] ? yy - 3 : yy + 1}" width="${w}" height="2" fill="#7a5a1e"/>
+        <rect x="${lx - tw / 2}" y="${yy - 8}" width="${tw}" height="16" rx="3" fill="#fff" stroke="#d9d5cc"/>
+        <text x="${lx}" y="${yy + 4}" text-anchor="middle" font-size="11" ${mono}>${esc(t)}</text>`;
+    });
+    const words = panels.slice(1).map(([name], j) => (name === panels[j][0] ? `the crease in ${short(name)}` : `${short(panels[j][0])}–${short(name)}`) + (ways[j + 1] < 0 ? " out" : " in"));
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(`${title}: ${words.join(", ")}`)}"><g fill="currentColor">${s}</g></svg>`;
+  },
+  /* A drawn leaf, folded every way in (as the viewer guessed) or as Davis describes it, under the page it faces today. */
+  foldLeaf(id, leaf, guess) {
+    const panels = D.folds?.sheets?.[id]?.drawn?.[leaf];
+    if (!panels) return "";
+    const pages = linearize(ORDERS.get("beinecke"), { ghosts: true });
+    const i = pages.findIndex(p => p.sheet === id && p.face === "inside" && p.leafNo === +leaf), f = pages[i % 2 ? i + 1 : i - 1];
+    return this.foldSvg(`leaf ${leaf}, ${guess ? "every fold in (the viewer's guess)" : "as Davis describes it"}`, panels,
+      this.foldWays(id, panels, guess), f ? short(sideLabel(f)) : "cover");
+  },
+
   build() {
     const toc = [
       ["Using the viewer", [["what", "What you are looking at"], ["book", "Folded sheets"], ["foldouts", "Foldouts"], ["orders", "The orders"],
         ["colours", "The colours"], ["views", "Three ways to look"], ["yours", "Make it your own"]]],
       ["Lisa Fagin Davis's research", [["blog", "“Voynich Codicology” in brief"], ["quires", "Folio order: her quire diagrams"], ["history", "Her history of the book"],
-        ["singulions", "The 2026 proposal"]]],
+        ["singulions", "The 2026 proposal"], ["folds", "How the foldouts fold"]]],
       ["Reference", [["sure", "Known or guessed?"], ["notes", "Notes on single sheets"], ["words", "Words used here"], ["sources", "Sources"], ["privacy", "Privacy and cookies"]]]];
     const cite = k => this.cite(k);
     const blogUrl = D.orders.sources.LFD2025blog.url, yaleUrl = D.orders.sources.Yale.url;
@@ -1797,20 +1936,21 @@ const Info = {
 
       this.sec("foldouts", "Foldouts",
         h("p", {}, "Some sheets are much bigger than a page. They have extra panels that fold in, so the sheet fits inside the book and opens out like a map. The biggest is the Rosettes sheet (85|86), six panels in two rows. Quire 9 (sheet 67|68) is a strip of five panels."),
-        h("p", {}, "In the Reader, a folded foldout is a leaf like any other: you see the panel at its spine on each face, and the panels inside the folds stay hidden until you press ", h("b", {}, "Unfold"), ", which opens the fold-out panels of the opening you are on. In 3D, pick a sheet and press ", h("kbd", {}, "U"), ".")),
+        h("p", {}, "In the Reader, a folded foldout is a leaf like any other: you see the panel at its spine on each face, and the panels inside the folds stay hidden until you unfold it. Wherever there is a foldout, a gold ", h("b", {}, "Unfold"), " button comes up over the foot of the pages (or press ", h("kbd", {}, "U"), "), and the strips along the bottom show foldouts as wider marks. In 3D the same button unfolds the sheet you have picked, fold by fold; to open one fold at a time, click a flap, or use the list of folds beside the sheet. Each fold turns the way Davis describes, in or out (see ", h("button", { class: "linkish", onclick: () => this.go("folds") }, "How the foldouts fold"), ")."),
+        h("p", {}, "The Rosettes sheet opens as the real one does: its right-hand column swings out first, then the whole top half lifts in one piece. ", h("a", { href: "https://collections.library.yale.edu/catalog/2002046?child_oid=1006229", target: "_blank", rel: "noopener" }, "Yale's photograph of it half open"), " shows the top half lying folded down as a single strip.")),
 
       this.sec("orders", "The orders in the menu",
         h("p", {}, "The ", h("b", {}, "Order"), " menu at the top changes the order of the sheets everywhere at once: in 3D, in the Reader and in the Folio order tables."),
         h("ul", {},
           h("li", {}, h("b", {}, "Current binding. "), "The book exactly as it is sewn today."),
-          h("li", {}, h("b", {}, "Davis: complete proposed order. "), "Everything Lisa Fagin Davis has proposed about the order of the book, in one sequence. It makes the three changes explained just below."),
+          h("li", {}, h("b", {}, "Davis: proposed order. "), "Everything Lisa Fagin Davis has proposed about the order of the book, in one sequence. It makes the three changes explained just below. Only quires 13 and 20 get a new order of sheets; in every other quire, quires 1–8 included, the sheets stay in today's sequence, which is not part of the proposal."),
           h("li", {}, h("b", {}, "Your own orders. "), "Any order you make with ", h("b", {}, "Rearrange"), " in 3D appears here too (see ", h("button", { class: "linkish", onclick: () => this.go("yours") }, "Make it your own"), ").")),
         h("h3", {}, "Change 1: every sheet is read on its own"),
-        this.fig(q1Svg, "Quire 1 seen from its bottom edge; each V is one sheet. Left: today the sheets are tucked inside each other. Right: Davis's order reads each sheet on its own, one after another."),
+        this.fig(q1Svg, "Quire 1 seen from its bottom edge; each V is one sheet. Left: today the sheets are tucked inside each other. Right: Davis's order reads each sheet on its own, one after another, here in today's sequence, which is not part of the proposal."),
         h("p", {}, "Today the sheets of a quire are tucked inside each other, so 1v faces 2r. Davis and Colin Layfield found that the two halves of one sheet have more in common than pages that face each other across sheets. So they think each sheet was written, and meant to be read, on its own: 1r, 1v, 8r, 8v, then the next sheet. A folded sheet read like this is called a ", h("b", {}, "singulion"), "."),
         h("h3", {}, "Change 2: quires 13 and 20 in a new order"),
         this.fig(q13Svg, "Quire 13 seen from its bottom edge. Left: as bound, five sheets tucked inside each other. Right: Davis's order, each sheet on its own, in the order that makes neighbouring pages most alike. Sheet 78|81 is gold."),
-        h("p", {}, "For quires 13 and 20 they also worked out which order of the sheets makes neighbouring pages most alike (the numbers are under ", h("button", { class: "linkish", onclick: () => this.go("singulions") }, "The 2026 proposal"), "). The plant sheets and the recipe quires keep their present order, because nobody has worked theirs out yet."),
+        h("p", {}, "For quires 13 and 20 they also worked out which order of the sheets makes neighbouring pages most alike (the numbers are under ", h("button", { class: "linkish", onclick: () => this.go("singulions") }, "The 2026 proposal"), "). Every other quire, quires 1–8 included, keeps today's order of sheets. That order is not part of the proposal, and Davis has no results for quires 1–8 yet."),
         h("p", {}, "Read on its own, sheet 78|81 opens at 78v | 81r. Page 78v has water pipes (\u201cwaterspouts\u201d) on it, and 81r women bathing in pools: facing each other, the spouts line up with the pools across the fold. In today's binding those two pages don't face each other at all. Nick Pelling spotted this first, and Davis points to it in her 2025 post."),
         this.link("#read/davis/81r", "See 78v and 81r side by side"),
         h("h3", {}, "Change 3: quire 9 was sewn at a different fold"),
@@ -1864,7 +2004,7 @@ const Info = {
         h("h3", {}, "The stain"),
         h("p", {}, "A large stain, probably from water, runs along the top margin of the first several dozen leaves. Had the sheets been in today's order when it happened, the stain would grow or shrink smoothly from page to page. It doesn't: the stain on 32v is much smaller and narrower than on the facing 33r, so the spill came before the sheets were mixed up. The folio numbers are written over the stain, not smudged by it, so the spill also came before the 1600s. Wet parchment has to be taken apart to dry, and loose, unnumbered sheets are easy to rebind in the wrong order. Paint that rubbed off onto facing pages matches today's order, so the sheets were rebound before they were fully dry."),
         h("h3", {}, "Two early changes"),
-        h("p", {}, "The waterspouts on 78v line up with the pools on 81r, so 78|81 was once the centre of its quire (Nick Pelling's observation, in ", h("i", {}, "The Curse of the Voynich"), "). And quire 9 was first sewn at another fold, which puts its quire number on its last page. The quire 9 change happened after the quire numbers were written and before the folio numbers. Both are built into ", h("button", { class: "linkish", onclick: () => this.go("orders") }, "“Davis: complete proposed order”"), ": quire 9 is re-sewn there, and because every sheet is read on its own, 78v faces 81r."),
+        h("p", {}, "The waterspouts on 78v line up with the pools on 81r, so 78|81 was once the centre of its quire (Nick Pelling's observation, in ", h("i", {}, "The Curse of the Voynich"), "). And quire 9 was first sewn at another fold, which puts its quire number on its last page. The quire 9 change happened after the quire numbers were written and before the folio numbers. Both are built into ", h("button", { class: "linkish", onclick: () => this.go("orders") }, "“Davis: proposed order”"), ": quire 9 is re-sewn there, and because every sheet is read on its own, 78v faces 81r."),
         h("h3", {}, "Her caution"),
         h("p", {}, "Davis stresses that this is her interpretation, from several examinations of the manuscript in person; others may read the evidence differently, and more evidence (offsets, other stains, damage) is still to be studied. Why it matters: if the original order of the leaves can be recovered, we are a step closer to understanding the book."),
         h("p", { class: "small muted" }, "She credits Prescott Currier (the two hands), Nick Pelling (the waterspouts), Beinecke conservator Paula Zyatts (who observed that the book was rebound at least once; ", cite("Clemens2016"), ") and binding expert Vladimir Dulov (who has written about the binding on his blog).")),
@@ -1893,14 +2033,41 @@ const Info = {
           h("tr", {}, h("th", {}, "Quire"), h("th", {}, "As bound (outer → inner)"), h("th", {}, "Proposed"), h("th", {}, "Basis")),
           h("tr", {}, h("td", {}, "9"), h("td", {}, "67|68, sewn between 67v1 and 68r1"), h("td", {}, "67|68, sewn between 67v2 and 67v1"), h("td", {}, "sewing holes; quire mark position (", cite("LFD2025blog"), ")")),
           h("tr", {}, h("td", {}, "13 (blog)"), h("td", {}, "78|81 second from the centre"), h("td", {}, "78|81 innermost, so 78v faces 81r"), h("td", {}, "the waterspouts run across the gutter (", cite("LFD2025blog"), ", after Pelling)")),
-          h("tr", {}, h("td", {}, "all others"), h("td", {}, "nested quires (e.g. 1|8 wraps 2|7, 3|6, 4|5, so 1v faces 2r)"), h("td", {}, "each sheet read on its own, current sequence kept (1r, 1v | 8r, 8v | 2r …)"), h("td", {}, "conjoint pages more alike than facing ones, e.g. quire 1: 0.399 vs 0.246 (", cite("LD2026"), ", table 8)")),
+          h("tr", {}, h("td", {}, "all others"), h("td", {}, "nested quires (e.g. 1|8 wraps 2|7, 3|6, 4|5, so 1v faces 2r)"), h("td", {}, "each sheet read on its own, in today's sequence, not re-ordered (1r, 1v | 8r, 8v | 2r …)"), h("td", {}, "conjoint pages more alike than facing ones, e.g. quire 1: 0.399 vs 0.246 (", cite("LD2026"), ", table 8)")),
           h("tr", {}, h("td", {}, "13"), h("td", {}, "75|84, 76|83, 77|82, 78|81, 79|80 (nested)"), h("td", {}, "77|82, 78|81, 75|84, 76|83, 79|80 (singulions)"), h("td", {}, "LSA facing score 0.461 → 0.517 (", cite("LD2026"), ", table 14)")),
           h("tr", {}, h("td", {}, "13, runner-up"), h("td", {}, ""), h("td", {}, "76|83, 77|82, 79|80, 75|84, 78|81"), h("td", {}, "0.494 (table 15); it starts on 76r, which opens with an enlarged initial")),
           h("tr", {}, h("td", {}, "20"), h("td", {}, "103|116 … 108|111, [109|110] (nested)"), h("td", {}, "105|114, 104|115, 106|113, 107|112, 108|111, 103|116 (singulions); 109|110 unplaced"), h("td", {}, "LSA 0.438 → 0.526 (table 14); it opens on 105r, the only page of the section that starts with an oversize glyph, and ends on 116v, originally blank"))),
         h("p", {}, "They left the plant sheets in their current sequence, because each page is about a different plant, and they did not test the recipe (pharmaceutical) quires."),
         h("div", { class: "callout" }, h("b", {}, "How sure is this? "),
           "Davis and Layfield call it a hypothesis: until the text can be read, the order cannot be confirmed. They tested only quires 13 and 20. In her Toronto lecture (", cite("LFD2025talk"), ") Davis also described work in progress on using the shrinking waterstains in the early quires to recover their original nesting, with no firm results yet (", cite("Pelling2025"), "). Nick Pelling argues that LSA similarity is a prompt for codicology rather than codicological evidence."),
-        h("p", {}, "The top sequences, with quire 9 re-sewn, are in the Order menu as ", h("b", {}, "Davis: complete proposed order"), ". To try the runner-up, choose that order, open ", h("button", { class: "linkish", onclick: () => this.go("yours") }, "Rearrange"), " in 3D and drag quire 13's sheets into the order 76|83, 77|82, 79|80, 75|84, 78|81.")),
+        h("p", {}, "The top sequences, with quire 9 re-sewn, are in the Order menu as ", h("b", {}, "Davis: proposed order"), ". To try the runner-up, choose that order, open ", h("button", { class: "linkish", onclick: () => this.go("yours") }, "Rearrange"), " in 3D and drag quire 13's sheets into the order 76|83, 77|82, 79|80, 75|84, 78|81.")),
+
+      this.sec("folds", "How the foldouts fold (2026)",
+        h("p", {}, "Folded inside the book, a foldout's extra panels lie on top of each other, and which way each fold goes decides which faces touch. The viewer used to guess that every fold goes in, onto the inside of the sheet. In October 2026, on the forum The Voynich Ninja, Davis went through every foldout as it is bound today: which way each fold goes, and which faces touch when the book is closed (", cite(D.folds?.src), "). She also pointed to the photographs that show where the extra creases are."),
+        h("p", {}, "Most folds do go in. Three go out, so the outside faces meet there: the crease in 68r3, the fold between 72r2 and 72r3, and the crease in 102r2. 3D folds every sheet this way, with each extra crease where the photographs show it, and its ", h("b", {}, "Touching faces"), " (", h("kbd", {}, "K"), ") marks the faces she gives as “confirmed”."),
+        h("table", { class: "info-table" },
+          h("tr", {}, h("th", {}, "Quire"), h("th", {}, "Sheet"), h("th", {}, "Folds she gives"), h("th", {}, "What touches, against the viewer's guess")),
+          ...[[9, "67|68", "", "The end of 68r3 lies face down on 68r1 and the two halves of 68v3 meet; 68r2 lies on 68r3 only."],
+              [10, "69|70", "", "As the viewer had it; 70r1 also touches 70r2 where its second panel does not reach."],
+              [11, "71|72", "", "72r2 lies on 72r1 and 72r3 on the back of 72r2; 71v touches 72r1, 72r3 and the back of the end of 72r3, not 72v2."],
+              [14, "85|86", "none; folded as voynich.nu describes it", "Everything the viewer had, from voynich.nu's description, is right."],
+              [15, "87|90, 88|89", "", "As the viewer had it; 88v also touches part of 89r1, and 89r1 part of 89r2."],
+              [17, "94|95", "none; the viewer folds it in", "As the viewer had it; 94v also touches part of 95r1."],
+              [19, "99|102, 100|101", "", "The end of 102r2 turns back on top, so 101v1 touches 102r1, 102r2 and 102v2; 100v also touches part of 101r."]]
+            .map(([q, ids, none, what]) => h("tr", {}, h("td", {}, String(q)), h("td", {}, ids),
+              h("td", {}, ids.split(", ").map(id => this.foldWords(id)).filter(Boolean).join("; ") || none), h("td", {}, what)))),
+        h("p", {}, "The drawings show a folded leaf from its top edge, with the spine on the left. The panel at the spine is at the bottom, and each layer above it lies nearer the page the leaf faces, which is dashed. A panel's dark edge is its inside face (its r): ↑ means it looks toward the facing page, ↓ away from it. Gold folds go out. They are schematic, not to scale."),
+        this.fig(`<div class="fig-pair">${this.foldLeaf("67|68", 68, true)}${this.foldLeaf("67|68", 68)}</div>`,
+          "Quire 9. The crease in 68r3 folds out, not in, so the end of 68r3 tucks under the rest of it, against 68r1, back to back with it."),
+        this.fig(`<div class="fig-pair">${this.foldLeaf("71|72", 72, true)}${this.foldLeaf("71|72", 72)}</div>`,
+          "Quire 11. The folds alternate in, out, in. 72r2 now lies on 72r1, 72r3 lies on top, and the end of 72r3 folds back over it, so 71v meets three faces."),
+        this.fig(`<div class="fig-pair">${this.foldLeaf("99|102", 102, true)}${this.foldLeaf("99|102", 102)}</div>`,
+          "Quire 19. The crease in 102r2 folds out, so its end turns back on top of the leaf instead of tucking inside it, and 101v1 meets 102r1, 102r2 and 102v2."),
+        this.fig(`<div class="fig-pair">${this.foldLeaf("69|70", 70)}${this.foldLeaf("88|89", 89)}</div>`,
+          "Quires 10 and 15 fold in throughout, as the viewer had them. Davis adds the faces that touch only in part: 70r1 and 70r2, 88v and 89r1, 89r1 and 89r2."),
+        this.fig(`<div class="fig-pair">${this.foldLeaf("94|95", 95)}${this.foldLeaf("100|101", 101)}</div>`,
+          "Quires 17 and 19. Each flap leaves part of its leaf bare, so 94v also touches 95r1, and 100v also touches 101r."),
+        h("p", { class: "small muted" }, "Quire 14, the Rosettes, folds in two directions and is not drawn here; Davis confirms every face the viewer has touching there. The panels in 3D are cut from Yale's photographs, whose widths are only roughly right, so 3D cannot show every face that touches in part; the list in Touching faces follows Davis.")),
 
       // ---------------------------------------------------------------- reference
       h("div", { class: "info-part" }, "Reference"),
@@ -1909,7 +2076,8 @@ const Info = {
           h("li", {}, h("b", {}, "Known: "), "which leaves belong to which sheet and quire, which leaves are lost, and the page photographs. Folio order, sections and scribes follow Davis's quire diagrams (", cite("LFD2025blog"), "); they agree with the transliteration file's page data except that 115r also has Scribe 2, and 116v, a later addition, has none of the five scribes."),
           h("li", {}, h("b", {}, "Foldouts: "), "the panels and their positions follow ", cite("VN"), ". Panel r1/v1 is always the one at the spine. The Rosettes sheet (quire 14) is 2 × 3 panels; folded it reads 84v | 85r1, 85r2 | 86v5, 86v3 | 87r."),
           h("li", {}, h("b", {}, "Davis's reading of the evidence: "), "the two changes in her order. They rest on real marks in the book, but they are her interpretation."),
-          h("li", {}, h("b", {}, "Guessed by this viewer: "), "which way the fold-out panels fold. In 3D the viewer assumes they roll-fold onto the inside of the sheet, so a flap lies over one face of its leaf and a folded opening shows the back of the second panel (e.g. 67r2 | 68v2 at the centre of quire 9); that is where the 1600s folio numbers were written, which is why voynich.nu infers it. The Reader is plainer: a folded foldout shows just the panel at the spine on each face (67r1, 67v1, 68r1, 68v1 for quire 9), and the panels inside the folds appear when you unfold it. In 3D, a panel wider than the leaf it folds onto (68r3, 70r2, 72r3, 89r2, 102r2) gets one more crease to stay inside the book, and the faces that touch inside a folded foldout follow from these guesses. They are marked “inferred”. Sheets in 3D are drawn four times thicker than real parchment, so you can see how they nest."),
+          h("li", {}, h("b", {}, "Which way the foldouts fold: "), "as Lisa Fagin Davis gives them, with the faces that touch when the book is closed (", cite("LFD2026ninja"), "; see ", h("button", { class: "linkish", onclick: () => this.go("folds") }, "How the foldouts fold"), "). Most panels fold in, onto the inside of the sheet, so a folded opening shows the back of the second panel (e.g. 67r2 | 68v2 at the centre of quire 9), where the 1600s folio numbers were written; but the crease in 68r3, the fold between 72r2 and 72r3, and the crease in 102r2 fold out. 3D folds them so, and marks these contacts “confirmed”. The Reader is plainer: a folded foldout shows just the panel at the spine on each face (67r1, 67v1, 68r1, 68v1 for quire 9), and the panels inside the folds appear when you unfold it."),
+          h("li", {}, h("b", {}, "Guessed by this viewer: "), "how a sheet folds when an order sews or turns it differently from the binding: its contacts are worked out from the folds and marked “inferred”. The extra creases in 68r3, 72r3, 89r2 and 102r2 are placed where the photographs Davis pointed to show them, at about 63%, 66%, 60% and 76% of the panel's width from the fold it hangs from. Sheets in 3D are drawn four times thicker than real parchment, so you can see how they nest."),
           h("li", {}, "Yale labels the photograph of 90v2 as “90r”; it is placed here as 90v2. The page pictures are cut from the photographs and may show slivers of the neighbouring leaves. A foldout's panel at the spine was photographed in the bound book, so it shows the stacked edges of the book block on the side its flaps hang; opened out, the flap lies over that strip."))),
 
       this.sec("notes", "Notes on single sheets",
@@ -2002,6 +2170,8 @@ async function boot() {
     D = { ...codex, orders };
     // where the paper starts on a foldout's hinge panel (tools/seams.py): an extra, so without the file a foldout just opens flat
     D.seams = await fetch("data/seams.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : { panels: {} }).catch(() => ({ panels: {} }));
+    // how the foldouts fold and which faces touch, as Davis described them: without it every fold is inferred
+    D.folds = await fetch("data/folds.json", { cache: "no-cache" }).then(r => r.ok ? r.json() : { sheets: {} }).catch(() => ({ sheets: {} }));
   } catch (e) {
     $("#cx-main").replaceChildren(h("div", { style: { padding: "30px" } }, "The page data could not be loaded (", String(e.message), ")."));
     return;
