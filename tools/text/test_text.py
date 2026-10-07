@@ -150,23 +150,56 @@ class Data(unittest.TestCase):
         self.assertLess(sum(n.values()), 300)
 
     def test_word_boxes_cover_most_words_and_stay_on_the_page(self):
-        """data/text/boxes (tools/text/boxes.py): voynichese.com's boxes fitted to the site's page photos."""
+        """data/text/boxes (tools/text/boxes.py): voynichese.com's boxes fitted to the site's page photos. Rows are
+        [locus, word, x, y, w, h(, estimated, panel)]; the panels are the page's own in data/codex.json, the first
+        always, or a neighbour's cut from the same photograph of Yale's."""
         files = [f for f in (DATA / "boxes").glob("*.json") if f.name != "pages.json"]
         self.assertEqual(json.loads((DATA / "boxes" / "pages.json").read_text()), sorted(f.stem for f in files))
         self.assertGreaterEqual(len(files), 220)
-        boxed = total = 0
+        codex = json.loads((ROOT / "data" / "codex.json").read_text())
+        imgs, photo = collections.defaultdict(set), {}
+        for s in codex["sheets"]:
+            for side in ("inside", "outside"):
+                for row in s[side]:
+                    for sg in row:
+                        if "img" in sg:
+                            imgs[sg.get("page")].add(sg["img"])
+                            photo[sg["img"]] = sg.get("iiif")
+        boxed = total = est = 0
         for f in files:
             b = json.loads(f.read_text())
             loci = page(b["page"])["loci"]
+            self.assertIn(b["imgs"][0], imgs[b["page"]])
+            for img in b["imgs"][1:]:
+                self.assertTrue(img in imgs[b["page"]] or photo[img] == photo[b["imgs"][0]], (b["page"], img))
             seen = set()
-            for li, wi, x, y, w, h in b["words"]:
+            for row in b["words"]:
+                self.assertIn(len(row), (6, 7, 8), (b["page"], row))
+                li, wi, x, y, w, h = row[:6]
+                e, p = (row[6:] + [0, 0])[:2]
+                self.assertIn(e, (0, 1))
+                self.assertTrue(0 <= p < len(b["imgs"]), (b["page"], row))
                 self.assertLess(wi, len(loci[li]["c"].split(".")), (b["page"], li, wi))
                 self.assertTrue(0 <= x <= 1000 and 0 <= y <= 1000 and 0 < w <= 1000 and 0 < h <= 1000, (b["page"], li, wi))
                 self.assertNotIn((li, wi), seen)
                 seen.add((li, wi))
+                est += e
             boxed += len(b["words"])
             total += sum(len(l["c"].split(".")) for l in loci)
-        self.assertGreater(boxed / total, 0.95)
+        self.assertGreater(boxed / total, 0.99)
+        self.assertLess(est / boxed, 0.005)          # almost every box is voynichese.com's own
+
+    def test_every_ring_and_radius_word_has_a_box(self):
+        """On the round diagrams voynichese.com covers, each word written along a circle or a radius has a box."""
+        have = set(json.loads((DATA / "boxes" / "pages.json").read_text()))
+        missing = []
+        for name in have:
+            b = json.loads((DATA / "boxes" / f"{name}.json").read_text())
+            got = {(r[0], r[1]) for r in b["words"]}
+            for li, l in enumerate(page(name)["loci"]):
+                if l["t"][0] in "CR":
+                    missing += [(l["id"], wi) for wi in range(len(l["c"].split("."))) if (li, wi) not in got]
+        self.assertEqual(missing, [])
 
     def test_sizes(self):
         self.assertLess((DATA / "index.json").stat().st_size, 400_000)

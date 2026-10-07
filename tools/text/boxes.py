@@ -10,10 +10,18 @@ the frame of each page's full photograph scaled to 1,500 px tall. To put them on
   1. the frame of the site's own page images (636 x 900, data/folio/image/glance/...) is fitted to the XML frame from
      the two sets of boxes, which are the same boxes (data/folio/script/<page>.js, word for word);
   2. that image is matched to this site's crop of Yale's photograph (data/panels/<img>_l.jpg) by SIFT features and a
-     RANSAC homography;
+     RANSAC homography; of a foldout page's panels, the one it matches best;
   3. each box's corners go through both, and are kept in thousandths of the panel image's width and height;
   4. each of its words is lined up with the voynichese.com transcription in data/text (VT, Takahashi's) and so with
-     the consensus words: a box belongs to the consensus word(s) it covers.
+     the consensus words (wordmatch.py): a box belongs to the consensus word(s) it covers;
+  5. a foldout page's words go on whichever of its panels shows them, each panel with its own fit, or on the next
+     page's panel cut from the same photograph of Yale's where a ring runs over the cut; a panel its 636 x 900 image
+     does not show gets none (carried across that far, boxes land up to a line or a word off).
+
+Each page's file: {"page", "imgs": [its panels], "credit", "words": [[locus, word, x, y, w, h(, estimated, panel)]]},
+estimated 1 where a word has no box of voynichese.com's and its place is estimated from its line's words around it,
+panel an index into imgs (0 when left out; imgs lists every panel the page's words sit on, which can include a
+neighbouring page's).
 
 The photographs fetched for step 2 stay in tools/text/cache/vc (their checksums in vc-manifest.json); only the boxes
 are published. Pages it cannot fit well are listed in docs/text/boxes.md and get no boxes.
@@ -45,6 +53,7 @@ CREDIT = ("Word boxes: The Voynichese Project (2014), Apache License 2.0, fitted
 
 sys.path.insert(0, str(HERE))
 import readings  # noqa: E402
+import wordmatch  # noqa: E402
 
 
 def sha(p: Path) -> str:
@@ -85,13 +94,20 @@ def frame_fit(words, script):
     for (_, x, y, w, h, s), (wi, X, Y, W, H) in zip(words, boxes):
         if uniq[wi][0] != s:
             return None
-        A.append((x, x + w, y, y + h)); B.append((X, X + W, Y, Y + H))
+        if W > 0 and H > 0 and X > 0 and Y > 0:        # not cut away at the frame's edge (to nothing, at 0)
+            A.append((x, x + w, y, y + h)); B.append((X, X + W, Y, Y + H))
+    if len(A) < 3:
+        return None
     A, B = np.array(A), np.array(B)
     ax = np.polyfit(A[:, :2].ravel(), B[:, :2].ravel(), 1)
     ay = np.polyfit(A[:, 2:].ravel(), B[:, 2:].ravel(), 1)
     err = max(np.abs(np.polyval(ax, A[:, :2]) - B[:, :2]).max(), np.abs(np.polyval(ay, A[:, 2:]) - B[:, 2:]).max())
     return ax, ay, float(err)
 
+
+NEAR = 150                                              # thousandths past a panel's edge: looked for on the next
+FOLD = 15                                               # thousandths: a word centred this far past the edge, in the fold
+MAX_FRAME_ERR = 12                                      # px in its page image: more, and the two frames disagree
 
 SIFT = cv2.SIFT_create(nfeatures=8000)
 
@@ -109,64 +125,62 @@ def homography(src, dst):
     return H, int(mask.sum()) if mask is not None else 0
 
 
-def vt_tokens(loci):
-    """VT's words over the page, each with the consensus words (locus index, word index) it covers."""
-    toks = []
+def to_photo(sg):
+    """A panel's thousandths -> Yale's photograph (pixels of the full-size image), and back: its quad's corners."""
+    quad = np.float32(sg["quad"])
+    unit = np.float32([[0, 0], [1000, 0], [1000, 1000], [0, 1000]])
+    if (sg.get("rotate") or 0) % 360 == 180:           # served turned half round
+        unit = unit[[2, 3, 0, 1]]
+    return cv2.getPerspectiveTransform(unit, quad), cv2.getPerspectiveTransform(quad, unit)
+
+
+def estimate(per: dict, loci, off=(), size=None) -> dict:
+    """Boxes for the words of a line that have none, between (or after) the words of the same line that have one:
+    along the line from one to the next, as wide as their glyphs. Marked as estimated. Not for words known to be on
+    another panel (off), nor where the estimate falls off this one (size: its width and height)."""
+    est = {}
     for li, loc in enumerate(loci):
-        rd = readings.words_of(loc, "VT")
-        if rd is None:
+        ws = loc["c"].split(".")
+        have = [wi for wi in range(len(ws)) if (li, wi) in per]
+        if not have or len(have) == len(ws):
             continue
-        cur = None
-        for wi, (text, nxt) in enumerate(rd):
-            parts = re.split(r"[.,]", text) if text else [""]
-            for k, part in enumerate(parts):
-                if k and cur is not None:
-                    toks.append(cur); cur = None
-                if cur is None:
-                    cur = {"text": "", "refs": []}
-                cur["text"] += part
-                if (li, wi) not in cur["refs"]:
-                    cur["refs"].append((li, wi))
-            if nxt in (".", ",") or wi == len(rd) - 1:
-                toks.append(cur); cur = None
-        if cur:
-            toks.append(cur)
-    return [t for t in toks if t["text"]]
-
-
-def lev(a: str, b: str) -> int:
-    prev = list(range(len(b) + 1))
-    for i, x in enumerate(a, 1):
-        cur = [i]
-        for j, y in enumerate(b, 1):
-            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x != y)))
-        prev = cur
-    return prev[-1]
-
-
-def align(xs: list[str], ys: list[str]):
-    """Pairs (i, j) lining up two word lists in order (Needleman-Wunsch; a word pair costs its share of edits)."""
-    n, m = len(xs), len(ys)
-    GAP = 0.8
-    D = np.full((n + 1, m + 1), np.inf); D[0, :] = np.arange(m + 1) * GAP; D[:, 0] = np.arange(n + 1) * GAP
-    B = np.zeros((n + 1, m + 1), dtype=np.int8)
-    for i in range(1, n + 1):
-        for j in range(max(1, i - 60), min(m, i + 60) + 1):
-            a, b = xs[i - 1], ys[j - 1]
-            sub = D[i - 1, j - 1] + (0 if a == b else min(1.6, 2 * lev(a, b) / max(len(a), len(b), 1)))
-            up, left = D[i - 1, j] + GAP, D[i, j - 1] + GAP
-            D[i, j], B[i, j] = min((sub, 0), (up, 1), (left, 2))
-    pairs, i, j = [], n, m
-    while i > 0 and j > 0:
-        if B[i, j] == 0:
-            if xs[i - 1] == ys[j - 1] or 2 * lev(xs[i - 1], ys[j - 1]) / max(len(xs[i - 1]), len(ys[j - 1]), 1) <= 1:
-                pairs.append((i - 1, j - 1))
-            i, j = i - 1, j - 1
-        elif B[i, j] == 1:
-            i -= 1
+        c = lambda b: np.array([(b[0] + b[2]) / 2, (b[1] + b[3]) / 2])
+        glyph_w = np.mean([(per[(li, wi)][2] - per[(li, wi)][0]) / max(1, len(ws[wi])) for wi in have])
+        hgt = np.mean([per[(li, wi)][3] - per[(li, wi)][1] for wi in have])
+        if len(have) > 1:   # the way the line runs, from its first boxed word to its last
+            a, b = c(per[(li, have[0])]), c(per[(li, have[-1])])
+            step = (b - a) / max(1, sum(len(ws[x]) + 1 for x in range(have[0], have[-1])))
         else:
-            j -= 1
-    return pairs[::-1]
+            step = np.array([glyph_w, 0.0])
+        for wi in range(len(ws)):
+            if (li, wi) in per or (li, wi) in off:
+                continue
+            prev = max((x for x in have if x < wi), default=None)
+            nxt = min((x for x in have if x > wi), default=None)
+            if prev is not None and nxt is not None:   # between two: shared out along the gap by glyph counts
+                pa, pb = per[(li, prev)], per[(li, nxt)]
+                a, b = np.array([pa[2], (pa[1] + pa[3]) / 2]), np.array([pb[0], (pb[1] + pb[3]) / 2])
+                lens = [len(ws[x]) + 1 for x in range(prev + 1, nxt)]
+                before = sum(lens[:wi - prev - 1])
+                f0, f1 = before / sum(lens), (before + lens[wi - prev - 1]) / sum(lens)
+                p0, p1 = a + (b - a) * f0, a + (b - a) * f1
+            elif prev is not None:                      # after the last: on along the line
+                pa = per[(li, prev)]
+                start = sum(len(ws[x]) + 1 for x in range(prev + 1, wi))
+                o = np.array([pa[2], (pa[1] + pa[3]) / 2]) + step * start
+                p0, p1 = o, o + step * len(ws[wi])
+            else:                                       # before the first: back along the line
+                pb = per[(li, nxt)]
+                start = sum(len(ws[x]) + 1 for x in range(wi + 1, nxt)) + 1
+                o = np.array([pb[0], (pb[1] + pb[3]) / 2]) - step * start
+                p0, p1 = o - step * len(ws[wi]), o
+            # a word's own size, about where it falls: as wide as its glyphs, as tall as its line's words
+            cx, cy = (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2
+            half = glyph_w * max(1, len(ws[wi])) / 2
+            if size and not (0 <= cx <= size[0] and 0 <= cy <= size[1]):
+                continue
+            est[(li, wi)] = (cx - half, cy - hgt / 2, cx + half, cy + hgt / 2)
+    return est
 
 
 def main():
@@ -178,48 +192,109 @@ def main():
     vps = sorted(n[5:-4] for n in z.namelist() if re.match(r"data/f.*\.xml$", n))
     fetch(vps)
     codex = json.loads((ROOT / "data" / "codex.json").read_text())
-    seg_of = {}
+    all_segs = []
+    segs_of = {}                                        # page -> its panels (a foldout's page can have several)
     for s in codex["sheets"]:
         for f in ("inside", "outside"):
             for row in s[f]:
                 for sg in row:
-                    if not sg.get("missing"):
-                        seg_of.setdefault(sg["page"], sg)
+                    if not sg.get("missing") and not sg.get("custom") and sg.get("quad"):
+                        segs_of.setdefault(sg["page"], []).append(sg)
+                        all_segs.append(sg)
     OUT.mkdir(parents=True, exist_ok=True)
-    for old in OUT.glob("*.json"):
-        old.unlink()                                    # (pages.json too: it is written again at the end)
-    report = []
+    only = set(sys.argv[1:])                            # boxes.py f70r2 f57v: just those pages, to look at
+    if only:
+        vps = [v for v in vps if RENAME.get(v, v) in only]
+    else:
+        for old in OUT.glob("*.json"):
+            old.unlink()                                # (pages.json too: it is written again at the end)
+    report, quality = [], {}
     for vp in vps:
         page = RENAME.get(vp, vp)
         pfile = ROOT / "data" / "text" / "pages" / f"{page}.json"
-        seg = seg_of.get(page)
-        if not pfile.exists() or not seg:
-            report.append((page, "no page", 0, 0, 0)); continue
+        segs = segs_of.get(page)
+        if not pfile.exists() or not segs:
+            report.append((page, "no page", 0, 0, 0, 0, 0)); continue
         words = xml_words(z, vp)
-        fit = frame_fit(words, json.loads((VC / f"{vp}.js").read_text()))
-        if not fit:
-            report.append((page, "frames differ", 0, 0, len(words))); continue
+        script = json.loads((VC / f"{vp}.js").read_text())
+        fit = frame_fit(words, script)
+        if not fit or fit[2] > MAX_FRAME_ERR:
+            report.append((page, "frames differ", 0, 0, len(words), 0, 0)); continue
         ax, ay, ferr = fit
         big = cv2.imread(str(VC / f"{vp}.jpg"))
-        pan = cv2.imread(str(ROOT / "data" / "panels" / f"{seg['img']}_l.jpg"))
-        s = big.shape[0] / pan.shape[0]
-        H, inl = homography(big, cv2.resize(pan, None, fx=s, fy=s, interpolation=cv2.INTER_AREA))
-        if H is None or inl < MIN_INLIERS:
-            report.append((page, "photo not matched", inl, 0, len(words))); continue
-        Hp = np.diag([1 / s, 1 / s, 1]) @ H
-        PH, PW = pan.shape[:2]
+        fits = []                                       # voynichese.com's photo against each of the page's panels
+        for sg in segs:
+            pan = cv2.imread(str(ROOT / "data" / "panels" / f"{sg['img']}_l.jpg"))
+            s = big.shape[0] / pan.shape[0]
+            H, inl = homography(big, cv2.resize(pan, None, fx=s, fy=s, interpolation=cv2.INTER_AREA))
+            if H is not None:
+                fits.append((inl, sg, np.diag([1 / s, 1 / s, 1]) @ H, pan.shape[1], pan.shape[0]))
+        fits = sorted((f for f in fits if f[0] >= MIN_INLIERS), key=lambda f: -f[0])
+        if not fits:
+            report.append((page, "photo not matched", max((f[0] for f in fits), default=0), 0, len(words), 0, 0)); continue
+        inl = fits[0][0]
         loci = json.loads(pfile.read_text())["loci"]
-        toks = vt_tokens(loci)
-        pairs = align([w[5] for w in words], [t["text"] for t in toks])
-        per = {}
-        for i, j in pairs:
-            _, x, y, w, h, _s = words[i]
-            pts = np.float32([[np.polyval(ax, x), np.polyval(ay, y)], [np.polyval(ax, x + w), np.polyval(ay, y)],
-                              [np.polyval(ax, x + w), np.polyval(ay, y + h)], [np.polyval(ax, x), np.polyval(ay, y + h)]])
+        xml = []
+        for _, x, y, w, h, t in words:
+            xml.append((t, x + w / 2, y + h / 2, h))
+        got, toks = wordmatch.match(xml, loci)
+        quality[page] = wordmatch.match.quality
+        corners = lambda x, y, w, h: np.float32([[x, y], [x + w, y], [x + w, y + h], [x, y + h]])
+
+        def on_panel(xi, fit):
+            """voynichese.com's box (XML frame) -> a panel, in thousandths; None where the fit folds over (far
+            beyond what it was measured on)"""
+            _inl, _sg, Hp, PW, PH = fit
+            _, x, y, w, h, _s = words[xi]
+            c = corners(x, y, w, h)
+            pts = np.stack([np.polyval(ax, c[:, 0]), np.polyval(ay, c[:, 1])], 1).astype(np.float32)
+            if (np.c_[pts, np.ones(4)] @ Hp[2] <= 0).any():
+                return None
             q = cv2.perspectiveTransform(pts.reshape(-1, 1, 2), Hp).reshape(-1, 2)
+            return q / [PW, PH] * 1000
+
+        def shown(q):
+            """how much of a box (thousandths of a panel) lies on the panel"""
+            (x0, y0), (x1, y1) = q.min(0), q.max(0)
+            return max(0, min(x1, 1000) - max(x0, 0)) * max(0, min(y1, 1000) - max(y0, 0)) / max(1e-9, (x1 - x0) * (y1 - y0))
+
+        # Each word goes on the panel that shows most of it (at least a tenth, or any of it if it sinks into the fold
+        # just past the edge; the box is then cut to the panel's edge). Every panel of the page that voynichese.com's photo shows has its own fit; through Yale's
+        # photograph the word can also land on a neighbouring page's panel cut from the same photograph (a ring running
+        # over the cut between two pages of a foldout). A panel its photo does not show gets no boxes: carried across
+        # that far they land up to a line or a word off.
+        near = [sg for sg in all_segs if sg["page"] != page and sg.get("iiif") == fits[0][1].get("iiif")
+                and (sg.get("rotate") or 0) % 180 == 0]
+        placed = {}                                     # (locus, token) -> (panel's seg, corners in thousandths)
+        for kj, xi in got.items():
+            best = None
+            for fit in fits:
+                qs = [on_panel(one, fit) for one in (xi if isinstance(xi, tuple) else (xi,))]
+                if any(q is None for q in qs):
+                    break
+                q = np.concatenate(qs)
+                tries = [(fit[1], q)]
+                if shown(q) < 1 and near and (-NEAR < q.mean(0)).all() and (q.mean(0) < 1000 + NEAR).all():
+                    photo = cv2.perspectiveTransform(q.reshape(-1, 1, 2).astype(np.float32), to_photo(fit[1])[0])
+                    tries += [(sg, cv2.perspectiveTransform(photo, to_photo(sg)[1]).reshape(-1, 2)) for sg in near]
+                for sg, qq in tries:
+                    c = qq.mean(0)
+                    ok = shown(qq) >= .1 or (shown(qq) > 0 and (-FOLD < c).all() and (c < 1000 + FOLD).all())
+                    if ok and (best is None or shown(qq) > best[0]):
+                        best = (shown(qq), sg, qq)
+            if best:
+                placed[kj] = best[1:]
+        panels = [f[1] for f in fits if any(sg is f[1] for sg, _q in placed.values())]
+        panels += [sg for sg in near if any(x is sg for x, _q in placed.values())]
+        placed = {kj: (next(n for n, p in enumerate(panels) if p is sg), q) for kj, (sg, q) in placed.items()}
+        if not panels:
+            report.append((page, "no word on its panels", inl, 0, len(words), 0, 0)); continue
+        # the boxes, by panel; a box over several consensus words (VT joins them) is shared out along its width by
+        # their lengths
+        per = [{} for _ in panels]
+        for kj, (pi, q) in placed.items():
             x0, y0 = q.min(0); x1, y1 = q.max(0)
-            refs = toks[j]["refs"]
-            # a box over several consensus words (VT joins them) is shared out along its width by their lengths
+            refs = toks[kj[0]][kj[1]]["refs"]
             ws = [readings.word_text(loci[li], wi) for li, wi in refs]
             tot = sum(max(1, len(t)) for t in ws)
             acc = 0
@@ -227,19 +302,68 @@ def main():
                 f0, f1 = acc / tot, (acc + max(1, len(t))) / tot
                 acc += max(1, len(t))
                 bx = (x0 + (x1 - x0) * f0, y0, x0 + (x1 - x0) * f1, y1)
-                old = per.get((li, wi))
-                per[(li, wi)] = bx if not old else (min(old[0], bx[0]), min(old[1], bx[1]), max(old[2], bx[2]), max(old[3], bx[3]))
-        k = lambda v, d: int(round(max(0, min(1, v / d)) * 1000))
-        out = [[li, wi, k(b[0], PW), k(b[1], PH), max(1, k(b[2] - b[0], PW)), max(1, k(b[3] - b[1], PH))]
-               for (li, wi), b in sorted(per.items())]
+                old = per[pi].get((li, wi))
+                per[pi][(li, wi)] = bx if not old else (min(old[0], bx[0]), min(old[1], bx[1]), max(old[2], bx[2]), max(old[3], bx[3]))
+        # a word written across the fold, in two of voynichese.com's boxes, one on each panel: on the one with more of it
+        for pi in range(1, len(per)):
+            for w in [w for w in per[pi] if any(w in per[pj] for pj in range(pi))]:
+                pj = next(pj for pj in range(pi) if w in per[pj])
+                a, b = per[pi][w], per[pj][w]
+                del (per[pj] if (a[2] - a[0]) > (b[2] - b[0]) else per[pi])[w]
+        # words that voynichese.com places but not on any of these panels: no estimate for them
+        off = {r for kj, xi in got.items() if kj not in placed for r in toks[kj[0]][kj[1]]["refs"]}
+        k = lambda v: int(round(max(0, min(1000, v))))
+        out, n_est = [], 0
+        for pi, pp in enumerate(per):
+            # (an estimate goes only where its line has words on this panel, and not onto a word placed on another)
+            elsewhere = off | {w for pj, o in enumerate(per) if pj != pi for w in o}
+            est = estimate(pp, loci, elsewhere, (1000, 1000))
+            n_est += len(est)
+            for (li, wi), b in {**pp, **est}.items():
+                out.append([li, wi, k(b[0]), k(b[1]), max(1, k(b[2] - b[0])), max(1, k(b[3] - b[1]))]
+                           + ([1 if (li, wi) in est else 0, pi] if pi else [1] if (li, wi) in est else []))
+        out.sort()
         nwords = sum(len(l["c"].split(".")) for l in loci)
-        (OUT / f"{page}.json").write_text(json.dumps({"page": page, "img": seg["img"], "credit": CREDIT, "words": out},
-                                                     separators=(",", ":")) + "\n")
-        report.append((page, "ok", inl, len(out), nwords))
-        print(page, "inliers", inl, "boxes", len(out), "of", nwords, "frame err", round(ferr, 1))
+        (OUT / f"{page}.json").write_text(json.dumps({"page": page, "imgs": [sg["img"] for sg in panels],
+                                                      "credit": CREDIT, "words": out}, separators=(",", ":")) + "\n")
+        report.append((page, "ok", inl, len(out), nwords, n_est, len(off - {(r[0], r[1]) for r in out})))
+        print(page, "inliers", inl, "boxes", len(out), "of", nwords, "estimated", n_est, "frame err", round(ferr, 1),
+              "panels", len({r[7] if len(r) > 7 else 0 for r in out}))
+    jumps = check_jumps(only or None)
+    q = {k: sum(v[k] for v in quality.values()) for k in ("exact", "matched")}
+    print(f"matched {q['matched']}, exactly {q['exact']} ({100 * q['exact'] / max(1, q['matched']):.1f}%); jumps {len(jumps)}")
+    for j in jumps[:30]:
+        print("  jump", *j)
+    if only:
+        return
     # the pages that have boxes, so the site asks only for those
     (OUT / "pages.json").write_text(json.dumps(sorted(r[0] for r in report if r[1] == "ok"), separators=(",", ":")) + "\n")
     write_report(report)
+
+
+def check_jumps(pages=None):
+    """Words of one line whose boxes are far apart: next-door words more than five word-heights from each other, a
+    sign that a box went to the wrong word. Rings and radii bend, so they get a wider allowance."""
+    out = []
+    for f in sorted(OUT.glob("f*.json")):
+        b = json.loads(f.read_text())
+        if pages and b["page"] not in pages:
+            continue
+        loci = json.loads((ROOT / "data" / "text" / "pages" / f"{b['page']}.json").read_text())["loci"]
+        by = {}
+        for row in b["words"]:                          # (a line across a foldout's panels: each panel's part alone)
+            by.setdefault((row[0], row[7] if len(row) > 7 else 0), {})[row[1]] = row
+        for (li, _panel), ws in by.items():
+            hs = sorted(r[5] for r in ws.values())
+            hmed = hs[len(hs) // 2] or 1
+            allow = 8 if loci[li]["t"][0] in "CR" else 5
+            for wi in sorted(ws):
+                if wi + 1 in ws:
+                    a, c = ws[wi], ws[wi + 1]
+                    gap = max(c[2] - (a[2] + a[4]), a[2] - (c[2] + c[4]), c[3] - (a[3] + a[5]), a[3] - (c[3] + c[5]), 0)
+                    if gap > allow * hmed:
+                        out.append((b["page"], loci[li]["id"], wi + 1, gap, hmed))
+    return out
 
 
 def write_report(rows):
@@ -248,10 +372,15 @@ def write_report(rows):
              "Built by `tools/text/boxes.py` from The Voynichese Project's word boxes (2014, Apache License 2.0), fitted to the "
              "site's page crops of Yale's photographs. A word with a box can be pointed at on the page.", "",
              f"- Pages with boxes: **{len(ok)}**; words with a box: **{sum(r[3] for r in ok):,}** of {sum(r[4] for r in ok):,} "
-             f"on those pages ({100 * sum(r[3] for r in ok) / max(1, sum(r[4] for r in ok)):.1f}%).",
-             "- Pages without: " + (", ".join(f"{r[0]} ({r[1]})" for r in rows if r[1] != "ok") or "none") + ".", "",
-             "| Page | Fit (matched features) | Words with a box | Words |", "|---|---|---|---|"]
-    lines += [f"| {r[0]} | {r[2]} | {r[3]} | {r[4]} |" for r in ok]
+             f"on those pages ({100 * sum(r[3] for r in ok) / max(1, sum(r[4] for r in ok)):.1f}%), "
+             f"{sum(r[5] for r in ok):,} of them estimated between the words around them.",
+             "- Pages without: " + (", ".join(f"{r[0]} ({r[1]})" for r in rows if r[1] != "ok") or "none")
+             + "; and the pages voynichese.com has no boxes for: "
+             + ", ".join(sorted({f.stem for f in (ROOT / "data" / "text" / "pages").glob("*.json")} - {r[0] for r in rows})) + ".",
+             "- Words on a foldout's panel that voynichese.com's photograph leaves out (no box): "
+             + (", ".join(f"{r[0]} ({r[6]})" for r in ok if r[6]) or "none") + ".", "",
+             "| Page | Fit (matched features) | Words with a box | Estimated | Words |", "|---|---|---|---|---|"]
+    lines += [f"| {r[0]} | {r[2]} | {r[3]} | {r[5]} | {r[4]} |" for r in ok]
     (ROOT / "docs" / "text" / "boxes.md").write_text("\n".join(lines) + "\n")
 
 
