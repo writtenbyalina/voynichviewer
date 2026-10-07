@@ -100,7 +100,7 @@ test.describe("page turns", () => {
     expect(go.where).toContain("f78v");
   });
 
-  test("an unfolded foldout folds shut where it stands, then the leaf turns", async ({ page }) => {
+  test("an unfolded foldout folds shut, its gutter coming back to the middle, then the leaf turns", async ({ page }) => {
     test.setTimeout(60_000);
     await openReader(page);
     const r = await page.evaluate(async () => {
@@ -110,15 +110,37 @@ test.describe("page turns", () => {
       const open = R.unfold.L || R.unfold.R;
       __rec(); Reader.step(1); await __idle(); const frames = __end();
       const firstLeaf = frames.findIndex(f => f.leaf);
+      // opened out, the foldout sits in the middle of the stage, so its gutter is off-centre; once it is shut the gutter is
+      // back in the middle and stays there while the leaf turns
+      const stage = document.querySelector("#rd-stage").getBoundingClientRect();
       return { k, at: R.at, open, unfolded: R.unfold.L || R.unfold.R, leaves: __leaves(frames), shutFirst: frames.slice(0, Math.max(firstLeaf, 1)).some(f => f.unfolded),
-        gutters: [...new Set(frames.map(f => Math.round(f.gutter)))] };
+        gutters: [...new Set(frames.slice(firstLeaf).map(f => Math.round(f.gutter)))], middle: Math.round(stage.left + stage.width / 2) };
     });
     expect(r.open, "the foldout was open").toBe(true);
     expect(r.at).toBe(r.k + 1);
     expect(r.unfolded).toBe(false);
     expect(r.shutFirst, "it folded shut before the leaf lifted").toBe(true);
     expect(r.leaves).toBe(1);
-    expect(r.gutters, "the gutter did not move while it folded and turned").toHaveLength(1);
+    expect(r.gutters, "the gutter did not move while the leaf turned").toHaveLength(1);
+    expect(Math.abs(r.gutters[0] - r.middle), "and it is in the middle of the stage").toBeLessThanOrEqual(2);
+  });
+
+  test("a run of turns is one riffle: the first leaf lifts gently, those between keep their pace, the last settles", async ({ page }) => {
+    await openReader(page, "20r");
+    const r = await page.evaluate(async () => {
+      // each leaf's pace, read as it is put in the air
+      const seen = [];
+      new MutationObserver(list => { for (const m of list) for (const n of m.addedNodes) if (n.classList?.contains("turn")) { const t = n.getAnimations()[0]?.effect.getTiming(); seen.push([t?.easing, t?.duration]); } })
+        .observe(document.querySelector("#rd-zoomer"), { childList: true, subtree: true });
+      const at = R.at;
+      Reader.step(1); await __idle();                  // one turn on its own
+      for (let i = 0; i < 4; i++) Reader.step(1);      // four asked for at once
+      await __idle();
+      return { moved: R.at - at, seen };
+    });
+    expect(r.moved).toBe(5);
+    expect(r.seen.map(x => x[0])).toEqual(["cubic-bezier(0.4, 0, 0.2, 1)", "cubic-bezier(0.5, 0, 0.8, 0.5)", "linear", "linear", "cubic-bezier(0.2, 0.6, 0.3, 1)"]);
+    expect(r.seen[0][1], "a turn on its own takes its time").toBeGreaterThan(r.seen[2][1]);
   });
 
   test("zoomed in on a spot, the view eases out and the leaf turns", async ({ page }) => {
