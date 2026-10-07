@@ -235,7 +235,7 @@ function segEl(seg, height, { size = "l", labels = true, scribes = true, cls = "
   const img = h("img", { src: imgUrl(seg.img, size, seg.v), alt: pageName(seg), draggable: "false", loading: lazy ? "lazy" : "eager",
     "data-key": seg.img, "data-v": seg.v || "", style: rot ? { transform: `rotate(${rot}deg)` } : null });
   Sharp.seg.set(img, seg);
-  const el = h("div", { class: "seg " + cls, style: { width: w + "px", height: height + "px" }, title: pageName(seg) }, img);
+  const el = h("div", { class: "seg " + cls, style: { width: w + "px", height: height + "px" }, title: pageName(seg), "data-page": seg.page }, img);
   const sc = (seg.scribes || []).filter(n => SCRIBES[n]);
   if (scribes && sc.length) el.append(h("i", { class: "scribe", title: sc.map(n => SCRIBES[n]).join(" + "),
     style: { background: sc.length === 1 ? `var(--h${sc[0]})`
@@ -389,7 +389,7 @@ const Reader = {
           h("button", { id: "rd-scribes", class: S.scribes ? "on" : "", title: "Colour bar = Davis's scribe", onclick: e => { S.scribes = !S.scribes; store.set("scribes", S.scribes); e.target.classList.toggle("on", S.scribes); Reader.render(); } }, "Scribes"),
           h("button", { id: "rd-ghosts", class: S.ghosts ? "on" : "", title: "Show lost leaves as blank pages", onclick: e => { S.ghosts = !S.ghosts; store.set("ghosts", S.ghosts); e.target.classList.toggle("on", S.ghosts); Reader.open(R.order, Reader.nearestKept()); } }, "Lost leaves"),
           h("button", { title: "Go to a folio (G)", onclick: () => Reader.ask() }, "Go to…"),
-          h("button", { id: "rd-textbtn", title: "The text of these pages, from its transcriptions (T)", "aria-pressed": "false",
+          h("button", { id: "rd-textbtn", title: "Read the text: point at any word on the page (T)", "aria-pressed": "false",
             "aria-controls": "rd-text", onclick: () => TextUI.toggle() }, "Text"),
           h("button", { id: "rd-bm", title: "Bookmark a page of this opening (B)", onclick: () => Bookmarks.here() }, "☆", h("span", { class: "txt" }, " Bookmark")),
           h("button", { id: "rd-gridbtn", title: "See every page at once, to jump anywhere (O)", onclick: () => Reader.toggleGrid() }, h("span", { class: "ico" }, "▦ "), "Grid"),
@@ -838,6 +838,7 @@ const Reader = {
       R.zx = st.clientWidth / 2 * (1 - R.zoom); R.zy = st.clientHeight / 2 * (1 - R.zoom);
     }
     z.style.transform = R.zoom !== 1 ? `translate(${R.zx}px, ${R.zy}px) scale(${R.zoom})` : "";
+    z.style.setProperty("--iz", 1 / R.zoom);   // lines drawn over the pages (the word outlines) stay as thin at any zoom
     st.classList.toggle("zoomed", R.zoom > 1);
     // While you zoom or pan, the layer moves as one picture (will-change, in the CSS), drawn at the size it had when
     // you began; once you stop, it is drawn again at the size it has now, or zoomed pages would stay as blurry as at
@@ -904,7 +905,7 @@ const Reader = {
       }
     }, { passive: false });
     stage.addEventListener("dblclick", e => {
-      if (e.target.closest("button")) return;
+      if (e.target.closest("button") || TextUI.mod?.justPicked()) return;   // a click that just picked a word (text.js)
       const r = stage.getBoundingClientRect();
       if (R.zoom !== 1) this.resetZoom(); else this.zoomAt(2.5, e.clientX - r.left, e.clientY - r.top);
     });
@@ -1485,6 +1486,7 @@ const TextUI = {
     el.hidden = !this.open;
     b.classList.toggle("on", this.open);
     b.setAttribute("aria-pressed", String(this.open));
+    if (!this.open) this.mod?.undecorate();   // the words on the photographs go with the text
     this.sync();
   },
   /* the panel follows the opening (cheap when nothing changed) */
@@ -1995,14 +1997,14 @@ const Info = {
         h("p", {}, "Nobody can read the manuscript's writing, but people can still study it. To do that, they copy it out glyph by glyph (a ", h("b", {}, "glyph"), " is one written shape) into letters a computer can count and search. A copy like that is a ", h("b", {}, "transcription"), "."),
         h("p", {}, "Most transcriptions use ", h("b", {}, "Eva"), ", an alphabet René Zandbergen and Gabriel Landini made for the manuscript in the 1990s. Each Eva letter is a name for a shape, picked because it looks a little like it: ", h("i", {}, "o"), " is a small circle, ", h("i", {}, "ch"), " two joined c's, ", h("i", {}, "k"), " and ", h("i", {}, "t"), " are tall loops called gallows. ",
           h("b", {}, "The letters are not sounds."), " “daiin” is a way of writing down which shapes are on the page, not a word anyone knows how to say."),
-        h("p", {}, "In the Reader, press ", h("kbd", {}, "T"), " (or the Text button) to see the text of the pages beside them. The ", h("b", {}, "Glyphs"), " switch shows it in the manuscript's own shapes, each word with its Eva underneath. ",
-          this.link("#read/beinecke/1r/text", "Try it on the first page"))),
+        h("p", {}, "In the Reader, press ", h("kbd", {}, "T"), " (or the Text button), then point at any word on the page: it is outlined and says what it reads. Click it for the word on its own: a sharp picture of it from Yale's photograph, how each transcriber read it, and where else it appears. The text of the pages is beside them; the ", h("b", {}, "Glyphs"), " switch shows it in the manuscript's own shapes. ",
+          this.link("#read/beinecke/2r/text", "Try it on 2r"))),
       this.sec("consensus", "One text from many",
         h("p", {}, "Copying unknown glyphs is hard, and careful people disagree: is this an ", h("i", {}, "a"), " or an ", h("i", {}, "o"), "? Is that a space between two words, or just a wider gap? So the viewer does not pick one transcription. It lines up as many as twelve independent ones, glyph by glyph, and lets each person vote once on every glyph and every space. The reading with the most votes is the ", h("b", {}, "consensus"), ", and that is the text you see."),
         h("ul", {},
-          h("li", {}, "A ", h("b", {}, "dotted gold underline"), " marks a glyph where the vote is split: a tie, or no reading with more than half the votes. You can ask for every disagreement to be marked, or none."),
-          h("li", {}, "A ", h("b", {}, "gold dot"), " between glyphs is an ", h("b", {}, "uncertain space"), ": about half of the transcribers wrote a space there. Searches count it either way unless you say otherwise."),
-          h("li", {}, h("b", {}, "Click any word"), " to see how each person read it, and the votes. Nothing is thrown away: every reading is kept, and you can read the page as any one transcriber read it instead. The ", h("b", {}, "Interlinear"), " (", h("kbd", {}, "I"), ") shows them all under each other."),
+          h("li", {}, "A small ", h("b", {}, "orange dot"), " under a glyph in the text marks a split vote: a tie, or no reading with more than half the votes. ", h("kbd", {}, "N"), " goes to the next one. The dots can be turned off in the text's ⋯ menu."),
+          h("li", {}, "A faint ", h("b", {}, "·"), " between glyphs is an ", h("b", {}, "uncertain space"), ": about half of the transcribers wrote a space there. Searches count it either way unless you say otherwise."),
+          h("li", {}, h("b", {}, "Click any word"), ", on the page or in the text, to see how each person read it and the votes, and one step further, how each of them wrote the whole line. Nothing is thrown away: every reading is kept, and you can compare the page with any one transcriber's reading (⋯ menu, or click a name)."),
           h("li", {}, "A tie goes to the transcriber who covered most of the book, and stays marked as a tie. Where someone could not read a glyph, or Glen Claston wrote one of his in-between glyphs (“a circle-type glyph, not saying which”), they do not vote on it."),
           h("li", {}, "Two well-known versions are shown for comparison but do not vote, because they are built from others: RF1, Zandbergen's merge of his own and Claston's, and the text of voynichese.com, which is Takahashi's.")),
         h("p", {}, "The consensus is a tool, not the truth: the truth is the parchment. The method is written out in full, with worked examples, in the viewer's design notes (docs/TEXT.md).")),
@@ -2014,11 +2016,12 @@ const Info = {
             ["dy-qo  dy_qo  dy~qo", "joined, across a word break, or either"], ["^qo*  *dy$", "first or last in a line"], ["A A", "the same word twice in a row"],
             ["/qo[kt]e+dy/", "a regular expression over each line"], ["scribe:2  lang:B  section:balneo  quire:13  in:label  page:f75r-f84v", "filters"]]
             .flatMap(([t, d]) => [h("dt", { class: "mono" }, t), h("dd", {}, d)])),
-        h("p", {}, "Counts come with a range, like “826 · 817–826”: the same search in the three fullest transcriptions (Zandbergen & Landini's, Claston's, Takahashi's), so you can see how much a count depends on who did the copying. The strip of bars is the book in the order chosen at the top; the narrowing on the left, the saved searches and the exports keep to what you have chosen. ",
+        h("p", {}, "The count is said in one sentence; its ⓘ gives the same search in the three fullest transcriptions alone (Zandbergen & Landini's, Claston's, Takahashi's), so you can see how much a count depends on who did the copying. The strip is the book page by page, in the order chosen at the top, with its sections named under it; the narrowing on the left, the saved searches and the exports keep to what you have chosen. ",
           this.link("#text/beinecke/search?q=qok*", "Try qok*"))),
       this.sec("transcribers", "Who made the text",
         h("p", {}, "The text is the work of the people who transcribed the manuscript, over eighty years: René Zandbergen and Gabriel Landini; Glen Claston; Takeshi Takahashi; the First Study Group led by William Friedman; Prescott Currier and Mary D'Imperio; Jorge Stolfi; John Grove; John Tiltman; Don Latham; Theodore Petersen (from Karl Kluge's copy); Mike Roe; and Denis Mardle."),
         h("p", {}, "Their transcriptions come from René Zandbergen's ", h("a", { href: "https://www.voynich.nu/transcr.html", target: "_blank", rel: "noopener" }, "voynich.nu"), ", which makes them available under the CC0 licence, and from the Landini–Stolfi interlinear file. Zandbergen also wrote the alphabet the viewer compares them in (his STA). The viewer's own work is the lining up and the vote; any mistake in that is the viewer's."),
+        h("p", {}, "Where each word sits on the page comes from The Voynichese Project's word boxes (2014, Apache License 2.0), which the viewer fits to Yale's photographs; on the round diagrams, where the words go round, some words have none yet."),
         h("p", {}, "The glyphs are drawn with ", h("b", {}, "Voynich VV"), ": Glen Claston's Voynich font (2005, given to the public domain; William Porquet fixed it for Unicode), with 89 rare glyphs added for this viewer from Claston's own shapes.")),
 
       // ---------------------------------------------------------------- reference
@@ -2053,7 +2056,7 @@ const Info = {
 
       this.sec("sources", "Sources",
         h("ul", { class: "info-src" }, Object.keys(D.orders.sources).map(k => h("li", {}, cite(k)))),
-        h("p", { class: "small muted" }, "Scribes and section names: Davis. Illustration type and Currier language: the page labels of Zandbergen's transliteration file. The text: the transcriptions on voynich.nu and the Landini–Stolfi interlinear (see “Who made the text”). 3D drawing: three.js (MIT licence)."),
+        h("p", { class: "small muted" }, "Scribes and section names: Davis. Illustration type and Currier language: the page labels of Zandbergen's transliteration file. The text: the transcriptions on voynich.nu and the Landini–Stolfi interlinear (see “Who made the text”). Where each word is on the photographs: The Voynichese Project's word boxes (2014, Apache License 2.0), fitted to Yale's photographs. 3D drawing: three.js (MIT licence)."),
         h("p", { class: "small muted" }, `Voynich Viewer ${APP_VERSION} is an independent project. It is not made or endorsed by Yale University or by Lisa Fagin Davis.`)),
 
       this.privacySec());

@@ -1,5 +1,6 @@
-/* Text: the transcriptions of the manuscript, beside its pages in the Reader. Loaded the first time the panel opens
-   (TextUI in app.js), and uses app.js's helpers (h, $, $$, store, toast, R, Reader, ...).
+/* Text: the transcriptions of the manuscript, tied to its pages in the Reader (docs/text/REDESIGN.md). Point at any word
+   on a page photograph for its reading; click it for the word panel. Loaded the first time the text opens (TextUI in
+   app.js), and uses app.js's helpers (h, $, $$, store, toast, R, Reader, ...).
 
    The data is built offline by tools/text/ (docs/TEXT.md). For every line of the manuscript (a "locus", as IVTFF calls
    it: f1r.2 is the second line of f1r) it holds the consensus of independent transcriptions, voted glyph by glyph, and
@@ -66,25 +67,6 @@ const KINDS = { P: ["Paragraphs", "line", "lines"], L: ["Labels", "label", "labe
 const kindOf = loc => KINDS[loc.t[0]] ? loc.t[0] : "P";
 const plural = (n, k) => `${n} ${n === 1 ? KINDS[k][1] : KINDS[k][2]}`;
 
-/* What a mark means. Units (columns of the vote): t tie, p plurality, m majority, n none, s single, u unanimous (kept
-   only because a reference reads it otherwise). Gaps: u uncertain, m most wrote a space, d doubted (one wrote an
-   uncertain space), f few wrote a space. */
-const SAY = {
-  t: "readings differ: a tie", p: "readings differ: most read it so, but fewer than half",
-  m: "readings differ: more than half read it so", n: "nobody could read it", s: "only one transcriber read it",
-};
-const GAP_SAY = {
-  u: "uncertain space: about half wrote a space here", m: "most wrote a space here, not all",
-  d: "one transcriber wrote an uncertain space here", f: "some wrote a space here, most did not",
-};
-/* Which marks show: quietly only where the vote is really split; or every disagreement; or none. The uncertain space is
-   part of the text, so it always shows. */
-const MARKS = {
-  quiet: { units: "tpn", gaps: "" },
-  every: { units: "tpnm", gaps: "mdf" },
-  none: { units: "", gaps: "" },
-};
-
 /* A locus as words of glyphs. The consensus comes twice: c in Eva and g in Zandbergen's STA codes, two characters a
    glyph (P2A3K1…), with the same separators; each glyph's Eva is its rare-glyph code or glyphs.json's. Offsets are
    into c, as the data's are. */
@@ -107,21 +89,6 @@ export function words(loc) {
     w.eva = loc.c.slice(w.off, w.end);
   }
   return (loc._words = out);
-}
-
-/* the marks of a locus under a setting: glyph offset -> unit status; boundary offset -> gap status; and the
-   zero-width units (an empty reading that won) at their offsets */
-function marksOf(loc, how) {
-  const set = MARKS[how] || MARKS.quiet;
-  const glyph = new Map(), gap = new Map(), empty = new Map();
-  for (const u of loc.u) {
-    const [o, len, st] = u;
-    if (!set.units.includes(st)) continue;
-    if (len === 0) empty.set(o, st);
-    for (let i = o; i < o + len; i++) glyph.set(i, st);
-  }
-  for (const [o, st] of loc.s) if (set.gaps.includes(st)) gap.set(o, st);
-  return { glyph, gap, empty };
 }
 
 /* Where the data keeps a column or a gap that is not everyone's: column start -> unit, offset -> the zero-width units
@@ -203,8 +170,6 @@ const ROUGH = "This transcriber's line lines up with the others only roughly her
 const ORD = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
 const nth = k => ORD[k] || `${k + 1}th`;
 const votes = v => Number.isInteger(v) ? String(v) : v.toFixed(1);
-const STATUS = { m: "a majority", p: "the most votes, not a majority", t: "a tie, broken by the order of transcribers",
-  n: "nobody could read it", s: "only one read it", u: "everyone who voted" };
 
 /* how often a word is in the consensus of the whole book, from index.json (loaded on first use) */
 const Count = {
@@ -225,51 +190,146 @@ const Count = {
   },
 };
 
+/* ---- word positions on the photographs (data/text/boxes, tools/text/boxes.py) ---- */
+const Boxes = {
+  pages: null,
+  async list() {
+    if (!this.pages) this.pages = new Set(await load("boxes/pages.json").catch(() => []));
+    return this.pages;
+  },
+  /* page -> Map("li:wi" -> [x, y, w, h] in thousandths of the page image), or null when it has none */
+  async of(page) {
+    const list = await this.list();
+    if (!list.has(page)) return null;
+    const b = await load(`boxes/${encodeURIComponent(page)}.json`).catch(() => null);
+    return b ? (b._map ||= new Map(b.words.map(([li, wi, ...r]) => [li + ":" + wi, r]))) : null;
+  },
+};
+
+const DIFFER = "tpn";   // a split vote: a tie, the most votes without a majority, or nobody could read it
+const key = (page, li, wi) => `${page}|${li}|${wi}`;
+const unkey = k => { const [page, li, wi] = k.split("|"); return { page, li: +li, wi: +wi }; };
+/* the columns of the vote inside word w of a locus */
+function unitsIn(loc, w) {
+  return loc.u.filter(u => u[1] ? u[0] >= w.off && u[0] < w.end : u[0] > w.off && u[0] < w.end);
+}
+/* the glyphs of a word where the vote is split */
+const disputed = (loc, w) => unitsIn(loc, w).some(u => DIFFER.includes(u[2]));
+const names = list => list.length < 3 ? list.join(" and ") : list.slice(0, -1).join(", ") + " and " + list[list.length - 1];
+
+/* The word in one sentence: do the transcribers agree, and where not, how they split. */
+function verdict(loc, w) {
+  const us = unitsIn(loc, w), n = loc.w.length;
+  const glyphs = w.toks.filter(t => !t.sep);
+  const where = u => {
+    if (!u[1]) return "a glyph between two others";
+    const k = glyphs.findIndex(t => t.off >= u[0]);
+    const span = glyphs.filter(t => t.off >= u[0] && t.off < u[0] + u[1]).length;
+    return span > 1 ? `glyphs ${k + 1} to ${k + span}` : `the ${nth(k)} glyph`;
+  };
+  const read = r => r[0] ? h("b", { class: "mono" }, r[0].replace(/,/g, "·")) : "nothing";
+  const votes_ = u => u[3].filter(r => r[1] > 0);
+  const off = us.flatMap(u => u[3].filter(r => r[1] === 0)).map(r => SHORT[r[2]]);
+  const split = us.filter(u => DIFFER.includes(u[2])), most = us.filter(u => u[2] === "m");
+  if (n === 1) return [`Only ${Data.names.get(loc.w[0]) || SHORT[loc.w[0]]} transcribed this line.`];
+  if (!split.length && !most.length)
+    return off.length ? [`Everyone who could read it agrees. ${names([...new Set(off)])} could not read part of it.`] : [`All ${n} transcribers read it this way.`];
+  if (split.length) {
+    const u = split[0], v = votes_(u), out = [];
+    if (u[2] === "n") out.push(`Nobody could read ${where(u)}.`);
+    else if (u[2] === "t") out.push(`A tie on ${where(u)}: `, ...v.slice(0, 2).flatMap((r, i) => [i ? " and " : "", read(r)]), `, ${votes(v[0][1])} each. The tie goes to the transcriber who covered most of the book.`);
+    else {
+      const tot = v.reduce((a, r) => a + r[1], 0);
+      out.push(`Transcribers differ on ${where(u)}: `, ...v.flatMap((r, i) => [i ? (i === v.length - 1 ? " and " : ", ") : "", `${votes(r[1])} of ${votes(tot)} read `, read(r)]), ".");
+    }
+    const more = split.length - 1 + most.length;
+    if (more) out.push(` They differ on ${more} more glyph${more === 1 ? "" : "s"} too.`);
+    return out;
+  }
+  const u = most[0], v = votes_(u), tot = v.reduce((a, r) => a + r[1], 0);
+  const minority = v.slice(1).map(r => u[3].filter(x => x[0] === r[0]).flatMap(x => x[2].split(" ")).map(c => SHORT[c]));
+  return [`Most agree: ${votes(v[0][1])} of ${votes(tot)} read it this way. `, ...v.slice(1).flatMap((r, i) => [i ? "; " : "", names(minority[i]), " read ", read(r), ` for ${where(u).replace(/^the /, "the ")}`]), most.length > 1 ? `, and they differ on ${most.length - 1} more.` : "."];
+}
+
+/* the characters of reading a that are not in b, marked (a plain LCS, enough for words) */
+function diffMark(a, b) {
+  const m = a.length, n = b.length, L = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = m - 1; i >= 0; i--) for (let j = n - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = [];
+  let i = 0, j = 0, run = "", diff = false;
+  const flush = () => { if (run) out.push(diff ? h("span", { class: "x" }, run) : run); run = ""; };
+  while (i < m) {
+    if (j < n && a[i] === b[j]) { if (diff) flush(); diff = false; run += a[i]; i++; j++; }
+    else if (j < n && L[i][j + 1] >= L[i + 1][j]) j++;
+    else { if (!diff) flush(); diff = true; run += a[i]; i++; }
+  }
+  flush();
+  return out;
+}
+
+/* A sharp crop of a word from Yale's full-size photograph (the Reader already loads from Yale to zoom): the page crop's
+   corners on the photograph (seg.quad) carry the word's box across. */
+function cropUrl(seg, b, px = 656) {
+  if (!seg || !seg.iiif || !seg.quad || seg.rotate || seg.custom) return null;
+  const [q0, q1, q2, q3] = seg.quad;
+  const at = (u, v) => [0, 1].map(k => (1 - u) * (1 - v) * q0[k] + u * (1 - v) * q1[k] + u * v * q2[k] + (1 - u) * v * q3[k]);
+  const [x, y, w, hh] = b.map(v => v / 1000);
+  const u0 = Math.max(0, x - w * .35), u1 = Math.min(1, x + w * 1.35), v0 = Math.max(0, y - hh * .9), v1 = Math.min(1, y + hh * 1.9);
+  const pts = [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)];
+  const X0 = Math.round(Math.min(...pts.map(p => p[0]))), X1 = Math.round(Math.max(...pts.map(p => p[0])));
+  const Y0 = Math.round(Math.min(...pts.map(p => p[1]))), Y1 = Math.round(Math.max(...pts.map(p => p[1])));
+  return `${YALE_IIIF}${encodeURIComponent(seg.iiif)}/${X0},${Y0},${X1 - X0},${Y1 - Y0}/${px},/0/default.jpg`;
+}
+
 const T = {
   el: null, onShow: "", gen: 0,
-  reading: "cons",   // whose reading the lines show: the consensus, or a transcriber's code
-  loaded: new Map(),   // page -> its data, for the pages on show
-  marks: store.get("text:marks", "quiet"),
-  font: store.get("text:font", "eva"),   // "eva" or "glyphs"
-  view: store.get("text:view", "lines"),   // "lines" or "inter" (interlinear: every transcriber, column by column)
-  hide: new Set(store.get("text:hide", [])),   // transcribers' rows hidden in the interlinear
-  collapse: store.get("text:collapse", false),   // interlinear: lines everyone reads alike show the consensus only
-  query: "",   // the address's options after "text?", kept for what reads them
+  font: store.get("text:font", "eva"),        // "eva" or "glyphs"
+  dots: store.get("text:dots", true),         // mark the glyphs where transcribers disagree
+  compare: null,                              // a transcriber's code: the page text shows their reading against the consensus
+  loaded: new Map(),                          // page -> its data, for the pages on show
+  boxes: new Map(),                           // page -> its word positions (or null)
+  segs: new Map(),                            // page -> its codex panel, for the crop
+  sel: null,                                  // the word chosen: "page|li|wi"
+  hov: null,                                  // the word pointed at
+  ask: null,                                  // a search result asked for in the address: { l, m, hit, seen }
 
-  /* Fill the panel for the pages on show, unless they are the ones already there. */
+  /* ---- following the Reader ---- */
   async sync() {
     const el = $("#rd-text");
-    if (!el || el.hidden || !R.spreads) return;
+    if (!el || el.hidden || !R.spreads) { this.undecorate(); return; }
     const shown = this.shown();
-    const key = JSON.stringify([shown.map(x => x.page), this.marks, this.reading, this.font, this.view, [...this.hide], this.collapse]);
-    if (el === this.el && key === this.onShow) return;
-    this.el = el; this.onShow = key;
+    const key_ = JSON.stringify([shown.map(x => x.page || x.folded), this.font, this.dots, this.compare]);
+    if (!el.firstChild || el !== this.el) { this.el = el; this.frame(el); this.onShow = ""; }
+    if (key_ === this.onShow) { this.decorate(); return; }
+    this.onShow = key_;
     const gen = ++this.gen;
-    if (!el.firstChild) this.frame(el);
-    const body = $(".tx-body", el);
-    if (!Data.meta) body.replaceChildren(h("p", { class: "tx-msg" }, "Loading the text…"));
+    if (!Data.meta) $(".tx-body", el).replaceChildren(h("p", { class: "tx-msg" }, "Loading the text…"));
     try {
       await Data.base();
-      const pages = await Promise.all(shown.filter(x => Data.has(x.page)).map(x => Data.page(x.page).then(d => ({ ...x, d }))));
+      const pages = shown.filter(x => x.page && Data.has(x.page));
+      const got_ = await Promise.all(pages.map(async x => [x.page, await Data.page(x.page), await Boxes.of(x.page)]));
       if (gen !== this.gen) return;
-      this.loaded = new Map(pages.map(x => [x.page, x.d]));
-      this.render(body, shown, pages);
+      this.loaded = new Map(got_.map(([p, d]) => [p, d]));
+      this.boxes = new Map(got_.map(([p, , b]) => [p, b]));
+      this.segs = new Map(pages.map(x => [x.page, x.seg]));
+      this.shownNow = shown;
+      if (this.sel && !this.loaded.has(unkey(this.sel).page)) { this.sel = null; setHash(); }
+      this.show();
+      this.decorate();
+      this.light();
     } catch (e) {
       if (gen !== this.gen) return;
       this.onShow = "";
-      body.replaceChildren(h("p", { class: "tx-msg" }, "The text could not be loaded (" + e.message + ")."));
+      $(".tx-body", el).replaceChildren(h("p", { class: "tx-msg" }, "The text could not be loaded (" + e.message + ")."));
     }
   },
 
-  /* The pages on show, left to right: each visible panel of each page side, with that side for its facts; and the
-     panels folded in, which show when the page is unfolded. */
+  /* the pages on show, left to right, with the panels folded away inside them */
   shown() {
     const out = [];
-    const sp = R.spreads[R.at] || [];
-    sp.forEach((p, i) => {
+    (R.spreads[R.at] || []).forEach((p, i) => {
       if (!p || p.lost) return;
-      const side = i === 0 ? "L" : "R";
-      const open = R.unfold[side];
+      const side = i === 0 ? "L" : "R", open = R.unfold[side];
       const vis = Reader.pageParts(p, side, open).segs.filter(s => !s.missing);
       for (const seg of vis) out.push({ page: seg.page, seg, side: p });
       if (!open && !p.grid && p.segs.length > 1) {
@@ -280,66 +340,24 @@ const T = {
     return out;
   },
 
-  /* the panel's frame: its head with the settings, and the body that scrolls */
   frame(el) {
-    const marks = h("select", { class: "tx-sel tx-marks", "aria-label": "Marks in the text", title: "Mark the text where the transcribers' vote is split, wherever anyone differs, or nowhere",
-      onchange: e => { this.marks = e.target.value; store.set("text:marks", this.marks); this.sync(); } },
-      h("option", { value: "quiet" }, "Marks: split votes"),
-      h("option", { value: "every" }, "Marks: every difference"),
-      h("option", { value: "none" }, "Marks: none"));
-    marks.value = this.marks;
-    const reading = h("select", { class: "tx-sel tx-reading", "aria-label": "Whose reading",
-      onchange: e => { this.reading = e.target.value; this.closeCard(); this.sync(); setHash(); } });
-    const fonts = h("div", { class: "tx-seg", role: "group", "aria-label": "Show the text as" },
-      [["eva", "Eva", "The text in Eva letters, names for the shapes"], ["glyphs", "Glyphs", "The text in the manuscript's own glyphs, with their Eva under each word"]]
-        .map(([v, t, title]) => h("button", { "data-font": v, title, "aria-pressed": String(this.font === v), onclick: () => this.setFont(v) }, t)));
-    const views = h("div", { class: "tx-seg", role: "group", "aria-label": "Lines or interlinear" },
-      [["lines", "Lines", "The text, line by line (I)"], ["inter", "Interlinear", "Every transcriber under the consensus, glyph by glyph (I)"]]
-        .map(([v, t, title]) => h("button", { "data-view": v, title, "aria-pressed": String(this.view === v), onclick: () => this.setView(v) }, t)));
     el.replaceChildren(
-      h("div", { class: "tx-grip", role: "separator", tabindex: "0", "aria-label": "Resize the text panel",
-        "aria-orientation": "vertical" }),
-      h("div", { class: "tx-head" },
-        h("div", { class: "tx-ctl" }, views, fonts, reading, marks,
-          h("a", { class: "tx-srch", href: `#text/${encodeURIComponent(S.order)}/search`, title: "Search the whole book's text (/)" }, "Search"),
-          h("button", { class: "tx-x", title: "Close the text (T)", "aria-label": "Close the text", onclick: () => TextUI.toggle(false) }, "✕"))),
+      h("div", { class: "tx-grip", role: "separator", tabindex: "0", "aria-label": "Resize the text panel", "aria-orientation": "vertical" }),
+      h("div", { class: "tx-head" }),
       h("div", { class: "tx-step", hidden: true, role: "navigation", "aria-label": "Search results" }),
       h("div", { class: "tx-body", tabindex: "-1" }));
     this.grip($(".tx-grip", el), el);
     const body = $(".tx-body", el);
     body.addEventListener("click", e => {
-      const w = e.target.closest(".w");
-      if (w) this.openCard(w, true);
+      const w = e.target.closest(".w[data-k]");
+      if (w) this.pick(w.dataset.k);
     });
     body.addEventListener("keydown", e => {
-      if ((e.key === "Enter" || e.key === " ") && e.target.matches(".w")) { e.preventDefault(); this.openCard(e.target, true); }
+      if ((e.key === "Enter" || e.key === " ") && e.target.matches(".w[data-k]")) { e.preventDefault(); this.pick(e.target.dataset.k); }
     });
-    if (matchMedia("(hover: hover)").matches) {
-      body.addEventListener("pointerover", e => {
-        const w = e.target.closest(".w.mk");
-        clearTimeout(this.hoverT);
-        if (w && (!this.card || this.card.word !== w)) this.hoverT = setTimeout(() => { if (!this.card || !this.card.pinned) this.openCard(w, false); }, 300);
-      });
-      body.addEventListener("pointerout", e => {
-        clearTimeout(this.hoverT);
-        if (this.card && !this.card.pinned && !e.relatedTarget?.closest?.(".tx-card")) this.leaveT = setTimeout(() => this.card && !this.card.pinned && this.closeCard(), 250);
-      });
-    }
-  },
-
-  setView(v) {
-    this.view = v;
-    store.set("text:view", v);
-    for (const b of $$(".tx-seg button[data-view]", this.el)) b.setAttribute("aria-pressed", String(b.dataset.view === v));
-    this.closeCard(false);
-    this.sync();
-  },
-  setFont(v) {
-    this.font = v;
-    store.set("text:font", v);
-    for (const b of $$(".tx-seg button[data-font]", this.el)) b.setAttribute("aria-pressed", String(b.dataset.font === v));
-    this.closeCard(false);
-    this.sync();
+    body.addEventListener("pointerover", e => { const w = e.target.closest(".w[data-k]"); if (w) this.hover(w.dataset.k, false); });
+    body.addEventListener("pointerout", e => { if (e.target.closest(".w[data-k]") && !e.relatedTarget?.closest?.(".w[data-k]")) this.hover(null); });
+    this.wireStage();
   },
 
   /* Drag the panel's edge to make it wider (beside the pages) or taller (below them, on a phone); arrow keys too. */
@@ -355,8 +373,8 @@ const T = {
     const set = (dim, v) => {
       const row = $("#rd-row").getBoundingClientRect();
       const s = { ...store.get("text:size", {}) };
-      if (dim === "w") s.w = Math.round(Math.max(300, Math.min(row.width * .62, v)));
-      else s.hh = Math.round(Math.max(120, Math.min(row.height - 140, v)));
+      if (dim === "w") s.w = Math.round(Math.max(300, Math.min(row.width * .5, v)));
+      else s.hh = Math.round(Math.max(140, Math.min(row.height - 140, v)));
       store.set("text:size", s);
       apply();
     };
@@ -380,421 +398,392 @@ const T = {
     apply();
   },
 
-  render(body, shown, pages) {
-    this.closeCard();
-    const byPage = new Map(pages.map(x => [x.page, x.d]));
-    const here = new Set();
-    for (const x of pages) for (const l of x.d.loci) { l.w.forEach(n => here.add(n)); for (const n in l.r || {}) if (isRef(n)) here.add(n); }
-    const sel = $(".tx-reading", this.el);
-    if (this.reading !== "cons" && !here.has(this.reading)) here.add(this.reading);
-    sel.replaceChildren(h("option", { value: "cons" }, "The consensus"),
-      h("optgroup", { label: "One transcriber" }, Data.meta.voters.filter(v => here.has(v.code)).map(v => h("option", { value: v.code }, SHORT[v.code]))),
-      h("optgroup", { label: "For comparison" }, Data.meta.references.filter(v => here.has(v.code)).map(v => h("option", { value: v.code }, SHORT[v.code]))));
-    sel.value = this.reading;
+  /* ---- the words on the photographs ---- */
+  /* A layer of word boxes over each page on show (inside the page, so it zooms and pans with it). Drawn again whenever
+     the Reader draws the opening. */
+  decorate() {
+    for (const segEl of $$("#rd-zoomer .spread .seg[data-page]")) {
+      const page = segEl.dataset.page, b = this.boxes.get(page), seg = this.segs.get(page);
+      if (!b || !seg || seg.custom || seg.rot) { $(".seg-words", segEl)?.remove(); continue; }
+      let layer = $(".seg-words", segEl);
+      if (!layer || layer.dataset.n !== String(b.size)) {
+        layer?.remove();
+        layer = h("div", { class: "seg-words", "data-n": b.size, "aria-hidden": "true" });
+        for (const [k, [x, y, w, hh]] of b) {
+          const [li, wi] = k.split(":");
+          layer.append(h("i", { class: "wb", "data-k": key(page, li, wi), style: { left: x / 10 + "%", top: y / 10 + "%", width: w / 10 + "%", height: hh / 10 + "%" } }));
+        }
+        segEl.append(layer);
+      }
+    }
+    this.marks();
+  },
+  undecorate() {
+    $$("#rd-zoomer .seg-words").forEach(l => l.remove());
+    $("#rd-zoomer .spread")?.classList.remove("has-sel");
+    $("#tx-tip")?.remove();
+  },
+  /* the chosen and pointed-at word, wherever it shows: on the photograph and in the text */
+  marks() {
+    const sp = $("#rd-zoomer .spread");
+    $$("#rd-zoomer .wb.sel, #rd-zoomer .wb.hov").forEach(b => b.classList.remove("sel", "hov"));
+    $$("#rd-zoomer .seg.sel-seg").forEach(s => s.classList.remove("sel-seg"));
+    const selBox = this.sel && $(`#rd-zoomer .wb[data-k="${CSS.escape(this.sel)}"]`);
+    if (selBox) { selBox.classList.add("sel"); selBox.closest(".seg").classList.add("sel-seg"); }
+    sp?.classList.toggle("has-sel", !!selBox);
+    if (this.hov && this.hov !== this.sel) $(`#rd-zoomer .wb[data-k="${CSS.escape(this.hov)}"]`)?.classList.add("hov");
+    if (this.el) {
+      $$(".tx-body .w.lit, .tx-body .w.sel", this.el).forEach(w => w.classList.remove("lit", "sel"));
+      if (this.sel) $(`.tx-body .w[data-k="${CSS.escape(this.sel)}"]`, this.el)?.classList.add("sel");
+      if (this.hov) $(`.tx-body .w[data-k="${CSS.escape(this.hov)}"]`, this.el)?.classList.add("lit");
+    }
+  },
+  /* Point at a word: it is outlined on the photograph and lit in the text, and says in one line what it is. */
+  hover(k, onPhoto = true) {
+    if (k === this.hov) return;
+    this.hov = k;
+    this.marks();
+    const tip = $("#tx-tip");
+    if (!k || !onPhoto || (this.sel && k === this.sel)) { tip?.remove(); return; }
+    const box = $(`#rd-zoomer .wb[data-k="${CSS.escape(k)}"]`), it = this.item(k);
+    if (!box || !it) { tip?.remove(); return; }
+    const st = $("#rd-stage"), r = box.getBoundingClientRect(), sr = st.getBoundingClientRect();
+    const t = tip || h("div", { id: "tx-tip", class: "tx-tip", role: "status" });
+    const glyph = this.font === "glyphs";
+    t.replaceChildren(h("b", { class: glyph ? "gl" : "" }, glyph ? it.w.toks.map(x => x.sep ? " " : chOf(x.code)).join("") : it.w.eva.replace(/,/g, "·")),
+      glyph ? h("span", { class: "ev" }, it.w.eva.replace(/,/g, "·")) : "",
+      h("span", { class: "say" }, this.short(it)), h("span", { class: "chev", "aria-hidden": "true" }, "›"));
+    if (!tip) st.append(t);
+    t.style.left = Math.max(80, Math.min(sr.width - 80, r.left - sr.left + r.width / 2)) + "px";
+    t.style.top = Math.max(44, r.top - sr.top) + "px";
+  },
+  short(it) {
+    const us = unitsIn(it.loc, it.w), n = it.loc.w.length;
+    if (n === 1) return "one transcriber";
+    if (us.some(u => DIFFER.includes(u[2]))) return "transcribers differ";
+    if (us.some(u => u[2] === "m")) return "most agree";
+    return `all ${n} agree`;
+  },
+  /* Clicks on the photograph: a click that does not drag picks the word under it; one on bare parchment lets go. */
+  wireStage() {
+    const st = $("#rd-stage");
+    if (st.dataset.words) return;
+    st.dataset.words = "1";
+    let down = null;
+    st.addEventListener("pointerover", e => { if (TextUI.open && e.pointerType === "mouse") { const b = e.target.closest(".wb"); if (b) this.hover(b.dataset.k); } });
+    st.addEventListener("pointerout", e => { if (e.target.closest(".wb") && !e.relatedTarget?.closest?.(".wb")) this.hover(null); });
+    st.addEventListener("pointerdown", e => { down = { x: e.clientX, y: e.clientY, t: Date.now() }; $("#tx-tip")?.remove(); });
+    st.addEventListener("wheel", () => { if (this.hov) this.hover(null); }, { passive: true });
+    st.addEventListener("pointerup", e => {
+      if (!TextUI.open || !down || e.button !== 0) return;
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), long = Date.now() - down.t;
+      down = null;
+      if (moved > 5 || long > 700 || e.target.closest("button")) return;
+      const b = document.elementsFromPoint(e.clientX, e.clientY).find(x => x.classList?.contains("wb"));
+      if (b) { this.picked = Date.now(); this.pick(b.dataset.k, { from: "photo" }); }
+      else if (this.sel && document.elementsFromPoint(e.clientX, e.clientY).some(x => x.classList?.contains("seg"))) this.unpick();
+    });
+  },
+  /* the Reader's double-click zoom leaves alone a click that just picked a word */
+  justPicked() { return Date.now() - (this.picked || 0) < 450; },
+
+  /* ---- choosing a word ---- */
+  item(k) {
+    const { page, li, wi } = unkey(k), d = this.loaded.get(page);
+    const loc = d && d.loci[li];
+    if (!loc) return null;
+    return { page, li, wi, loc, w: words(loc)[wi], d };
+  },
+  pick(k, { from = "text", zoom = true } = {}) {
+    if (!this.item(k)) return;
+    this.sel = k;
+    $("#tx-tip")?.remove();
+    this.show();
+    this.marks();
+    if (zoom) this.frameWord(k, from === "photo");
+    setHash();
+  },
+  unpick() {
+    if (!this.sel) return;
+    const k = this.sel;
+    this.sel = null;
+    this.show();
+    this.marks();
+    setHash();
+    $(`.tx-body .w[data-k="${CSS.escape(k)}"]`, this.el)?.scrollIntoView({ block: "nearest" });
+  },
+  /* Bring the word into view: zoomed in until it is about 48 px tall if it is smaller than 36 (at most 4x), and moved to
+     the middle of the room the panel leaves. A word picked on the photograph is only zoomed if it is small. */
+  frameWord(k, fromPhoto) {
+    const box = $(`#rd-zoomer .wb[data-k="${CSS.escape(k)}"]`);
+    if (!box) return;
+    const st = $("#rd-stage"), sr = st.getBoundingClientRect(), r = box.getBoundingClientRect();
+    const z0 = R.zoom, z1 = r.height < 36 ? Math.min(4, MAX_ZOOM, Math.max(z0, z0 * 48 / Math.max(4, r.height))) : z0;
+    const inView = r.left > sr.left + 30 && r.right < sr.right - 30 && r.top > sr.top + 30 && r.bottom < sr.bottom - 30;
+    if (fromPhoto && z1 === z0 && inView) return;
+    const px = (r.left + r.width / 2 - sr.left - R.zx) / z0, py = (r.top + r.height / 2 - sr.top - R.zy) / z0;   // the word's centre, unzoomed
+    R.zoom = z1; R.zx = sr.width / 2 - px * z1; R.zy = sr.height / 2 - py * z1;
+    const z = $("#rd-zoomer");
+    if (!REDUCED) { z.style.transition = "transform .3s ease"; setTimeout(() => { z.style.transition = ""; }, 320); }
+    Reader.applyZoom();
+  },
+  /* every word on show, in reading order, for ‹ › */
+  order() {
+    const out = [];
+    for (const [page, d] of this.loaded) d.loci.forEach((loc, li) => words(loc).forEach((w, wi) => out.push(key(page, li, wi))));
+    return out;
+  },
+  stepWord(d) {
+    const all = this.order(), i = all.indexOf(this.sel);
+    if (i < 0) return;
+    const next = all[i + d];
+    if (next) this.pick(next, { from: "step" });
+  },
+  /* N / Shift+N: the next or previous word where transcribers disagree */
+  stepDispute(d) {
+    const all = this.order().filter(k => { const it = this.item(k); return disputed(it.loc, it.w); });
+    if (!all.length) { toast("Transcribers agree on every word here"); return; }
+    const flat = this.order(), at = this.sel ? flat.indexOf(this.sel) : (d > 0 ? -1 : flat.length);
+    const next = d > 0 ? all.find(k => flat.indexOf(k) > at) || all[0] : [...all].reverse().find(k => flat.indexOf(k) < at) || all[all.length - 1];
+    this.pick(next, { from: "step" });
+  },
+
+  /* ---- the panel ---- */
+  show() {
+    if (!this.el) return;
+    const body = $(".tx-body", this.el);
+    const keep = this.sel ? 0 : this.pageScroll || 0;
+    if (!this.sel) this.pageView(body); else { if (body.dataset.view === "page") this.pageScroll = body.scrollTop; this.wordView(body); }
+    body.dataset.view = this.sel ? "word" : "page";
+    body.scrollTop = this.sel ? 0 : keep;
+  },
+
+  /* The text of the pages on show: plain lines, one mark (a dot under a glyph where transcribers disagree). */
+  pageView(body) {
+    const head = $(".tx-head", this.el);
+    const pages = [...this.loaded.keys()];
+    const fonts = h("div", { class: "tx-seg", role: "group", "aria-label": "Show the text as" },
+      [["eva", "Eva", "The text in Eva letters, names for the shapes"], ["glyphs", "Glyphs", "The text in the manuscript's own glyphs"]]
+        .map(([v, t, title]) => h("button", { title, "aria-pressed": String(this.font === v), onclick: () => { this.font = v; store.set("text:font", v); this.sync(); } }, t)));
+    head.replaceChildren(h("span", { class: "tx-title" }, pages.map(short).join(" · ") || "Text"), h("span", { class: "sp" }), fonts,
+      this.menu(), h("button", { class: "tx-ic", title: "Close the text (T)", "aria-label": "Close the text", onclick: () => TextUI.toggle(false) }, "✕"));
     const kids = [];
-    for (const x of shown) {
+    if (this.compare) kids.push(h("div", { class: "tx-cmp" }, `Comparing with ${Data.names.get(this.compare) || SHORT[this.compare]}: words read the same way are faded.`,
+      h("button", { class: "tx-link", onclick: () => this.setCompare(null) }, "Stop")));
+    for (const x of this.shownNow || []) {
       if (x.folded) {
         const n = x.folded.filter(p => Data.has(p));
         if (n.length) kids.push(h("p", { class: "tx-folded" }, `Folded in: ${n.map(short).join(", ")}. `,
           h("button", { class: "tx-link", onclick: () => Reader.toggleUnfold() }, "Unfold"), " to read ", n.length > 1 ? "them" : "it", " (U)."));
         continue;
       }
-      const d = byPage.get(x.page);
+      const d = this.loaded.get(x.page);
       if (d) kids.push(this.pageEl(d, x));
     }
     if (!kids.some(k => k.classList.contains("tx-page")))
-      kids.unshift(h("p", { class: "tx-msg" }, shown.length ? "No text on these pages." : "No text here: these leaves are lost."));
-    if (this.view === "inter") kids.unshift(this.legend(here));
+      kids.unshift(h("p", { class: "tx-msg" }, (this.shownNow || []).length ? "No text on these pages." : "No text here: these leaves are lost."));
     kids.push(this.credits());
-    const inter = this.view === "inter";
-    this.el.classList.toggle("wide", inter);
-    for (const x of $$(".tx-seg [data-font], .tx-reading, .tx-ctl select:not(.tx-reading)", this.el)) x.disabled = inter;
-    body.classList.toggle("glyph", this.font === "glyphs" && !inter);
-    body.classList.toggle("inter", inter);
+    body.classList.toggle("glyph", this.font === "glyphs");
     body.replaceChildren(...kids);
-    body.scrollTop = 0;
-    const want = R.focus && $$(".tx-page", body).find(el => short(el.dataset.page) === short(R.focus));
-    if (want && want !== body.querySelector(".tx-page")) want.scrollIntoView({ block: "start" });
-    this.light(body);
+    this.marks();
+  },
+  /* ⋯: the rarer settings, one step away */
+  menu() {
+    const here = new Set();
+    for (const d of this.loaded.values()) for (const l of d.loci) { l.w.forEach(n => here.add(n)); for (const n in l.r || {}) if (isRef(n)) here.add(n); }
+    const sel = h("select", { "aria-label": "Compare with a transcriber", onchange: e => this.setCompare(e.target.value || null) },
+      h("option", { value: "" }, "nobody"),
+      Data.meta ? Data.meta.voters.filter(v => here.has(v.code)).map(v => h("option", { value: v.code }, SHORT[v.code])) : [],
+      Data.meta ? h("optgroup", { label: "For comparison" }, Data.meta.references.filter(v => here.has(v.code)).map(v => h("option", { value: v.code }, SHORT[v.code]))) : "");
+    sel.value = this.compare || "";
+    return h("details", { class: "tx-menu" }, h("summary", { class: "tx-ic", title: "More", "aria-label": "More settings" }, "⋯"),
+      h("div", { class: "tx-menu-m" },
+        h("label", {}, h("input", { type: "checkbox", checked: this.dots, onchange: e => { this.dots = e.target.checked; store.set("text:dots", this.dots); this.sync(); } }),
+          " Mark where transcribers disagree"),
+        h("label", {}, "Compare with ", sel),
+        h("a", { href: `#text/${encodeURIComponent(S.order)}/search` }, "Search the whole book (/)"),
+        h("a", { href: "#info/beinecke/consensus" }, "How the text is made")));
+  },
+  setCompare(code) {
+    this.compare = code && (SHORT[code]) ? code : null;
+    this.sel = null;
+    this.onShow = "";
+    this.sync();
+    setHash();
   },
 
-  /* one page: a header with its facts, then its loci by kind, each kind said once */
   pageEl(d, x) {
-    const loci = d.loci, seg = x.seg;
-    const counts = {};
-    for (const l of loci) counts[kindOf(l)] = (counts[kindOf(l)] || 0) + 1;
-    const who = new Map();
-    for (const l of loci) for (const n of l.w) who.set(n, (who.get(n) || 0) + 1);
-    const order = Data.meta.voters.map(v => v.code).filter(n => who.has(n));
+    const seg = x.seg, loci = d.loci;
     const facts = [];
     for (const n of seg.scribes || []) if (SCRIBES[n]) facts.push(SCRIBES[n]);
     if (seg.vars && LANG[seg.vars.L]) facts.push(LANG[seg.vars.L]);
-    if (seg.section) facts.push(seg.section + (seg.vars && seg.vars.I === "T" ? ", text only" : ""));
-    facts.push(qWord(x.side.quire));
+    if (seg.section) facts.push(seg.section);
+    const counts = {};
+    for (const l of loci) counts[kindOf(l)] = (counts[kindOf(l)] || 0) + 1;
     const groups = [];
-    for (const l of loci) {
+    loci.forEach((l, li) => {
       const k = kindOf(l);
       let g = groups.find(x => x.k === k);
-      if (!g) groups.push(g = { k, loci: [] });
-      g.loci.push(l);
-    }
+      if (!g) groups.push(g = { k, rows: [] });
+      g.rows.push([l, li]);
+    });
     return h("section", { class: "tx-page", "data-page": d.page, "aria-label": `Text of ${short(d.page)}` },
-      h("header", { class: "tx-ph" },
-        h("h3", {}, short(d.page)),
-        h("span", { class: "tx-count" }, Object.keys(KINDS).filter(k => counts[k]).map(k => plural(counts[k], k)).join(", ")),
-        h("details", { class: "tx-who" },
-          h("summary", {}, `${order.length} transcriber${order.length === 1 ? "" : "s"}`),
-          h("ul", {}, order.map(n => h("li", {}, Data.names.get(n) || n, h("span", {}, ` ${who.get(n)} of ${loci.length}`)))),
-          h("p", {}, "Shown for comparison, without a vote: RF1, Zandbergen's merge of his and Claston's, and voynichese.com."))),
-      h("p", { class: "tx-facts" }, facts.join(" · ")),
+      h("header", { class: "tx-ph" }, h("h3", {}, short(d.page)),
+        h("span", { class: "tx-count" }, [Object.keys(KINDS).filter(k => counts[k]).map(k => plural(counts[k], k)).join(", "), ...facts].join(" · "))),
       groups.flatMap(g => [
         groups.length > 1 || g.k !== "P" ? h("h4", { class: "tx-kind" }, KINDS[g.k][0]) : null,
-        h("div", { class: `tx-lines k-${g.k}` }, g.loci.map((l, i) => this.lineEl(l, i)))]));
+        h("div", { class: `tx-lines k-${g.k}` }, g.rows.map(([l, li], i) => this.lineEl(d.page, l, li, i)))]));
   },
-
-  lineEl(loc, i) {
+  lineEl(page, loc, li, i) {
     const n = loc.id.slice(loc.id.lastIndexOf(".") + 1);
     return h("div", { class: `ln${loc.ps && i ? " ps" : ""}`, "data-id": loc.id },
-      h("button", { class: "no", title: `${loc.id}: click to copy`, "aria-label": `Line ${loc.id}, copy its name`,
-        onclick: () => copy(loc.id) }, n),
-      this.view === "inter" ? this.interOf(loc) : h("span", { class: "t" }, this.reading === "cons" ? this.textOf(loc) : this.readingText(loc, this.reading)));
+      h("span", { class: "no", title: loc.id }, n),
+      h("span", { class: "t" }, this.compare ? this.compareText(page, loc, li) : this.lineText(page, loc, li)));
   },
-
-  /* ---- the interlinear: the consensus, an agreement bar, then each transcriber, column by column ---- */
-  legend(here) {
-    const who = Data.meta.voters.filter(v => here.has(v.code)).concat(Data.meta.references.filter(v => here.has(v.code)));
-    const set = () => { store.set("text:hide", [...this.hide]); this.sync(); };
-    const shownN = who.filter(v => !this.hide.has(v.code)).length;
-    const d = h("details", { class: "tx-legend", ontoggle: e => { this.legendOpen = e.target.open; } },
-      h("summary", {}, `Key, and rows: ${shownN} of ${who.length} transcriptions shown${this.collapse ? ", lines read alike shortened" : ""}`),
-      h("p", {}, h("b", {}, "Bold"), " the consensus · dim: as the consensus · ", h("span", { class: "x" }, "x"), " differs · ",
-        h("span", { class: "mono" }, "-"), " nothing here · ", h("span", { class: "mono" }, ","), " uncertain space · ",
-        h("span", { class: "mono" }, "‿"), " joined where others break"),
-      h("fieldset", {}, h("legend", {}, "Rows"),
-        who.map(v => h("label", {}, h("input", { type: "checkbox", checked: !this.hide.has(v.code),
-          onchange: e => { e.target.checked ? this.hide.delete(v.code) : this.hide.add(v.code); set(); } }), " ", SHORT[v.code])),
-        h("label", { class: "tx-coll" }, h("input", { type: "checkbox", checked: this.collapse,
-          onchange: e => { this.collapse = e.target.checked; store.set("text:collapse", this.collapse); this.sync(); } }), " Shorten lines everyone reads alike")));
-    d.open = !!this.legendOpen;
-    return d;
-  },
-  /* the columns of a locus: glyphs everyone reads alike one by one, the columns the data keeps whole, and the zero-wide
-     ones (a glyph only some read); each with the gap before it */
-  columns(loc) {
-    const { unitAt, emptyAt, gapAt } = lookup(loc);
-    const tokAt = new Map();
-    words(loc).forEach((w, wi) => w.toks.forEach(t => { if (!t.sep) tokAt.set(t.off, { t, wi }); }));
-    const c = loc.c, cols = [];
-    let gap = null, wi = 0;
-    for (let i = 0; i <= c.length;) {
-      for (const u of emptyAt.get(i) || []) { cols.push({ o: i, len: 0, cons: "", u, wi, gap: null, before: u[5] || "" }); }
-      if (i === c.length) break;
-      const ch = c[i];
-      if (ch === "." || ch === ",") { gap = { o: i, cons: ch }; if (ch === ".") wi++; i++; continue; }
-      if (!gap && i > 0 && gapAt.has(i)) gap = { o: i, cons: "" };
-      const u = unitAt.get(i), tk = tokAt.get(i);
-      const len = u ? u[1] : tk ? tk.t.len : 1;
-      cols.push({ o: i, len, cons: c.slice(i, i + len), u, wi: tk ? tk.wi : wi, gap });
-      gap = null;
-      i += len;
-    }
-    return cols;
-  },
-  interOf(loc) {
-    const cols = this.columns(loc), { gapAt } = lookup(loc);
-    const rows = loc.w.filter(n => !this.hide.has(n)), refs = ["RF", "VT"].filter(n => present(loc, n) && !this.hide.has(n));
-    const cell = (col, n) => n === "cons" ? col.cons : col.u ? unitReading(col.u, n, col.cons) : col.cons;
-    const gapOf = (col, n) => {
-      if (col.len === 0) { const m = (col.before.match(new RegExp((n === "cons" ? "^$" : n) + "([.,\\-0])")) || [])[1]; return m == null ? null : m === "0" ? "" : m === "-" ? "." : m; }
-      if (!col.gap) return null;
-      if (n === "cons") return col.gap.cons;
-      const g = gapAt.get(col.gap.o);
-      return g && n in g.marks ? g.marks[n] : col.gap.cons;
-    };
-    const slot = cols.map((col, k) => k > 0 && (col.gap || (col.len === 0 && col.before)));
-    const width = cols.map(col => Math.max(1, col.cons.length, ...rows.concat(refs).map(n => (loc.x && n in loc.x) ? 0 : cell(col, n).length)));
-    const ws = words(loc);
-    const alike = loc.w.every(n => !(loc.x && n in loc.x) && ws.every((w, i) => !differs(readingOf(loc, n), ws, i)));
-    const share = col => { if (!col.u) return 1; const tot = col.u[3].reduce((a, r) => a + r[1], 0); const won = col.u[3].filter(r => r[0] === col.cons).reduce((a, r) => a + r[1], 0); return tot ? won / tot : 0; };
-    const seq = n => {
-      const out = [];
-      cols.forEach((col, k) => {
-        if (slot[k]) {
-          const cg = col.len === 0 ? "" : col.gap ? col.gap.cons : "", m = gapOf(col, n);
-          const show = v => v === "." ? " " : v === "," ? "," : "‿";
-          if (n === "cons") out.push(cg === "." ? " " : cg === "," ? h("span", { class: "us-c" }, ",") : h("span", { class: "d" }, "‿"));
-          else out.push(m == null || m === cg ? h("span", { class: "d" }, show(m ?? cg)) : h("span", { class: "xs", title: m === "." ? "a space here" : m === "," ? "an uncertain space here" : "no space here" }, m === "." ? "␣" : show(m)));
-        }
-        const t = cell(col, n), pad = "-".repeat(width[k] - t.length);
-        if (n === "cons") out.push(t, pad ? h("span", { class: "d" }, pad) : "");
-        else if (t === col.cons) out.push(h("span", { class: "d" }, t + pad));
-        else out.push(h("span", { class: "x" }, t || "-"), pad.length > (t ? 0 : 1) ? h("span", { class: "d" }, pad.slice(t ? 0 : 1)) : "");
-      });
-      return out;
-    };
-    // the consensus row in words, so that a click opens a word's card
-    const consRow = () => {
-      let cur = null, curW = -1;
-      const wrapped = [];
-      cols.forEach((col, k) => {
-        if (col.wi !== curW || !cur) {
-          if (slot[k]) wrapped.push(seqSlot(k));
-          cur = h("span", { class: `w${ws[col.wi] && this.diffWord(loc, col.wi) ? " mk" : ""}`, "data-o": ws[col.wi] ? ws[col.wi].off : 0, "data-e": ws[col.wi] ? ws[col.wi].eva : "" });
-          curW = col.wi;
-          wrapped.push(cur);
-        } else if (slot[k]) cur.append(seqSlot(k));
-        const t = col.cons, pad = "-".repeat(width[k] - t.length);
-        cur.append(t, pad ? h("span", { class: "d" }, pad) : "");
-      });
-      return wrapped;
-    };
-    const seqSlot = k => { const col = cols[k], cg = col.len === 0 ? "" : col.gap ? col.gap.cons : ""; return cg === "." ? " " : cg === "," ? h("span", { class: "us-c" }, ",") : h("span", { class: "d" }, "‿"); };
-    const bars = cols.flatMap((col, k) => [slot[k] ? h("i", { class: "sp" }) : "", h("i", { class: share(col) < 1 ? "lo" : "", style: { width: width[k] + "ch", height: Math.max(2, Math.round(8 * share(col))) + "px" } })]);
-    const grid = h("div", { class: "il" },
-      h("div", { class: "who cons" }, "Consensus"), h("div", { class: "seq cons" }, consRow()),
-      h("div", { "aria-hidden": "true" }), h("div", { class: "bars", "aria-hidden": "true" }, bars));
-    if (!(this.collapse && alike)) {
-      for (const n of rows) grid.append(h("div", { class: "who" }, SHORT[n]), (loc.x && n in loc.x) ? h("div", { class: "seq rough", title: ROUGH }, "≈ " + loc.x[n]) : h("div", { class: "seq" }, seq(n)));
-      if (refs.length) grid.append(h("div", { class: "sep" }));
-      for (const n of refs) grid.append(h("div", { class: "who ref" }, SHORT[n]), (loc.x && n in loc.x) ? h("div", { class: "seq ref rough", title: ROUGH }, "≈ " + loc.x[n]) : h("div", { class: "seq ref" }, seq(n)));
-    } else grid.append(h("div", { class: "who" }), h("div", { class: "seq alike" }, `${rows.length} transcriber${rows.length === 1 ? "" : "s"}, all alike`));
-    return grid;
-  },
-  /* whether anyone reads consensus word i otherwise */
-  diffWord(loc, i) {
-    const ws = words(loc);
-    return loc.w.some(n => !(loc.x && n in loc.x) && differs(readingOf(loc, n), ws, i));
-  },
-
-  /* a transcriber's own reading of a locus, word by word of the consensus, marked where it differs */
-  readingText(loc, who) {
-    const rd = readingOf(loc, who);
-    if (!rd) return [h("span", { class: "tx-none" }, `${SHORT[who]} did not transcribe this line`)];
-    if (loc.x && who in loc.x)   // a line that lines up with the others only roughly: as it is, unmarked
-      return [h("span", { class: "tx-rough", title: ROUGH }, "≈ "), loc.x[who].replace(/\./g, " ").replace(/,/g, "·")];
-    const ws = words(loc), out = [];
-    ws.forEach((w, i) => {
-      if (i) out.push(rd[i - 1].next === "." ? " " : "");
-      const t = rd[i].text, dif = differs(rd, ws, i);
-      const shownT = t.replace(/\./g, " ").replace(/,/g, "·") || "–";
-      const el = this.font === "glyphs"
-        ? h("span", { class: `w st${dif ? " mk" : ""}`, "data-o": w.off, "data-e": w.eva },
-            h("span", { class: "gl", "aria-hidden": "true" }, dif ? h("span", { class: "c" }, evaGlyphs(shownT)) : evaGlyphs(shownT)),
-            h("span", { class: "ev" }, shownT))
-        : h("span", { class: `w${dif ? " mk" : ""}`, "data-o": w.off, "data-e": w.eva }, dif ? h("span", { class: "c" }, shownT) : t);
-      if (i < ws.length - 1 && rd[i].next !== ".") el.append(h("span", { class: rd[i].next === "," ? "us" : "jn", title: rd[i].next === "," ? "uncertain space" : `${SHORT[who]} writes this and the next as one word` }, rd[i].next === "," ? "," : ""));
-      if (dif) { el.tabIndex = 0; el.setAttribute("aria-label", `${t || "nothing"}: the consensus reads ${w.eva}`); }
+  /* the consensus: each word a span (pointing lights it on the photograph); a dot under each glyph where the vote is
+     split; an uncertain space as a faint middle dot */
+  lineText(page, loc, li) {
+    const glyph = this.font === "glyphs", split = new Set();
+    if (this.dots) for (const u of loc.u) if (DIFFER.includes(u[2])) for (let i = u[0]; i < u[0] + Math.max(1, u[1]); i++) split.add(i);
+    const out = [];
+    words(loc).forEach((w, wi) => {
+      if (wi) out.push(" ");
+      const el = h("span", { class: "w", "data-k": key(page, li, wi), tabindex: "0", title: glyph ? w.eva : null });
+      for (const t of w.toks) {
+        if (t.sep) { el.append(h("span", { class: "us", title: "an uncertain space: about half the transcribers wrote a space here" }, glyph ? " " : "·")); continue; }
+        const d = split.has(t.off);
+        el.append(d || glyph ? h("span", { class: `g${d ? " d" : ""}` }, glyph ? chOf(t.code) : t.eva) : t.eva);
+      }
+      if (this.dots && disputed(loc, w)) el.setAttribute("aria-label", `${w.eva}: transcribers disagree`);
       out.push(el);
     });
     return out;
   },
-
-  /* A locus's consensus as words: runs of glyphs with the same mark in one span; an uncertain space as its IVTFF comma
-     (drawn as a dot, copied as a comma); gap marks between glyphs or words. */
-  textOf(loc) {
-    const mk = marksOf(loc, this.marks);
-    const glyph = this.font === "glyphs";
+  /* one transcriber's reading: words read as the consensus faded, the rest in full */
+  compareText(page, loc, li) {
+    const who = this.compare, rd = readingOf(loc, who);
+    if (!rd) return [h("span", { class: "tx-none" }, `Not in ${SHORT[who]}'s transcription`)];
+    if (loc.x && who in loc.x) return [h("span", { class: "tx-rough", title: ROUGH }, "≈ " + loc.x[who].replace(/\./g, " ").replace(/,/g, "·"))];
     const ws = words(loc), out = [];
     ws.forEach((w, wi) => {
-      if (wi) {
-        const st = mk.gap.get(w.off - 1), est = mk.empty.get(w.off - 1);
-        if (est) out.push(h("span", { class: "dj", title: SAY[est] }));
-        out.push(st ? h("span", { class: "gm", title: GAP_SAY[st] }, " ") : " ");
-      }
-      const el = h("span", { class: `w${glyph ? " st" : ""}`, "data-o": w.off, "data-e": w.eva });
-      const gl = glyph ? h("span", { class: "gl", "aria-hidden": "true" }) : el;   // where the glyphs go
-      const why = new Set();
-      let run = null, runSt = null;
-      const flush = () => { if (run) gl.append(runSt ? h("span", { class: `c c-${runSt}` }, run) : run); run = null; };
-      for (const t of w.toks) {
-        const gst = t !== w.toks[0] && !t.sep && mk.gap.get(t.off), est = mk.empty.get(t.off);
-        if (gst || est) {
-          flush();
-          gl.append(h("span", { class: "dj", title: est ? SAY[est] : GAP_SAY[gst] }));
-          why.add(est ? SAY[est] : GAP_SAY[gst]);
-        }
-        if (t.sep) {
-          flush();
-          gl.append(h("span", { class: "us", title: GAP_SAY.u }, ","));
-          why.add(GAP_SAY.u);
-          continue;
-        }
-        const st = mk.glyph.get(t.off) || null;
-        if (st !== runSt) flush();
-        runSt = st;
-        run = (run || "") + (glyph ? chOf(t.code) : t.eva);
-        if (st) why.add(SAY[st]);
-      }
-      flush();
-      if (glyph) el.append(gl, h("span", { class: "ev" }, w.toks.map(t => t.sep ? h("span", { class: "us" }, ",") : t.eva)));
-      if (why.size) {
-        el.classList.add("mk");
-        el.tabIndex = 0;
-        el.setAttribute("aria-label", `${w.eva}: ${[...why].join("; ")}`);
-      }
-      out.push(el);
+      if (wi) out.push(" ");
+      const dif = differs(rd, ws, wi);
+      out.push(h("span", { class: `w${dif ? " cx" : " cs"}`, "data-k": key(page, li, wi), tabindex: "0", title: dif ? `the consensus reads ${w.eva}` : null },
+        dif ? shownReading(rd, wi) : rd[wi].text.replace(/,/g, "·")));
     });
-    const end = mk.empty.get(loc.c.length);
-    if (end) out.push(h("span", { class: "dj", title: SAY[end] }));
     return out;
   },
-
   credits() {
     const m = Data.meta;
     return h("footer", { class: "tx-foot" },
-      h("p", {}, "The text is the consensus of independent transcriptions, lined up and voted glyph by glyph; wherever they differ, every reading is kept. ",
-        h("a", { href: "#info/beinecke/text" }, "How it is made"), "."),
+      h("p", {}, "The text is the consensus of independent transcriptions, compared glyph by glyph; every reading is kept. ",
+        h("a", { href: "#info/beinecke/consensus" }, "How it is made"), "."),
       h("p", {}, m.credit.replace(/,? from René Zandbergen's voynich\.nu.*$/, ""), ", from René Zandbergen's ",
         h("a", { href: "https://www.voynich.nu/transcr.html", target: "_blank", rel: "noopener" }, "voynich.nu"),
-        " (CC0) and the Landini–Stolfi interlinear."));
+        " (CC0) and the Landini–Stolfi interlinear. Word positions on the photographs: The Voynichese Project (Apache 2.0)."));
   },
 
-  /* ---- the card: one word as each transcriber reads it ---- */
-  card: null, hoverT: null, leaveT: null,
-  openCard(wordEl, pinned) {
-    clearTimeout(this.leaveT);
-    if (this.card && this.card.word === wordEl) { if (pinned && !this.card.pinned) this.pin(); return; }
-    this.closeCard(false);
-    const line = wordEl.closest(".ln"), id = line.dataset.id;
-    const loc = this.locus(id);
-    if (!loc) return;
-    const ws = words(loc), wi = ws.findIndex(w => w.off === +wordEl.dataset.o), w = ws[wi];
-    const { unitAt, emptyAt } = lookup(loc);
-    // the transcribers' readings of this word, alike ones together, then the references
+  /* The word: a sharp crop from the photograph, its reading, one sentence, the readings grouped, and the transcribers'
+     lines one step deeper. */
+  wordView(body) {
+    const it = this.item(this.sel);
+    if (!it) { this.sel = null; this.pageView(body); return; }
+    const { page, li, wi, loc, w } = it;
+    const all = this.order(), at = all.indexOf(this.sel);
+    const head = $(".tx-head", this.el);
+    head.replaceChildren(
+      h("button", { class: "tx-ic", title: "Back to the page text (Esc)", "aria-label": "Back to the page text", onclick: () => this.unpick() }, "←"),
+      h("span", { class: "tx-where" }, `${short(page)} · line ${loc.id.slice(loc.id.lastIndexOf(".") + 1)} · word ${wi + 1}`),
+      h("span", { class: "sp" }),
+      h("button", { class: "tx-ic", title: "Previous word", "aria-label": "Previous word", disabled: at <= 0, onclick: () => this.stepWord(-1) }, "‹"),
+      h("button", { class: "tx-ic", title: "Next word", "aria-label": "Next word", disabled: at >= all.length - 1, onclick: () => this.stepWord(1) }, "›"),
+      h("button", { class: "tx-ic", title: "Close the text (T)", "aria-label": "Close the text", onclick: () => TextUI.toggle(false) }, "✕"));
+    const box = this.boxes.get(page)?.get(li + ":" + wi);
+    const url = box && cropUrl(this.segs.get(page), box);
+    const glyphs = w.toks.filter(t => !t.sep), us = unitsIn(loc, w);
+    const band = t => {
+      const u = us.find(u => u[1] && t.off >= u[0] && t.off < u[0] + u[1]);
+      if (!u || u[2] === "u") return "all";
+      const v = u[3].filter(r => r[1] > 0), tot = v.reduce((a, r) => a + r[1], 0), top = v.length ? v[0][1] : 0;
+      return DIFFER.includes(u[2]) || top / tot <= .5 ? "disputed" : "most";
+    };
+    // the readings, alike ones together, most first
     const groups = new Map(), refs = [], rough = [];
-    for (const n of [...loc.w, ...["RF", "VT"].filter(n => present(loc, n))]) {
+    for (const n of [...loc.w, ...["RF", "VT"].filter(n => isRef(n) && loc.r && n in loc.r)]) {
       if (loc.x && n in loc.x) { rough.push(n); continue; }
-      const t = shownReading(readingOf(loc, n), wi);
-      if (isRef(n)) refs.push([t, n]);
-      else groups.set(t, [...(groups.get(t) || []), n]);
+      const rd = readingOf(loc, n);
+      if (!rd) continue;
+      const t = shownReading(rd, wi);
+      if (isRef(n)) refs.push([t, n]); else groups.set(t, [...(groups.get(t) || []), n]);
     }
-    // each glyph's support, and the votes where they are split
-    const glyphs = w.toks.filter(t => !t.sep);
-    const bar = [], said = [];
-    const units = [];
-    for (let i = w.off; i <= w.end; i++) {
-      for (const u of emptyAt.get(i) || []) units.push(u);
-      const u = unitAt.get(i);
-      if (u) units.push(u);
-    }
-    for (const t of glyphs) {
-      const u = units.find(u => u[1] && t.off >= u[0] && t.off < u[0] + u[1]);
-      const tot = u ? u[3].reduce((a, r) => a + r[1], 0) : 1, top = u ? Math.max(0, ...u[3].map(r => r[1])) : 1;
-      bar.push({ t, share: tot ? top / tot : 0 });
-    }
-    for (const u of units) {
-      const k = glyphs.findIndex(t => t.off >= u[0]);
-      const span = u[1] ? glyphs.filter(t => t.off >= u[0] && t.off < u[0] + u[1]).length : 0;
-      const where = !u[1] ? "Between glyphs" : span > 1 ? `Glyphs ${k + 1}–${k + span}` : `The ${nth(k)} glyph`;
-      const voted = u[3].filter(r => r[1] > 0), not = u[3].filter(r => r[1] === 0);
-      if (u[2] === "u" && !not.length) continue;
-      said.push(h("li", {}, `${where}: `, voted.flatMap((r, i) => [i ? " · " : "", i === 0 && u[2] !== "n" ? h("b", {}, r[0] || "nothing") : r[0] || "nothing", ` ${votes(r[1])}`]),
-        voted.length ? ` (${STATUS[u[2]]})` : STATUS.n,
-        not.length ? h("span", { class: "muted" }, `; not voting: ${not.map(r => `${SHORT[r[2]]} ${r[0] || "nothing"}`).join(", ")}`) : ""));
-    }
-    const verdict = this.reading === "cons" ? "consensus" : `${SHORT[this.reading]}'s reading`;
-    const occ = h("span", { class: "muted tx-occ" }, "counting…");
-    const card = h("div", { class: "tx-card", role: "dialog", "aria-label": `${w.eva}, in ${id}`, tabindex: "-1" },
-      h("button", { class: "tx-cx", "aria-label": "Close", title: "Close (Esc)", onclick: () => this.closeCard() }, "✕"),
-      h("div", { class: "tx-ch" }, this.font === "glyphs" ? h("span", { class: "tx-bigg", "aria-hidden": "true" }, w.toks.map(t => t.sep ? " " : chOf(t.code)).join("")) : "",
-        h("span", { class: "tx-big" }, w.eva.replace(/,/g, "·")), h("span", { class: "muted" }, `${id}, word ${wi + 1} · ${verdict}`)),
-      h("div", { class: "tx-agree", role: "img", "aria-label": bar.map(b => `${b.t.eva} ${Math.round(b.share * 100)}%`).join(", ") },
-        bar.map(b => h("span", { class: b.share < 1 ? "lo" : "", style: { width: `${b.t.len}ch` }, title: `${b.t.eva}: ${Math.round(b.share * 100)}% of the votes` }))),
-      h("table", {}, h("tbody", {},
-        [...groups].sort((a, b) => b[1].length - a[1].length).map(([t, who]) => {
-          const d = doubt(t);
-          return h("tr", {}, h("td", { class: "r" }, t), h("td", {}, who.map(n => SHORT[n]).join(", "), d ? h("span", { class: "muted" }, ` (${d})`) : ""),
-            h("td", { class: "n", title: "transcribers" }, String(who.length)));
-        }),
-        refs.map(([t, n]) => h("tr", { class: "ref" }, h("td", { class: "r" }, t), h("td", {}, Data.names.get(n)), h("td", { class: "n" }))))),
-      rough.length ? h("p", { class: "tx-roughs" }, `${rough.map(n => SHORT[n]).join(", ")}: ${rough.length > 1 ? "their lines line" : "the line lines"} up with the others only roughly here. `,
-        rough.map(n => h("span", { class: "mono" }, loc.x[n].replace(/\./g, " ").replace(/,/g, "·"))).flatMap((e, i) => i ? ["; ", e] : [e])) : "",
-      said.length ? h("ul", { class: "tx-votes" }, said) : h("p", { class: "tx-votes" }, "Everyone who transcribed it reads it so."),
-      h("p", { class: "tx-occ-l" }, occ),
-      h("div", { class: "tx-acts" },
-        h("a", { class: "tx-btn", href: `#text/${encodeURIComponent(S.order)}/search?q=${encodeURIComponent(w.eva.replace(/,/g, "~"))}` }, "Search the book"),
-        h("button", { class: "tx-btn", onclick: () => copy(id) }, `Copy ${id}`)));
-    card.addEventListener("keydown", e => this.cardKey(e));
-    card.addEventListener("pointerleave", () => { if (!this.card?.pinned) this.leaveT = setTimeout(() => this.card && !this.card.pinned && this.closeCard(), 250); });
-    card.addEventListener("pointerenter", () => clearTimeout(this.leaveT));
-    $("#v-read").append(card);
-    this.card = { el: card, word: wordEl, pinned: false };
-    this.place(card, wordEl);
-    wordEl.classList.add("sel");
-    const same = $$(".tx-body .w", this.el).filter(x => x !== wordEl && x.dataset.e === w.eva);
-    same.forEach(x => x.classList.add("hl"));
+    const cons = w.eva.replace(/,/g, "·");
+    const rows = [...groups].sort((a, b) => b[1].length - a[1].length || (b[0] === cons) - (a[0] === cons));
+    const row = ([t, who], ref) => h("div", { class: `rd${ref ? " ref" : ""}` },
+      h("span", { class: "r" }, t === cons ? t : diffMark(t, cons)),
+      h("span", { class: "n" }, ref ? "" : `${who.length} of ${loc.w.length}`),
+      h("span", { class: "who" }, ref ? Data.names.get(who) : who.flatMap((n, i) => [i ? ", " : "",
+        h("button", { class: "tx-name", title: `Read the page as ${SHORT[n]} did`, onclick: () => this.setCompare(n) }, SHORT[n])]),
+        !ref && doubt(t) ? h("span", { class: "dbt" }, ` · ${doubt(t)}`) : ""));
+    const more = rows.length > 3 || refs.length || rough.length;
+    const occ = h("span", {}, "…");
     Count.load().then(() => {
       const e = Count.map.get(w.eva);
-      occ.textContent = !e ? "Not elsewhere in the book" : e.n === 1 ? "Only here in the book" :
-        `${e.n} times in the book, on ${e.pages.size} page${e.pages.size === 1 ? "" : "s"}` + (same.length ? `; ${same.length + 1} here, lit` : "");
+      occ.textContent = !e ? "Not elsewhere in the book." : e.n === 1 ? "Only here in the book." : `${e.n.toLocaleString("en")} times on ${e.pages.size} page${e.pages.size === 1 ? "" : "s"}.`;
     }).catch(() => { occ.textContent = ""; });
-    if (pinned) this.pin();
+    const crop = url ? h("img", { class: "tx-crop", src: url, alt: `${w.eva}, on the page`, loading: "eager",
+      onerror: e => e.target.replaceWith(h("p", { class: "tx-msg" }, "Yale's photograph could not be loaded.")) }) : null;
+    body.replaceChildren(
+      crop ? h("figure", { class: "tx-fig" }, crop, h("figcaption", {}, `From Yale's photograph of ${short(page)}`)) : "",
+      h("div", { class: "tx-reading" }, h("span", { class: "gl", "aria-hidden": "true" }, glyphs.map(t => chOf(t.code)).join("")),
+        h("span", { class: "ev" }, cons)),
+      h("p", { class: "tx-verdict" }, ...verdict(loc, w)),
+      h("div", { class: "tx-bars", role: "img", "aria-label": glyphs.map(t => `${t.eva}: ${band(t).replace("all", "all agree").replace("most", "most agree")}`).join(", ") },
+        glyphs.map(t => h("span", {}, h("span", { class: "e" }, t.eva), h("i", { class: `b-${band(t)}` })))),
+      h("div", { class: "tx-key" }, h("span", {}, h("i", { class: "b-all" }), "all agree"), h("span", {}, h("i", { class: "b-most" }), "most agree"), h("span", {}, h("i", { class: "b-disputed" }), "disputed")),
+      h("h4", { class: "tx-h" }, "Readings"),
+      ...rows.slice(0, 3).map(r => row(r)),
+      more ? h("details", { class: "tx-more" }, h("summary", {}, `All readings${rows.length > 3 ? ` (${rows.length})` : ""}${refs.length ? ", and RF1 and voynichese.com" : ""}`),
+        ...rows.slice(3).map(r => row(r)), ...refs.map(r => row(r, true)),
+        rough.length ? h("p", { class: "tx-dim" }, `${names(rough.map(n => SHORT[n]))}: ${rough.length > 1 ? "their lines line" : "the line lines"} up with the others only roughly here.`) : "") : "",
+      h("h4", { class: "tx-h" }, "Elsewhere in the book"),
+      h("p", { class: "tx-else" }, occ, h("a", { href: `#text/${encodeURIComponent(S.order)}/search?q=${encodeURIComponent(w.eva.replace(/,/g, ""))}` }, "Find it in the book ›")),
+      this.lineDetails(loc, wi),
+      h("p", { class: "tx-src" }, `Consensus of ${loc.w.length} transcription${loc.w.length === 1 ? "" : "s"}`, box ? " · word position: The Voynichese Project" : "", crop ? " · photograph: Yale University" : ""));
   },
-  pin() {
-    this.card.pinned = true;
-    this.card.el.classList.add("pinned");
-    this.card.el.focus();
-  },
-  place(card, wordEl) {
-    if (matchMedia("(max-width: 760px)").matches) { card.classList.add("sheet"); return; }
-    const host = $("#v-read").getBoundingClientRect(), r = wordEl.getBoundingClientRect();
-    const cw = card.offsetWidth, ch = card.offsetHeight;
-    let x = Math.min(host.width - cw - 8, Math.max(8, r.left - host.left - cw / 2 + r.width / 2));
-    let y = r.bottom - host.top + 8;
-    if (y + ch > host.height - 8) y = r.top - host.top - ch - 8;   // no room below: above
-    if (y < 8) {   // no room above either: beside the text panel, over the pages, level with the word
-      x = Math.max(8, this.el.getBoundingClientRect().left - host.left - cw - 12);
-      y = Math.min(host.height - ch - 8, Math.max(8, r.top - host.top - ch / 3));
-    }
-    card.style.left = x + "px"; card.style.top = y + "px";
-  },
-  closeCard(refocus = true) {
-    clearTimeout(this.hoverT); clearTimeout(this.leaveT);
-    if (!this.card) return;
-    const { el, word, pinned } = this.card;
-    this.card = null;
-    el.remove();
-    word.classList.remove("sel");
-    $$(".tx-body .w.hl", this.el || document).forEach(x => x.classList.remove("hl"));
-    if (refocus && pinned && word.isConnected) word.focus({ preventScroll: true });
-  },
-  cardKey(e) {
-    if (e.key === "Escape") { e.stopPropagation(); this.closeCard(); return; }
-    if (e.key === "Tab") {   // focus stays in the card
-      const f = $$("a, button", this.card.el);
-      const i = f.indexOf(document.activeElement);
-      if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
-      else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
-    }
-    if (e.key === "n" || e.key === "N") { e.stopPropagation(); this.step(e.shiftKey ? -1 : 1); }
-  },
-  locus(id) {
-    const pg = id.slice(0, id.lastIndexOf("."));
-    const d = this.loaded.get(pg);
-    return d && d.loci.find(l => l.id === id);
+  /* one step deeper: each transcriber's line, words read as the consensus faded, only those who differ */
+  lineDetails(loc, wi0) {
+    const ws = words(loc);
+    const d = h("details", { class: "tx-line" }, h("summary", {}, "How each transcriber wrote this line"));
+    d.addEventListener("toggle", () => {
+      if (!d.open || d.children.length > 1) return;
+      const rows = [h("div", { class: "who c" }, "Consensus"), h("div", { class: "seq c" }, ws.map((w, i) => h("span", { class: i === wi0 ? "on" : "" }, w.eva.replace(/,/g, "·"))).flatMap((e, i) => i ? [" ", e] : [e]))];
+      let same = 0;
+      for (const n of loc.w) {
+        if (loc.x && n in loc.x) { rows.push(h("div", { class: "who" }, SHORT[n]), h("div", { class: "seq rough", title: ROUGH }, "≈ " + loc.x[n].replace(/\./g, " ").replace(/,/g, "·"))); continue; }
+        const rd = readingOf(loc, n);
+        if (!rd) continue;
+        if (!ws.some((_, i) => differs(rd, ws, i))) { same++; continue; }
+        rows.push(h("div", { class: "who" }, SHORT[n]), h("div", { class: "seq" }, ws.flatMap((w, i) => [i ? " " : "",
+          differs(rd, ws, i) ? h("span", { class: "x" }, shownReading(rd, i)) : h("span", { class: "s" }, rd[i].text.replace(/,/g, "·"))])));
+      }
+      if (same) rows.push(h("div"), h("div", { class: "note" }, `and ${same} more read the line as the consensus`));
+      d.append(h("div", { class: "tx-al" }, rows));
+    });
+    return d;
   },
 
-  /* N / Shift+N: the next or previous marked word, with its card */
-  step(d) {
-    const all = $$(".tx-body .w.mk", this.el);
-    if (!all.length) { toast(this.marks === "none" && this.reading === "cons" ? "Marks are off: choose them in the text panel" : "Nothing marked on these pages"); return; }
-    const at = this.card ? all.indexOf(this.card.word) : -1;
-    const next = all[at < 0 ? (d > 0 ? 0 : all.length - 1) : (at + d + all.length) % all.length];
-    next.scrollIntoView({ block: "nearest" });
-    this.openCard(next, true);
-  },
-
+  /* ---- keys and the address ---- */
   key(e) {
-    if ((e.key === "n" || e.key === "N") && !e.altKey) { this.step(e.shiftKey ? -1 : 1); return true; }
-    if (e.key === "i" || e.key === "I") { this.setView(this.view === "inter" ? "lines" : "inter"); return true; }
-    if (e.key === "Escape" && this.card) { this.closeCard(); return true; }
+    if ((e.key === "n" || e.key === "N") && !e.altKey) { this.stepDispute(e.shiftKey ? -1 : 1); return true; }
+    if (e.key === "Escape" && this.sel) { this.unpick(); return true; }
+    if (this.sel && (e.key === "[" || e.key === "]")) { this.stepWord(e.key === "]" ? 1 : -1); return true; }
     return false;
   },
-  /* the address: text, then the reading if it is not the consensus, and a line asked for (a search result) */
-  ask: null,   // { l: "f1r.2", m: [start, end], hit: k } from the address, until the reader moves on
+  /* text, then the word chosen, the transcriber compared, and a search result being stepped through */
   hash() {
     const p = new URLSearchParams();
-    if (this.reading !== "cons") p.set("r", this.reading);
+    if (this.sel) { const { page, li, wi } = unkey(this.sel); const d = this.loaded.get(page); if (d) p.set("w", `${d.loci[li].id}.${wi + 1}`); }
+    if (this.compare) p.set("r", this.compare);
     if (this.ask) {
       p.set("l", this.ask.l);
       if (this.ask.m) p.set("m", this.ask.m.join("-"));
@@ -806,30 +795,39 @@ const T = {
   fromHash(q) {
     const p = new URLSearchParams(q);
     const r = p.get("r");
-    this.reading = r && (SHORT[r]) ? r : "cons";
+    this.compare = r && SHORT[r] ? r : null;
     this.ask = p.get("l") ? { l: p.get("l"), m: p.get("m") ? p.get("m").split("-").map(Number) : null, hit: +p.get("hit") || 0, seen: false } : null;
+    this.wantWord = p.get("w") || null;
     this.onShow = "";
     if (this.el) this.sync();
   },
-  /* light the line asked for, and its match; and the stepper through the search's results */
-  light(body) {
-    const a = this.ask;
+  /* the word asked for in the address (w=f2r.4.1, or a search result's line and match), chosen once its page is on show */
+  light() {
     const bar = $(".tx-step", this.el);
+    const find = (id, test) => {
+      for (const [page, d] of this.loaded) {
+        const li = d.loci.findIndex(l => l.id === id);
+        if (li < 0) continue;
+        const wi = words(d.loci[li]).findIndex(test);
+        return wi >= 0 ? key(page, li, wi) : null;
+      }
+      return undefined;   // not on show (yet)
+    };
+    if (this.wantWord) {
+      const id = this.wantWord.slice(0, this.wantWord.lastIndexOf(".")), n = +this.wantWord.slice(this.wantWord.lastIndexOf(".") + 1);
+      const k = find(id, (w, i) => i === n - 1);
+      if (k !== undefined) { this.wantWord = null; if (k) this.pick(k, { from: "link" }); }
+    }
+    const a = this.ask;
     if (!a) { bar.hidden = true; return; }
-    const ln = $$(".ln", body).find(x => x.dataset.id === a.l);
-    if (!ln) {   // not there yet (the reader is on its way), or the reader has moved on
+    const k = find(a.l, w => !a.m || (w.off < a.m[1] && w.end > a.m[0]));
+    if (k === undefined) {   // not there yet (the reader is on its way), or the reader has moved on
       bar.hidden = true;
       if (a.seen) { this.ask = null; setHash(); }
       return;
     }
-    a.seen = true;
-    ln.classList.add("lit");
-    if (a.m && this.reading === "cons") for (const w of $$(".w", ln)) {
-      const o = +w.dataset.o, e = o + w.dataset.e.length;
-      if (o < a.m[1] && e > a.m[0]) w.classList.add("hit");
-    }
-    requestAnimationFrame(() => ln.scrollIntoView({ block: "center" }));
-    const S_ = TextTab.mod, n = a.hit && S_ ? S_.hit(a.hit) : null;
+    if (!a.seen) { a.seen = true; if (k) this.pick(k, { from: "search" }); }
+    const S_ = typeof TextTab !== "undefined" && TextTab.mod, n = a.hit && S_ ? S_.hit(a.hit) : null;
     bar.hidden = !n;
     if (!n) return;
     const prev = S_.hit(a.hit - 1), next = S_.hit(a.hit + 1);
@@ -842,10 +840,5 @@ const T = {
   },
 };
 
-/* copy a locus name */
-async function copy(s) {
-  try { await navigator.clipboard.writeText(s); toast(`Copied ${s}`); }
-  catch { toast(`Copy did not work: the line is ${s}`); }
-}
-
+export { Boxes, verdict };
 export default T;

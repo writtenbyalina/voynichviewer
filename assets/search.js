@@ -9,7 +9,7 @@ import { Data, SHORT, load } from "./text.js";
 const DEFAULTS = { q: "", in: "cons", sp: "either", eq: "eva", near: "0", set: "", steps: "", sort: "book", cmp: "" };
 const FACETS = [
   { key: "scribe", title: "Scribe (Davis)", label: v => v === "–" ? "none given" : `Scribe ${v}` },
-  { key: "section", title: "Section", label: v => v },
+  { key: "section", title: "Section", label: v => secName(v) },
   { key: "lang", title: "Language (Currier)", label: v => v === "–" ? "none given" : `Currier ${v}` },
   { key: "kind", title: "Kind of text", label: v => ({ P: "Paragraphs", L: "Labels", C: "Rings", R: "Radii" })[v] || v },
   { key: "quire", title: "Quire", label: v => qWord(isNaN(+v) ? v : +v) },
@@ -109,31 +109,35 @@ const T = {
     else this.draw();
   },
   build(v) {
-    const sel = (key, label, opts) => h("label", { class: "sx-opt" }, h("span", {}, label),
+    const sel = (key, label, opts, chip = true) => h("label", { class: chip ? "sx-chip-s" : "sx-opt" }, h("span", {}, label),
       h("select", { "data-k": key, onchange: e => { this.st[key] = e.target.value; this.go(); } }, opts.map(([val, t]) => h("option", { value: val }, t))));
     v.replaceChildren(
       h("div", { class: "sx-top" },
-        h("form", { class: "sx-row", role: "search", onsubmit: e => { e.preventDefault(); this.st.q = $("#sx-q").value.trim(); this.st.steps = ""; this.go(); } },
+        h("form", { class: "sx-row", role: "search", onsubmit: e => { e.preventDefault(); this.st.q = $("#sx-q").value.trim(); this.st.steps = ""; this.example = false; this.go(); } },
           h("label", { class: "sx-lbl", for: "sx-q" }, "Search the text"),
-          h("input", { id: "sx-q", type: "search", autocomplete: "off", autocapitalize: "off", spellcheck: "false",
-            placeholder: "qokeedy, qok*, chol daiin, dy_qo …", "aria-describedby": "sx-echo",
-            onkeydown: e => { if (e.key === "Escape") { e.target.value = ""; } if (e.key === "ArrowDown") { e.preventDefault(); $(".sx-hit")?.focus(); } } }),
-          h("button", { type: "button", class: "sx-glyphs-b", "aria-expanded": "false", "aria-controls": "sx-pal", onclick: e => this.palette(e.currentTarget) }, "Glyphs"),
+          h("div", { class: "sx-box" },
+            h("input", { id: "sx-q", type: "search", autocomplete: "off", autocapitalize: "off", spellcheck: "false",
+              placeholder: "a word, like qokeedy, or the start of one, like qok*", "aria-describedby": "sx-echo",
+              onkeydown: e => { if (e.key === "Escape") { e.target.value = ""; } if (e.key === "ArrowDown") { e.preventDefault(); $(".sx-hit")?.focus(); } } }),
+            h("details", { class: "sx-help" }, h("summary", { title: "How to search", "aria-label": "How to search" }, "?"), this.helpCard())),
           h("button", { class: "primary", type: "submit" }, "Search")),
-        h("div", { class: "sx-pal", id: "sx-pal", hidden: true }),
-        h("p", { class: "sx-echo", id: "sx-echo", "aria-live": "polite" }),
         h("div", { class: "sx-opts" },
-          sel("in", "Reading", [["cons", "the consensus"], ["all", "any transcriber"]]),
-          sel("sp", "Spaces", [["either", "uncertain either way"], ["space", "uncertain as spaces"], ["none", "ignored"]]),
-          sel("eq", "Match", [["eva", "exact Eva"], ["family", "same STA family (a o y, r s, k t…)"]]),
-          sel("near", "Near", [["0", "off"], ["1", "within 1 edit"], ["2", "within 2 edits"]]),
-          sel("set", "Pages", [["", "the whole book"]]),
-          h("button", { type: "button", class: "sx-cmp-b", onclick: () => this.compareOpen() }, "+ Compare with another search")),
+          sel("in", "Reading:", [["cons", "the consensus"], ["all", "any transcriber"]]),
+          sel("sp", "Spaces:", [["either", "uncertain either way"], ["space", "uncertain as spaces"], ["none", "ignored"]]),
+          h("details", { class: "sx-more-opts" }, h("summary", {}, "More options"),
+            h("div", { class: "sx-more-m" },
+              sel("eq", "Match", [["eva", "exact Eva"], ["family", "same STA family (a o y, r s, k t…)"]], false),
+              sel("near", "Near", [["0", "off"], ["1", "words 1 edit away"], ["2", "words 2 edits away"]], false),
+              sel("set", "Pages", [["", "the whole book"]], false),
+              h("button", { type: "button", class: "sx-cmp-b", onclick: () => this.compareOpen() }, "Compare with another search"),
+              h("button", { type: "button", class: "sx-cmp-b", onclick: e => this.palette(e.currentTarget) }, "Type with glyphs")))),
+        h("div", { class: "sx-pal", id: "sx-pal", hidden: true }),
         h("form", { class: "sx-cmp", hidden: true, onsubmit: e => { e.preventDefault(); this.st.cmp = $("#sx-cmp-q").value.trim(); this.go(); } },
           h("label", { for: "sx-cmp-q" }, "Compare with"),
           h("input", { id: "sx-cmp-q", type: "search", autocomplete: "off", spellcheck: "false", placeholder: "another query" }),
           h("button", { type: "submit" }, "Compare"),
-          h("button", { type: "button", onclick: () => { this.st.cmp = ""; this.go(); } }, "Remove")),
+          h("button", { type: "button", onclick: () => { this.st.cmp = ""; this.cmpOpen = false; this.go(); } }, "Remove")),
+        h("p", { class: "sx-echo", id: "sx-echo", "aria-live": "polite" }),
         h("div", { class: "sx-steps", id: "sx-steps" })),
       h("div", { class: "sx-strip", id: "sx-strip" }),
       h("div", { class: "sx-body" },
@@ -147,9 +151,20 @@ const T = {
     });
     this.built = true;
   },
+  /* the query language in brief, behind the ? in the box */
+  helpCard() {
+    const ex = [["qokeedy", "the word"], ["qok*  *dy  *ke*", "words beginning, ending or containing (* is any glyphs)"], ["ch?dy", "? is any one glyph"],
+      ["[kt]eedy", "either glyph"], ["chol daiin", "two words in a row"], ["dy_qo  dy-qo  dy~qo", "across a word break, inside a word, either"],
+      ["^qo*  *dy$", "first or last in a line"], ["A A", "the same word twice in a row"], ["<gallows>edy", "a kind of glyph: gallows, bench, pedestal, loop, unread"],
+      ["/qo[kt]e+dy/", "a regular expression"], ["qok* scribe:2", "filters: scribe: lang: section: quire: in: page: set:"]];
+    return h("div", { class: "sx-help-m" }, h("p", {}, "Type Eva: the letters name the glyphs' shapes, not sounds. Some examples:"),
+      h("dl", {}, ex.flatMap(([q, t]) => [h("dt", {}, h("button", { type: "button", onclick: e => { const x = q.split("  ")[0]; $("#sx-q").value = x; this.st.q = x; this.st.steps = ""; this.example = false; e.target.closest("details").open = false; this.go(); } }, q)), h("dd", {}, t)])),
+      h("p", {}, h("a", { href: "#info/beinecke/search" }, "More about searching")));
+  },
   syncControls() {
     this.fillSets();
     for (const s of $$(".sx-opts select", $("#v-text"))) s.value = this.st[s.dataset.k];
+    $(".sx-more-opts").classList.toggle("on", ["eq", "near", "set", "cmp"].some(k => this.st[k] !== DEFAULTS[k]));
     const cmp = $(".sx-cmp");
     cmp.hidden = !this.st.cmp && !this.cmpOpen;
     $("#sx-cmp-q").value = this.st.cmp;
@@ -191,7 +206,7 @@ const T = {
     toast(`Saved the page set set:${x.name}, ${x.pages.length} page${x.pages.length === 1 ? "" : "s"}`);
     return x;
   },
-  savedChanged() { if (this.built) { this.fillSets(); if (!this.st.q) this.empty(); } },
+  savedChanged() { if (this.built) this.fillSets(); },
   compareOpen() { this.cmpOpen = true; $(".sx-cmp").hidden = false; $("#sx-cmp-q").focus(); },
   focus() { $("#sx-q")?.focus(); $("#sx-q")?.select(); },
   go() {
@@ -206,15 +221,17 @@ const T = {
     const gen = ++this.gen;
     const st = this.st, echo = $("#sx-echo");
     this.res = null;
-    if (!st.q) { this.empty(); return; }
+    this.example = !st.q;   // nothing asked: an example, the commonest word, as Ngram opens on a finished search
+    const q = st.q || "daiin";
+    if (!st.q) $("#sx-q").value = q;
     let p;
-    try { p = parse(st.q); if (!p.items.length && !p.regex) throw new QueryError("Give something to search for, as well as the filters"); }
+    try { p = parse(q); if (!p.items.length && !p.regex) throw new QueryError("Give something to search for, as well as the filters"); }
     catch (e) { this.fail(e.message); return; }
     echo.replaceChildren("Searching…");
     try { await Book.load(); } catch (e) { this.fail("The text could not be loaded (" + e.message + ")."); return; }
     if (gen !== this.gen) return;
     // the voters, for "any transcriber" and for the reading menu
-    const rd = $(".sx-opts select[data-k=in]");
+    const rd = $(".sx-opts select[data-k=in]");   // the transcribers, once their names are loaded
     if (rd.options.length < 3) {
       rd.append(h("optgroup", { label: "One transcriber" }, Data.meta.voters.map(v => h("option", { value: v.code }, SHORT[v.code]))),
         h("optgroup", { label: "For comparison" }, Data.meta.references.map(v => h("option", { value: v.code }, SHORT[v.code]))));
@@ -223,7 +240,7 @@ const T = {
     const who = st.in === "all" ? Data.meta.voters.map(v => v.code) : [st.in];
     const opts = { sp: st.sp, eq: st.eq, near: +st.near };
     const t0 = performance.now();
-    const r = await Worker_.run({ q: st.q, opts, who });
+    const r = await Worker_.run({ q, opts, who });
     this.ms = performance.now() - t0;   // how long the search took, for the benchmark (tests/text.spec.js)
     if (gen !== this.gen) return;
     if (r.error) { this.fail(r.mine ? r.error : "The search failed (" + r.error + ")."); return; }
@@ -234,7 +251,7 @@ const T = {
     this.draw();
     // the same search on the three fullest transcriptions, for the range of every count
     if (st.in === "cons") {
-      const rr = await Worker_.run({ q: st.q, opts, who: ["ZL", "GC", "IT"] });
+      const rr = await Worker_.run({ q, opts, who: ["ZL", "GC", "IT"] });
       if (gen !== this.gen || rr.error) return;
       const per = {};
       for (const w of ["ZL", "GC", "IT"]) per[w] = this.collect({ [w]: rr.hits[w] }, null, false);
@@ -305,21 +322,32 @@ const T = {
     this.drawFacets();
     this.drawResults();
   },
+  /* the count in one sentence: "daiin appears 898 times on 210 of 227 pages." The rest (lines, the range across
+     transcriptions, the settings) behind the i. */
   drawEcho() {
     const { p } = this.res, st = this.st;
     const all = this.filtered(this.res.hits, []), now = this.filtered(this.res.hits);
     const lines = new Set(now.map(x => x.i)), pages = new Set(now.map(x => Book.pageOf[x.i]));
-    const bits = describe(p).map(([k, t]) => k === "b" ? h("b", {}, t) : t);
-    const fs = (this.st.set ? [...p.filters, ["set", this.st.set]] : p.filters).map(([k, v]) => sayFilter(k, v));
+    const plain = !p.regex && p.items.length === 1 && p.items[0].kind === "word" && p.items[0].whole && p.items[0].parts[0].every(x => x.k === "lit");
+    const fs = (st.set ? [...p.filters, ["set", st.set]] : p.filters).map(([k, v]) => sayFilter(k, v));
+    const steps = this.steps().map(([k, v]) => FACETS.find(f => f.key === k)?.label(v)).filter(Boolean);
+    const n = now.length, nP = pages.size, of = Object.keys(Data.meta.lines).length;
+    const count = n ? [h("b", {}, n.toLocaleString("en")), n === 1 ? " time" : " times", ` on ${nP} of ${of} pages`] : ["nowhere"];
+    const subject = plain ? [h("b", { class: "mono" }, p.items[0].parts[0].map(x => x.s).join("")), n ? " appears " : " appears "]
+      : [...describe(p).map(([k, t]) => k === "b" ? h("b", {}, t) : t), ": "];
+    if (!plain && subject.length) { const f = subject[0]; if (typeof f === "string") subject[0] = f[0].toUpperCase() + f.slice(1); }
     const rng = this.res.ranges && rangeOf(Object.values(this.res.ranges).map(hs => this.filtered(hs).length));
+    const more = h("details", { class: "sx-why" }, h("summary", { title: "More about this count", "aria-label": "More about this count" }, "i"),
+      h("div", { class: "sx-why-m" },
+        h("p", {}, `In ${SAY_IN(st.in)}, with ${SAY_SP[st.sp]}${st.eq === "family" ? ", STA families alike" : ""}.`),
+        n ? h("p", {}, `${n.toLocaleString("en")} times in ${lines.size.toLocaleString("en")} line${lines.size === 1 ? "" : "s"}.`) : "",
+        rng ? h("p", {}, `In the three fullest transcriptions alone (Zandbergen & Landini's, Claston's, Takahashi's): ${rng} times.`) : "",
+        n !== all.length ? h("p", {}, `${all.length.toLocaleString("en")} before narrowing.`) : "",
+        this.res.near ? h("p", {}, `Counting ${this.res.near.length} word${this.res.near.length === 1 ? "" : "s"} within ${st.near} edit${st.near === "1" ? "" : "s"}: ${this.res.near.slice(0, 12).join(", ")}${this.res.near.length > 12 ? "…" : ""}`) : ""));
     $("#sx-echo").replaceChildren(
-      h("span", {}, ...bits, fs.length ? ", " + fs.join(", ") : "", ` — in ${SAY_IN(st.in)}, ${SAY_SP[st.sp]}${st.eq === "family" ? ", STA families alike" : ""}`,
-        this.res.near ? `, with ${this.res.near.length} word${this.res.near.length === 1 ? "" : "s"} within ${st.near} edit${st.near === "1" ? "" : "s"}` : "", ": "),
-      h("b", {}, now.length.toLocaleString("en")), now.length === 1 ? " time" : " times",
-      now.length ? ` in ${lines.size.toLocaleString("en")} line${lines.size === 1 ? "" : "s"} on ${pages.size} page${pages.size === 1 ? "" : "s"}` : "",
-      rng ? h("span", { class: "sx-rng", title: "The same search in Zandbergen & Landini's, Claston's and Takahashi's transcriptions" }, ` (${rng} in ZL, GC and IT)`) : "",
-      now.length !== all.length ? h("span", { class: "muted" }, ` of ${all.length.toLocaleString("en")} before narrowing`) : "",
-      this.res.cmp ? h("span", { class: "sx-cmpsay" }, this.res.cmp.error ? ` · compare: ${this.res.cmp.error}` : ` · compared with “${st.cmp}”: ${this.filtered(this.res.cmp.hits).length.toLocaleString("en")} times`) : "");
+      h("span", { class: "sx-count" }, ...subject, ...count, fs.length ? ", " + fs.join(", ") : "", steps.length ? ` (${steps.join(", ")})` : "", "."), " ", more,
+      this.example ? h("span", { class: "sx-ex" }, "An example: daiin, the commonest word. Type any word, or the start of one with *, like qok*.") : "",
+      this.res.cmp ? h("span", { class: "sx-cmpsay" }, this.res.cmp.error ? ` Compare: ${this.res.cmp.error}` : ` Compared with “${st.cmp}” (blue): ${this.filtered(this.res.cmp.hits).length.toLocaleString("en")} times.`) : "");
   },
   drawSteps() {
     const steps = this.steps();
@@ -331,6 +359,8 @@ const T = {
       ...(this.st.sort !== "book" ? [" › ", chip(SORTS[this.st.sort], () => { this.st.sort = "book"; this.go(); })] : []));
   },
   /* one bar per page side in the order chosen: its height the hits there; gold what the steps leave, grey the rest */
+  /* The book, page by page in the order chosen: a bar for the hits on each page, over a band naming its sections, with
+     its quires shaded in turn. Pages the steps leave out are ghosts; pages with no hits, a hairline. */
   drawStrip() {
     const el = $("#sx-strip");
     const order = ORDERS.get(S.order);
@@ -339,18 +369,42 @@ const T = {
     const all = count(this.filtered(this.res.hits, [])), now = count(this.filtered(this.res.hits));
     const cmp = this.res.cmp && this.res.cmp.hits ? count(this.filtered(this.res.cmp.hits)) : null;
     const max = Math.max(1, ...all, ...(cmp || []));
-    const H = 40;
-    const top = all.map((n, k) => [n, k]).filter(x => x[0]).sort((a, b) => b[0] - a[0]).slice(0, 3);
+    const H = 36, N = sides.length;
+    const sec = p => { const s = (p.shown && p.shown.section) || ""; return s.split("/")[0].trim(); };
+    const runs = (f) => { const out = []; sides.forEach((p, k) => { const v = f(p); if (!out.length || out[out.length - 1].v !== v) out.push({ v, a: k, b: k }); else out[out.length - 1].b = k; }); return out; };
+    const secs = runs(sec), quires = runs(p => p.quire);
+    const W = el.clientWidth || 1200;
+    const named = secs.filter(s => (s.b - s.a + 1) / N * W >= secName(s.v).length * 6.8 + 8);   // a name where it fits in its section
     el.replaceChildren(
-      h("div", { class: "sx-strip-h" }, h("span", {}, `The book in ${order.title}`),
-        h("span", { class: "muted" }, all.some(Boolean) ? `hits on ${all.filter(Boolean).length} of ${sides.length} pages; most on ${top.map(([n, k]) => `${short(sideLabel(sides[k]))} (${n})`).join(", ")}` : "no hits")),
-      h("div", { class: "sx-bars", role: "img", "aria-label": `Hits page by page in ${order.title}` },
-        sides.map((p, k) => h("button", { type: "button", class: "sx-bar", tabindex: "-1",
-          title: `${short(sideLabel(p))}: ${now[k]}${all[k] !== now[k] ? ` of ${all[k]}` : ""}${cmp ? ` · compared: ${cmp[k]}` : ""}`,
+      h("div", { class: "sx-bars", role: "img", "aria-label": `Where it appears, page by page in ${order.title}: on ${now.filter(Boolean).length} of ${N} pages` },
+        quires.map((q, i) => i % 2 ? h("span", { class: "qz", style: { left: q.a / N * 100 + "%", width: (q.b - q.a + 1) / N * 100 + "%" } }) : ""),
+        sides.map((p, k) => h("button", { type: "button", class: `sx-bar${now[k] ? "" : all[k] ? " ghost" : " none"}`, tabindex: "-1",
+          "data-k": k, "aria-label": `${short(sideLabel(p))}: ${now[k]}`,
+          onpointerenter: e => this.barCard(e.currentTarget, p, now[k], all[k], cmp && cmp[k]), onpointerleave: () => $("#sx-card")?.remove(),
           onclick: () => this.jump(p) },
-          h("i", { class: "all", style: { height: Math.round(H * all[k] / max) + "px" } }),
-          h("i", { class: "now", style: { height: Math.round(H * now[k] / max) + "px" } }),
-          cmp ? h("i", { class: "cmp", style: { height: Math.round(H * cmp[k] / max) + "px" } }) : ""))));
+          h("i", { class: "all", style: { height: (all[k] ? Math.max(3, Math.round(H * (now[k] || all[k]) / max)) : 1) + "px" } }),
+          cmp && cmp[k] ? h("i", { class: "cmp", style: { height: Math.max(2, Math.round(H * cmp[k] / max)) + "px" } }) : ""))),
+      h("div", { class: "sx-secs" }, secs.map(s => h("span", { style: { flex: s.b - s.a + 1, background: SECTION_COL[s.v] || "#c9c2b5" }, title: secName(s.v) }))),
+      h("div", { class: "sx-secn" }, named.map(s => h("span", { style: { left: s.a / N * 100 + "%" } }, secName(s.v)))));
+  },
+  barCard(bar, p, n, all, c) {
+    $("#sx-card")?.remove();
+    const pgs = [p.shown, ...p.segs].filter(Boolean).map(s => s.page);
+    const hit = this.list && this.list.find(x => pgs.includes(Book.pageOf[x.i]));
+    const sec = (p.shown && p.shown.section || "").split("/")[0].trim();
+    const r = bar.getBoundingClientRect(), host = $("#v-text").getBoundingClientRect();
+    const card = h("div", { id: "sx-card", class: "sx-card" },
+      h("b", {}, short(sideLabel(p))), ` · ${secName(sec)} · ${qWord(p.quire)} · `, n ? `${n} time${n === 1 ? "" : "s"}` : all ? "left out by the steps" : "not here",
+      c ? ` · compared: ${c}` : "",
+      hit ? h("div", { class: "s" }, this.snippet(hit)) : "");
+    $("#v-text").append(card);
+    card.style.left = Math.max(8, Math.min(host.width - card.offsetWidth - 8, r.left - host.left - card.offsetWidth / 2)) + "px";
+    card.style.top = (r.top - host.top - card.offsetHeight - 8) + "px";
+  },
+  snippet(x) {
+    const line = this.res.lines[x.who[0]][x.i], show = s => s.replace(/\./g, " ").replace(/,/g, "·");
+    const L = line.slice(0, x.s), R_ = line.slice(x.s + x.len);
+    return [show(L.length > 28 ? "…" + L.slice(-28) : L), h("em", {}, show(line.slice(x.s, x.s + x.len))), show(R_.length > 28 ? R_.slice(0, 28) + "…" : R_)];
   },
   jump(side) {
     const pages = [side.shown, ...side.segs].filter(Boolean).map(s => s.page);
@@ -358,27 +412,30 @@ const T = {
     if (g) { g.scrollIntoView({ block: "start", behavior: REDUCED ? "auto" : "smooth" }); g.classList.remove("flash"); void g.offsetWidth; g.classList.add("flash"); }
     else toast(`No results on ${short(sideLabel(side))}${this.steps().length ? " as narrowed" : ""}`);
   },
+  /* Section open, in book order, only where there are hits; the rest one line each, opened on demand */
   drawFacets() {
     const el = $("#sx-facets");
     const steps = this.steps(), now = this.filtered(this.res.hits);
-    const ranges = this.res.ranges ? Object.values(this.res.ranges).map(hs => this.filtered(hs)) : null;
-    const tally = hs => { const m = {}; for (const f of FACETS) m[f.key] = new Map(); for (const x of hs) { const o = Book.of(x.i); for (const f of FACETS) for (const v of o[f.key]) m[f.key].set(v, (m[f.key].get(v) || 0) + 1); } return m; };
-    const t = tally(now), tr = ranges ? ranges.map(tally) : null;
+    const t = {}; for (const f of FACETS) t[f.key] = new Map();
+    for (const x of now) { const o = Book.of(x.i); for (const f of FACETS) for (const v of o[f.key]) t[f.key].set(v, (t[f.key].get(v) || 0) + 1); }
+    const bookOrder = new Map(); Book.sides(ORDERS.get(S.order)).sides.forEach((p, k) => { const s = (p.shown?.section || "–").trim(); if (!bookOrder.has(s)) bookOrder.set(s, k); });
+    const facet = (f, open) => {
+      const rows = [...t[f.key]].sort((a, b) => f.key === "section" ? (bookOrder.get(a[0]) ?? 999) - (bookOrder.get(b[0]) ?? 999)
+        : f.key === "quire" ? (parseInt(a[0]) || 99) - (parseInt(b[0]) || 99) : b[1] - a[1]);
+      const step = steps.find(([k]) => k === f.key);
+      const set = v => { const s = this.steps().filter(([k]) => k !== f.key); if (!(step && step[1] === v)) s.push([f.key, v]); this.setSteps(s); this.go(); };
+      const list = rows.map(([v, n]) => h("button", { type: "button", class: `sx-frow${step && step[1] === v ? " sel" : ""}`, "aria-pressed": String(!!(step && step[1] === v)), onclick: () => set(v) },
+        h("span", {}, f.label(v)), h("span", { class: "n" }, `(${n.toLocaleString("en")})`)));
+      if (open) return h("section", { class: "sx-facet" }, h("h4", {}, f.title), list);
+      return h("details", { class: "sx-facet one", open: !!step }, h("summary", {}, h("span", {}, f.title), h("span", { class: "v" }, step ? f.label(step[1]) : "any")), list);
+    };
     el.replaceChildren(
       h("div", { class: "sx-fhead" }, h("b", {}, "Narrow"), h("button", { type: "button", class: "sx-fclose", onclick: () => el.classList.remove("open") }, "Done")),
-      ...FACETS.map(f => {
-        const rows = [...t[f.key]].sort((a, b) => f.key === "quire" ? (parseInt(a[0]) || 99) - (parseInt(b[0]) || 99) : b[1] - a[1]);
-        if (!rows.length) return "";
-        const step = steps.find(([k]) => k === f.key);
-        return h("section", { class: "sx-facet" }, h("h4", {}, f.title),
-          rows.map(([v, n]) => {
-            const rg = tr && rangeOf(tr.map(m => m[f.key].get(v) || 0));
-            return h("button", { type: "button", class: `sx-frow${step && step[1] === v ? " sel" : ""}`, "aria-pressed": String(!!(step && step[1] === v)),
-              onclick: () => { const s = this.steps().filter(([k]) => k !== f.key); if (!(step && step[1] === v)) s.push([f.key, v]); this.setSteps(s); this.go(); } },
-              h("span", {}, f.label(v)), h("span", { class: "n" }, n.toLocaleString("en"), rg ? h("small", { title: "in ZL, GC and IT" }, " · " + rg) : ""));
-          }));
-      }));
+      facet(FACETS.find(f => f.key === "section"), true),
+      ...FACETS.filter(f => f.key !== "section").map(f => facet(f, false)));
   },
+  /* In book order: a heading for each page, then its lines at reading size, the match marked. Sorted: the concordance,
+     each match centred. */
   drawResults() {
     const el = $("#sx-res");
     const hits = this.filtered(this.res.hits);
@@ -397,8 +454,7 @@ const T = {
     this.list = sorted;
     const shown = sorted.slice(0, this.shownN);
     const head = h("div", { class: "sx-res-h" },
-      h("span", { class: "sx-cnt" }, hits.length ? `${hits.length.toLocaleString("en")} result${hits.length === 1 ? "" : "s"}` : "No results"),
-      h("label", { class: "sx-opt" }, h("span", {}, "Order"), h("select", { onchange: e => { this.st.sort = e.target.value; this.go(); } },
+      h("label", { class: "sx-opt" }, h("span", {}, "Show"), h("select", { onchange: e => { this.st.sort = e.target.value; this.go(); } },
         Object.entries(SORTS).map(([v, t]) => h("option", { value: v, selected: this.st.sort === v }, t)))),
       h("span", { class: "sx-acts" },
         h("button", { type: "button", onclick: () => this.save(), title: "Keep this search in Your work" }, this.savedAs() ? "★ Saved" : "Save"),
@@ -408,43 +464,53 @@ const T = {
             h("button", { type: "button", disabled: !hits.length, onclick: () => this.exportIVTFF() }, "Their lines as IVTFF"),
             h("button", { type: "button", disabled: !hits.length, onclick: () => this.copyLoci() }, "Copy the list of lines")))));
     const kids = [head];
-    if (!hits.length) kids.push(h("p", { class: "sx-none" }, this.res.hits.length ? "Nothing is left after narrowing: remove a step above." : "Nothing matches. Try * for any glyphs, or set Near to find words a glyph or two away."));
-    const row = (x, k) => {
-      const id = Book.ix[x.i][0], line = lineOf(x), shownL = s => s.replace(/\./g, " ").replace(/,/g, "·");
-      const L = line.slice(0, x.s), M = line.slice(x.s, x.s + x.len), R_ = line.slice(x.s + x.len);
-      const pg = Book.pageOf[x.i];
-      const n = Data.meta.voters.length;
-      return h("a", { class: "sx-hit", href: this.href(x, k),
-        "data-k": k },
+    if (!hits.length) kids.push(h("p", { class: "sx-none" }, this.res.hits.length ? "Nothing is left after narrowing: remove a step above." : "Nothing matches. Try * for any glyphs, or More options › Near for words a glyph or two away."));
+    const show = s => s.replace(/\./g, " ").replace(/,/g, "·");
+    const who = x => this.st.in === "all" ? h("span", { class: "sx-who", title: x.who.map(w => SHORT[w]).join(", ") }, `in ${x.who.length} of ${presentOn(x.i, this.res.lines)} transcriptions`) : "";
+    const line = (x, k) => {
+      const id = Book.ix[x.i][0], L = lineOf(x);
+      return h("a", { class: "sx-hit sx-line", href: this.href(x, k), "data-k": k },
         h("span", { class: "sx-id" }, id.slice(id.lastIndexOf(".") + 1)),
-        h("span", { class: "sx-l" }, h("span", {}, shownL(L.length > 60 ? "…" + L.slice(-60) : L))),
-        h("span", { class: "sx-m" }, shownL(M)),
-        h("span", { class: "sx-r" }, shownL(R_.length > 60 ? R_.slice(0, 60) + "…" : R_)),
-        this.st.in === "all" ? h("span", { class: "sx-who", title: x.who.map(w => SHORT[w]).join(", ") }, `in ${x.who.length} of ${presentOn(x.i, this.res.lines)}`) : "");
+        h("span", { class: "sx-t" }, show(L.slice(0, x.s)), h("em", {}, show(L.slice(x.s, x.s + x.len))), show(L.slice(x.s + x.len)), who(x)));
+    };
+    const kwic = (x, k) => {
+      const id = Book.ix[x.i][0], L = lineOf(x), l = L.slice(0, x.s), r = L.slice(x.s + x.len);
+      return h("a", { class: "sx-hit", href: this.href(x, k), "data-k": k },
+        h("span", { class: "sx-id" }, `${short(Book.pageOf[x.i])}.${id.slice(id.lastIndexOf(".") + 1)}`),
+        h("span", { class: "sx-l" }, h("span", {}, show(l.length > 60 ? "…" + l.slice(-60) : l))),
+        h("span", { class: "sx-m" }, show(L.slice(x.s, x.s + x.len))),
+        h("span", { class: "sx-r" }, show(r.length > 60 ? r.slice(0, 60) + "…" : r)), who(x));
     };
     if (this.st.sort === "book") {
-      let cur = null, box = null;
+      let cur = null, box = null, lastLine = -1;
       shown.forEach((x, k) => {
         const pg = Book.pageOf[x.i];
         if (pg !== cur) {
           cur = pg;
           const f = Book.facts.get(pg), n = hits.filter(y => Book.pageOf[y.i] === pg).length;
-          const seg = f && f.seg;
+          const seg = f && f.seg, sec = f ? f.section.split("/")[0].trim() : "";
           kids.push(box = h("section", { class: "sx-pg", "data-page": pg },
-            h("header", {}, seg ? h("img", { src: imgUrl(seg.img, "s", seg.v), alt: "", loading: "lazy", width: 36, height: Math.round(36 / aspect(seg)) }) : "",
-              h("div", {}, h("b", {}, short(pg)), h("span", { class: "muted" }, ` ${n} result${n === 1 ? "" : "s"}`),
-                h("div", { class: "muted small" }, factsOf(pg))))));
+            h("header", {}, seg ? h("img", { src: imgUrl(seg.img, "s", seg.v), alt: "", loading: "lazy", width: 30, height: Math.round(30 / aspect(seg)) }) : "",
+              h("div", {}, h("b", {}, short(pg)), h("span", { class: "muted" }, ` · ${secName(sec)} · ${n} time${n === 1 ? "" : "s"}`)))));
         }
-        box.append(row(x, k));
+        if (x.i === lastLine && this.st.in !== "all") return;   // a line with two matches is shown once, both marked
+        lastLine = x.i;
+        const more = shown.filter(y => y.i === x.i && y !== x && y.who[0] === x.who[0]);
+        const el_ = line(x, k);
+        if (more.length) {   // mark every match in the line
+          const L = lineOf(x), cuts = [x, ...more].sort((a, b) => a.s - b.s);
+          const t = $(".sx-t", el_);
+          let pos = 0;
+          t.replaceChildren(...cuts.flatMap(c => { const out = [show(L.slice(pos, c.s)), h("em", {}, show(L.slice(c.s, c.s + c.len)))]; pos = c.s + c.len; return out; }), show(L.slice(pos)), who(x));
+        }
+        box.append(el_);
       });
-    } else kids.push(h("div", { class: "sx-flat" }, shown.map((x, k) => [h("span", { class: "sx-fpg" }, short(Book.pageOf[x.i])), row(x, k)]).flat()));
+    } else kids.push(h("div", { class: "sx-flat" }, shown.map((x, k) => kwic(x, k))));
     if (sorted.length > shown.length) kids.push(h("button", { type: "button", class: "sx-more", onclick: () => { this.shownN += PAGE_SIZE * 2; this.drawResults(); } },
       `Show more (${(sorted.length - shown.length).toLocaleString("en")} left)`));
     el.replaceChildren(...kids);
-    $("#sx-ftog")?.remove();
     head.prepend(h("button", { id: "sx-ftog", type: "button", class: "sx-ftog", onclick: () => $("#sx-facets").classList.add("open") }, "Narrow"));
   },
-
   /* ---- keeping and exporting ---- */
   savedAs() { return Saved.searches.find(x => x.hash === location.hash); },
   async save() {
@@ -540,7 +606,13 @@ const T = {
   },
 };
 
-const SORTS = { book: "in book order", right: "by what follows", left: "by what comes before", match: "by the match" };
+const SORTS = { book: "lines, in book order", right: "concordance, by what follows", left: "concordance, by what comes before", match: "concordance, by the match" };
+/* the sections' names as Info uses them, and a colour each for the book strip */
+const SECTION_NAME = { Botanical: "Herbal", Astronomy: "Astronomical", Zodiac: "Zodiac", Balneology: "Balneological", Rose: "Rosettes",
+  Pharmaceutical: "Pharmaceutical", "Starred paragraphs": "Recipes" };
+const secName = v => String(v).split("/").map(x => SECTION_NAME[x.trim()] || x.trim()).join(" / ");
+const SECTION_COL = { Botanical: "#7fa36b", Astronomy: "#5f86b5", Zodiac: "#8b74b8", Balneology: "#c98b6b", Rose: "#c9a64f", Pharmaceutical: "#5aa3a0",
+  "Starred paragraphs": "#b5707c" };
 
 function rangeOf(ns) {
   const lo = Math.min(...ns), hi = Math.max(...ns);

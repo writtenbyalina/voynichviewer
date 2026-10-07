@@ -187,7 +187,7 @@ def main():
                         seg_of.setdefault(sg["page"], sg)
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
-        old.unlink()
+        old.unlink()                                    # (pages.json too: it is written again at the end)
     report = []
     for vp in vps:
         page = RENAME.get(vp, vp)
@@ -237,6 +237,8 @@ def main():
                                                      separators=(",", ":")) + "\n")
         report.append((page, "ok", inl, len(out), nwords))
         print(page, "inliers", inl, "boxes", len(out), "of", nwords, "frame err", round(ferr, 1))
+    # the pages that have boxes, so the site asks only for those
+    (OUT / "pages.json").write_text(json.dumps(sorted(r[0] for r in report if r[1] == "ok"), separators=(",", ":")) + "\n")
     write_report(report)
 
 

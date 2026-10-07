@@ -1,27 +1,27 @@
-// Text: the Reader's text panel, the word card, the interlinear, glyphs, and the Text tab's search, export and saved
-// searches (docs/TEXT.md). Needs the test kit (tests/fixtures.js). The numbers asserted come from data/text, built by
-// tools/text/build.py: a rebuild that changes them should change them here too, on purpose.
+// Text (docs/text/REDESIGN.md): pointing at words on the page photographs, the word panel, the page text, glyphs,
+// comparing with one transcriber, and the Text tab's search, export and saved searches. Needs the test kit
+// (tests/fixtures.js). The numbers asserted come from data/text, built by tools/text: a rebuild that changes them should
+// change them here too, on purpose.
 const { test, expect, openSite } = require("./fixtures");
 
 const panel = page => page.locator("#rd-text");
 const line = (page, id) => page.locator(`#rd-text .ln[data-id="${id}"]`);
 const textReady = page => expect(page.locator("#rd-text .tx-page").first()).toBeVisible({ timeout: 15_000 });
 const results = page => expect(page.locator("#sx-res .sx-hit, #sx-res .sx-none").first()).toBeVisible({ timeout: 15_000 });
+const box = (page, k) => page.locator(`#rd-zoomer .wb[data-k="${k}"]`);
 
-test.describe("the Reader's text panel", () => {
-  test("opens from a link, follows the pages, and T closes it", async ({ page }) => {
-    await openSite(page, "#read/beinecke/1r/text");
+test.describe("the text in the Reader", () => {
+  test("opens from a link, puts the words on the photographs, follows the pages, and T closes it", async ({ page }) => {
+    await openSite(page, "#read/beinecke/2r/text");
     await textReady(page);
     await expect(page.locator("#rd-textbtn")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#rd-text .tx-page h3")).toHaveText(["1r"]);
-    await expect(page.locator("#rd-text .tx-count")).toHaveText("28 lines");
-    // f1r.2 as the design works it through (docs/TEXT.md 3.4): an uncertain space, written as IVTFF's comma
-    await expect(line(page, "f1r.2").locator(".t")).toHaveText("sory ckhar or,y kair chtaiin shar are cthar cthar dan");
-    await expect(page.locator("#rd-text .tx-foot")).toContainText("voynich.nu");
-    await page.keyboard.press("ArrowRight");
     await expect(page.locator("#rd-text .tx-page h3")).toHaveText(["1v", "2r"]);
+    await expect(line(page, "f2r.2").locator(".t")).toContainText("dorchory chkar s shor cthy cto");
+    expect(await page.locator("#rd-zoomer .wb").count(), "words with a place on the photographs").toBeGreaterThan(150);
+    await expect(page.locator("#rd-text .tx-foot")).toContainText("voynich.nu");
     await page.keyboard.press("t");
     await expect(panel(page)).toBeHidden();
+    await expect(page.locator("#rd-zoomer .wb")).toHaveCount(0);
     await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r");
     await page.keyboard.press("t");
     await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text");
@@ -33,6 +33,89 @@ test.describe("the Reader's text panel", () => {
     await expect(panel(page)).toBeHidden();
   });
 
+  test("pointing at a word on the photograph outlines it, lights it in the text and says what it reads", async ({ page }) => {
+    await openSite(page, "#read/beinecke/2r/text");
+    await textReady(page);
+    await box(page, "f2r|3|0").hover();
+    await expect(page.locator("#tx-tip")).toContainText("shaiidy");
+    await expect(page.locator("#tx-tip")).toContainText("transcribers differ");
+    await expect(box(page, "f2r|3|0")).toHaveClass(/hov/);
+    await expect(line(page, "f2r.4").locator(".w").first()).toHaveClass(/lit/);
+  });
+
+  test("clicking a word on the photograph opens the word: a crop, its reading, one sentence, the readings", async ({ page }) => {
+    await page.route("https://collections.library.yale.edu/**", r => r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.alloc(0) }));
+    await openSite(page, "#read/beinecke/2r/text");
+    await textReady(page);
+    const b = await box(page, "f2r|3|0").boundingBox();
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    await expect(page.locator("#rd-text .tx-where")).toHaveText("2r · line 4 · word 1");
+    await expect(page.locator("#rd-text .tx-reading .ev")).toHaveText("shaiidy");
+    await expect(page.locator("#rd-text .tx-verdict")).toContainText("Transcribers differ on the first glyph");
+    for (const [reading, who] of [["shaiidy", "Claston"], ["soaiidy", "Zandbergen & Landini"], ["chaindy", "Takahashi"]])
+      await expect(page.locator("#rd-text .rd", { hasText: who }).first().locator(".r")).toHaveText(reading);
+    await expect(page.locator("#rd-text .tx-crop")).toHaveAttribute("src", /collections\.library\.yale\.edu\/iiif\/2\/.+\/\d+,\d+,\d+,\d+\//);
+    await expect(box(page, "f2r|3|0")).toHaveClass(/sel/);
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text?w=f2r.4.1");
+    await expect.poll(() => page.evaluate(() => R.zoom), "a small word is zoomed to").toBeGreaterThan(1.5);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#rd-text .tx-page").first()).toBeVisible();
+    await expect(box(page, "f2r|3|0")).not.toHaveClass(/sel/);
+  });
+
+  test("a word chosen in the text is chosen on the photograph too; ‹ › step to the next word", async ({ page }) => {
+    await openSite(page, "#read/beinecke/2r/text");
+    await textReady(page);
+    await line(page, "f2r.1").locator(".w").first().click();
+    await expect(page.locator("#rd-text .tx-where")).toHaveText("2r · line 1 · word 1");
+    await expect(box(page, "f2r|0|0")).toHaveClass(/sel/);
+    await page.locator('#rd-text button[aria-label="Next word"]').click();
+    await expect(page.locator("#rd-text .tx-where")).toHaveText("2r · line 1 · word 2");
+  });
+
+  test("the transcribers' lines are one step deeper, only those who differ", async ({ page }) => {
+    await openSite(page, "#read/beinecke/2r/text?w=f2r.4.1");
+    await expect(page.locator("#rd-text .tx-where")).toHaveText("2r · line 4 · word 1", { timeout: 15_000 });
+    await page.locator("#rd-text .tx-line summary").click();
+    const al = page.locator("#rd-text .tx-al");
+    await expect(al.locator(".who").first()).toHaveText("Consensus");
+    await expect(al).toContainText("Takahashi");
+    await expect(al.locator(".x").first()).toBeVisible();
+  });
+
+  test("N steps to the words where transcribers disagree; dots mark them, and can be turned off", async ({ page }) => {
+    await openSite(page, "#read/beinecke/1r/text");
+    await textReady(page);
+    expect(await page.locator("#rd-text .g.d").count()).toBeGreaterThan(3);
+    await page.keyboard.press("n");
+    await expect(page.locator("#rd-text .tx-verdict")).toContainText(/differ|tie|Nobody/);
+    await page.keyboard.press("Escape");
+    await page.locator("#rd-text .tx-menu summary").click();
+    await page.locator("#rd-text .tx-menu input[type=checkbox]").uncheck();
+    await expect(page.locator("#rd-text .g.d")).toHaveCount(0);
+  });
+
+  test("glyphs: the manuscript's shapes, in Voynich VV", async ({ page }) => {
+    await openSite(page, "#read/beinecke/57v/text");
+    await textReady(page);
+    await page.locator("#rd-text .tx-seg button", { hasText: "Glyphs" }).click();
+    await expect.poll(() => page.evaluate(async () => { await document.fonts.ready; return document.fonts.check('24px "Voynich VV"'); })).toBe(true);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector("#rd-text .ln .t")).fontFamily)).toContain("Voynich VV");
+    // the uncertain-space dot is never drawn in the glyph font (it once showed as a gold glyph)
+    expect(await page.evaluate(() => [...document.querySelectorAll("#rd-text .us")].every(e => !getComputedStyle(e, "::after").content || getComputedStyle(e, "::after").content === "none"))).toBe(true);
+  });
+
+  test("comparing with one transcriber fades what they read alike, and is kept in the address", async ({ page }) => {
+    await openSite(page, "#read/beinecke/1r/text?r=GC");
+    await textReady(page);
+    await expect(page.locator("#rd-text .tx-cmp")).toContainText("Comparing with Glen Claston");
+    await expect(line(page, "f1r.2").locator(".w.cx", { hasText: "kaer" })).toHaveCount(1);
+    expect(await line(page, "f1r.2").locator(".w.cs").count()).toBeGreaterThan(5);
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/1r/text?r=GC");
+    await page.locator("#rd-text .tx-cmp button", { hasText: "Stop" }).click();
+    await expect(page.locator("#rd-text .tx-cmp")).toHaveCount(0);
+  });
+
   test("a foldout's panels show their text when unfolded", async ({ page }) => {
     await openSite(page, "#read/beinecke/69r/text");
     await textReady(page);
@@ -40,89 +123,41 @@ test.describe("the Reader's text panel", () => {
     await page.keyboard.press("u");
     await expect(page.locator("#rd-text .tx-page h3")).toHaveText(["68v3", "68v2", "68v1", "69r"], { timeout: 10_000 });
   });
-
-  test("a word's card shows every transcriber's reading, and Escape gives the focus back", async ({ page }) => {
-    await openSite(page, "#read/beinecke/1r/text");
-    await textReady(page);
-    const word = line(page, "f1r.2").locator(".w").nth(6);
-    await word.click();
-    const card = page.locator(".tx-card");
-    await expect(card).toBeVisible();
-    await expect(card).toContainText("f1r.2, word 7");
-    for (const [reading, who] of [["ase", "Zandbergen & Landini"], ["are", "Takahashi"], ["@221;is", "Claston"], ["ary", "Stolfi"]])
-      await expect(card.locator("tr", { hasText: who }).first().locator("td.r")).toHaveText(reading);
-    await expect(card.locator(".tx-votes")).toContainText("a majority");
-    await expect(card.locator(".tx-occ")).toContainText(/time|Only here/);
-    await page.keyboard.press("Escape");
-    await expect(card).toBeHidden();
-    await expect(word).toBeFocused();
-  });
-
-  test("N and Shift+N step through the marked words", async ({ page }) => {
-    await openSite(page, "#read/beinecke/1r/text");
-    await textReady(page);
-    await page.keyboard.press("n");
-    await expect(page.locator(".tx-card")).toContainText("f1r.1, word 7");
-    await page.keyboard.press("n");
-    const second = await page.locator(".tx-card .tx-ch").textContent();
-    await page.keyboard.press("Shift+N");
-    await expect(page.locator(".tx-card")).toContainText("f1r.1, word 7");
-    expect(second).not.toContain("f1r.1, word 7");
-  });
-
-  test("glyphs: the manuscript's shapes, in Voynich VV, with each word's Eva under it", async ({ page }) => {
-    await openSite(page, "#read/beinecke/1r/text");
-    await textReady(page);
-    await page.locator('#rd-text .tx-seg button[data-font="glyphs"]').click();
-    const w = line(page, "f1r.2").locator(".w.st").first();
-    await expect(w.locator(".ev")).toHaveText("sory");
-    await expect(w.locator(".gl")).toHaveAttribute("aria-hidden", "true");
-    await expect.poll(() => page.evaluate(async () => { await document.fonts.ready; return document.fonts.check('26px "Voynich VV"'); })).toBe(true);
-    expect(await page.evaluate(() => getComputedStyle(document.querySelector("#rd-text .w.st .gl")).fontFamily)).toContain("Voynich VV");
-  });
-
-  test("one transcriber's reading, marked where it differs, kept in the address", async ({ page }) => {
-    await openSite(page, "#read/beinecke/1r/text?r=GC");
-    await textReady(page);
-    await expect(page.locator("#rd-text .tx-reading")).toHaveValue("GC");
-    await expect(line(page, "f1r.2").locator(".w.mk", { hasText: "kaer" })).toHaveCount(1);
-    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/1r/text?r=GC");
-  });
-
-  test("the interlinear has a row for each transcriber, and I goes back to lines", async ({ page }) => {
-    await openSite(page, "#read/beinecke/1r/text");
-    await textReady(page);
-    await page.keyboard.press("i");
-    const block = line(page, "f1r.2");
-    await expect(block.locator(".il .who")).toContainText(["Consensus", "Zandbergen & Landini", "Claston", "Takahashi", "Friedman's group", "Currier & D'Imperio", "Stolfi", "RF1", "voynichese.com"]);
-    await expect(block.locator(".seq.cons")).toContainText("cthar cthar");
-    await page.keyboard.press("i");
-    await expect(block.locator(".il")).toHaveCount(0);
-  });
 });
 
 test.describe("the Text tab", () => {
-  test("a search says what it means, counts with a range, and narrows step by step", async ({ page }) => {
+  test("opens on an example, says the count in a sentence, and narrows step by step", async ({ page }) => {
+    await openSite(page, "#text/beinecke/search");
+    await results(page);
+    const echo = page.locator("#sx-echo");
+    await expect(echo).toContainText("daiin appears 898 times on 210 of 227 pages");
+    await expect(echo).toContainText("An example");
+    await expect(page.locator(".sx-secn")).toContainText("Herbal");
+    await page.locator(".sx-frow", { hasText: "Recipes" }).click();
+    await expect(echo).toContainText("(Recipes)");
+    await expect.poll(() => page.evaluate(() => location.hash)).toContain("steps=section");
+  });
+
+  test("a search, its range behind the i, and Scribe narrowing", async ({ page }) => {
     await openSite(page, "#text/beinecke/search?q=qokeedy");
     await results(page);
     const echo = page.locator("#sx-echo");
-    await expect(echo).toContainText("the word qokeedy");
-    await expect(echo).toContainText("309 times");
-    await expect(echo).toContainText(/in ZL, GC and IT/);
-    await expect(page.locator(".sx-bar")).not.toHaveCount(0);
+    await expect(echo).toContainText("qokeedy appears 309 times");
+    await page.locator(".sx-why summary").click();
+    await expect(page.locator(".sx-why-m")).toContainText(/three fullest transcriptions alone/, { timeout: 15_000 });
+    await page.locator(".sx-facet.one summary", { hasText: "Scribe" }).click();
     await page.locator(".sx-frow", { hasText: "Scribe 2" }).click();
     await expect(page.locator("#sx-steps")).toContainText("Scribe 2");
-    await expect.poll(() => page.evaluate(() => location.hash)).toContain("steps=scribe%3A2");
-    await expect(echo).toContainText("before narrowing");
+    await expect(echo).toContainText("(Scribe 2)");
   });
 
-  test("a result opens in the Reader with its line lit, and steps on to the next", async ({ page }) => {
+  test("a result opens in the Reader on its word, and steps on to the next", async ({ page }) => {
+    await page.route("https://collections.library.yale.edu/**", r => r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.alloc(0) }));
     await openSite(page, "#text/beinecke/search?q=chol%20daiin");
     await results(page);
     await page.locator(".sx-hit").nth(2).click();
-    await expect(page.locator("#rd-text .ln.lit")).toHaveAttribute("data-id", "f3r.3", { timeout: 15_000 });
-    await expect(page.locator("#rd-text .w.hit")).toHaveText(["chol", "daiin"]);
-    await expect(page.locator(".tx-step")).toContainText("Result 3 of 34");
+    await expect(page.locator(".tx-step")).toContainText("Result 3 of 34", { timeout: 15_000 });
+    await expect(page.locator("#rd-text .tx-where")).toHaveText(/3r · line 3 · word \d/);
     await page.locator('.tx-step button[aria-label="Next result"]').click();
     await expect(page.locator(".tx-step")).toContainText("Result 4 of 34", { timeout: 15_000 });
     await page.locator(".tx-step a", { hasText: "All results" }).click();
@@ -207,13 +242,12 @@ test.describe("saved searches and the progress file", () => {
     await fresh.route(url => !url.toString().startsWith(baseURL), r => r.abort());
     const problems = [];
     fresh.on("pageerror", e => problems.push(e.message));
-    await openSite(fresh, "#text/beinecke");
+    await openSite(fresh, "#info/beinecke");
     await fresh.locator("#cx-work").click();
     await expect(fresh.locator("#work-dlg")).toContainText("Your searches (0)");
     await fresh.locator("#work-dlg input[type=file]").setInputFiles({ name: "progress.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(file)) });
     await expect(fresh.locator("#work-dlg")).toContainText("Your searches (1)");
     await expect(fresh.locator("#work-dlg a", { hasText: "my qokeedy" })).toHaveAttribute("href", "#text/beinecke/search?q=qokeedy");
-    // and again: nothing twice
     await fresh.locator("#work-dlg input[type=file]").setInputFiles({ name: "progress.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(file)) });
     await fresh.waitForTimeout(300);
     await expect(fresh.locator("#work-dlg")).toContainText("Your searches (1)");
@@ -247,21 +281,23 @@ test.describe("accessibility", () => {
   const unnamed = page => page.evaluate(() => {
     const visible = e => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
     const name = e => (e.getAttribute("aria-label") || e.textContent || e.getAttribute("title") || (e.labels && e.labels[0]?.textContent) || e.closest("label")?.textContent || "").trim();
-    return [...document.querySelectorAll("button, a[href], select, input:not([type=hidden]):not([type=file]), [role=button], [tabindex='0']")]
+    return [...document.querySelectorAll("button, a[href], select, input:not([type=hidden]):not([type=file]), [role=button], [tabindex='0'], summary")]
       .filter(visible).filter(e => !name(e)).map(e => e.outerHTML.slice(0, 100));
   });
-  test("the text panel, its card and the Text tab: every control has a name", async ({ page }) => {
-    await openSite(page, "#read/beinecke/1r/text");
+  test("the text, the word panel and the Text tab: every control has a name", async ({ page }) => {
+    await page.route("https://collections.library.yale.edu/**", r => r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.alloc(0) }));
+    await openSite(page, "#read/beinecke/2r/text");
     await textReady(page);
-    await line(page, "f1r.2").locator(".w").nth(6).click();
+    expect(await unnamed(page)).toEqual([]);
+    await line(page, "f2r.4").locator(".w").first().click();
     expect(await unnamed(page)).toEqual([]);
     await openSite(page, "#text/beinecke/search?q=qok*");
     await results(page);
     expect(await unnamed(page)).toEqual([]);
   });
-  test("a marked word says why it is marked", async ({ page }) => {
-    await openSite(page, "#read/beinecke/1r/text");
+  test("a word where transcribers disagree says so", async ({ page }) => {
+    await openSite(page, "#read/beinecke/2r/text");
     await textReady(page);
-    await expect(line(page, "f1r.1").locator(".w.mk").first()).toHaveAttribute("aria-label", /readings differ|uncertain space|nobody/);
+    await expect(line(page, "f2r.4").locator(".w").first()).toHaveAttribute("aria-label", /transcribers disagree/);
   });
 });

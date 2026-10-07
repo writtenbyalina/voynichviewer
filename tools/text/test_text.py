@@ -151,7 +151,8 @@ class Data(unittest.TestCase):
 
     def test_word_boxes_cover_most_words_and_stay_on_the_page(self):
         """data/text/boxes (tools/text/boxes.py): voynichese.com's boxes fitted to the site's page photos."""
-        files = list((DATA / "boxes").glob("*.json"))
+        files = [f for f in (DATA / "boxes").glob("*.json") if f.name != "pages.json"]
+        self.assertEqual(json.loads((DATA / "boxes" / "pages.json").read_text()), sorted(f.stem for f in files))
         self.assertGreaterEqual(len(files), 220)
         boxed = total = 0
         for f in files:

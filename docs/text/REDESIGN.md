@@ -43,12 +43,12 @@ Data: `data/text/boxes/<page>.json`, voynichese.com's boxes fitted to our photog
 
 | Property | Reference values | Spec | Why |
 |---|---|---|---|
-| Hover outline | Voynichese 2 px #ffff00; Sinaiticus 2 px #d75700; IA 1–2 px; Mol* 1.5 px | **1.5 px, selection pink at 70%, 3 px padding, no fill, instant** | median; no fill keeps the ink readable |
+| Hover outline | Voynichese 2 px #ffff00; Sinaiticus 2 px #d75700; IA 1–2 px; Mol* 1.5 px | **1 px white at 85% with a 1 px dark hairline outside it, tight to the word, no fill, instant** | Alina chose a demure white (7 Oct); the hairline keeps it visible on pale parchment |
 | Hover readout | Quran.com 150×34–40 px pill 8 px above the word; Mol* 330×86 label; Duolingo ≤320 px bubble | **one line, 8 px above the word, dark pill, 13 px: "chtaiin · all 6 agree"**, ends in › | the hint sits at the word (STEP's top banner is the anti-pattern) |
-| Selected outline | Voynichese 3 px; Sinaiticus 2 px; Mol* fill + outline | **2 px solid pink + a 4 px halo of the same pink at 25%** | crisp on dark ink and pale parchment |
+| Selected outline | Voynichese 3 px; Sinaiticus 2 px; Mol* fill + outline | **1.5 px solid white with a 1 px dark hairline, no gap and no halo**; lines kept this thin at any zoom | her review of the mocks: the halo and gap were too wide |
 | Fill | Voynichese 55–60% (hides the ink); IA ~35%; MDZ ~30% | **none** (outline only) | under every reference that stays readable |
 | Rest of the page while a word is selected | Shelley-Godwin fades to #d9d9d9; AlphaFold greys 100%; Bosch ~25% | **table colour at 38% over the photo, with a cut-out round the word; 160 ms fade** | middle of the range; colour stays, focus is clear |
-| Re-framing | Bosch flies in ~4×; Mol* centres; Maps pans the pin clear of its card; Sinaiticus's 22×10 px box is "easy to miss" | **if the word is under 40 px tall on screen, zoom until it is ~56 px; pan it into the free area** | the word must be big enough to see |
+| Re-framing | Bosch flies in ~4×; Mol* centres; Maps pans the pin clear of its card; Sinaiticus's 22×10 px box is "easy to miss" | **if the word is under 36 px tall on screen, zoom until it is ~48 px (at most 4×); centre it in the free area** | 56 px reached the 5× limit; 48 is enough to read |
 | "Crisp" | Transkribus line crop; Beowulf 110×75 crops; Shelley-Godwin fade | **a sharp crop of the word from Yale's full-size photograph at the top of the panel**, up to 328 px wide | Yale serves exact regions (the Reader already uses it to zoom) |
 | Tap target | WCAG 2.2: 24 px | **hit area grown to 24 px; the drawn outline stays the word's size** | |
 | Words without a box | EVT falls back to lines | **the panel still works from the text; the photo shows no outline** (never a wrong box) | EVT's off-by-one zones broke trust |
@@ -101,7 +101,8 @@ line in the page text with agreeing glyphs at 35% and differences in orange, on 
 
 | Token | Means | Value | Used for |
 |---|---|---|---|
-| `--sel` | the word you are on (and a search's match) | #ff5c8a (pink); halo 25% | photo outlines, the text's selected word, search matches |
+| (white) | the word you are on | white, 1–1.5 px, with a dark hairline | photo outlines, the text's chosen word (white underline) |
+| (ink) | a search's match | the ink colour, bold and underlined | search results, the book strip's bars |
 | `--differ` | transcribers disagree here | #ff8a4c (orange) | the dot under a glyph, the "disputed" bar, differing glyphs |
 | (none) | everything else | the Reader's existing table colours | |
 
@@ -122,10 +123,10 @@ photo panning if needed.
 | First view | Ngram opens on a finished query | opens on **daiin**, the commonest word, run, with "an example" beside it |
 | Count | BLB "occurs 17 times in 16 verses"; voynichese "4151 matches, in f46r… and 113 other folios" | **"daiin appears 898 times on 210 of 227 pages."** The range across ZL, GC and IT goes behind an ⓘ |
 | Book strip | IA 644 px for 681 pages, ticks 2×6 px on the slider; Voyant 32 px; voynichese 57 px, unlabelled (the anti-pattern) | 3 px bar, 1 px gap, 36 px tall, in the chosen order; **an 8 px band under it coloured by section with the names in 11 px where a section is ≥ 40 px**; quires as alternating #f3f1ec/#fbfaf7 shading behind the bars |
-| Narrowing | Ngram fades to ~40% | matched pages in pink; pages a filter removes as a 25% ghost; no hits: a hairline |
+| Narrowing | Ngram fades to ~40% | matched pages in ink; pages a step removes as a 20% ghost; no hits: a hairline |
 | Strip hover | IA 350×55 card; Ngram card | "f75r · Balneological · Quire 13 · 12 hits" and the first matching line |
 | Facets | Bible Gateway: book order, 16 px, 24 px rows, "(n)"; IA 6 rows then More; Scholar states defaults | **Section** open (book order, only with hits, "(n)"); Scribe, Language, Kind of text, Quire as one-line "Scribe: any ▾"; no ranges in rows |
-| Results | BlackLab 14 px title per document; Bible Gateway reference + highlighted line; "status said once" | a heading per page with a thumbnail "f75r · Balneological · 12 hits", the lines at reading size with the match in pink, the line opens the page; the centred concordance becomes an option ("Concordance") |
+| Results | BlackLab 14 px title per document; Bible Gateway reference + highlighted line; "status said once" | a heading per page with a thumbnail "f75r · Balneological · 12 hits", the lines at reading size with the match in bold, underlined, the line opens the page; the centred concordance becomes an option ("Concordance") |
 | Stepping | IA "1 / 61 ‹ ›"; VS Code "1 of 22" | kept: "Result 3 of 864 ‹ ›" in the Reader |
 
 ## 4. What goes, what stays
@@ -135,7 +136,7 @@ photo panning if needed.
 | The Interlinear mode and its key I | "How each transcriber wrote this line" in the word panel |
 | The reading switch in the panel header | "Compare with a transcriber…" in the ⋯ menu; "Read the page as …" from a reading row |
 | The marks menu (split / every / none) | one "Mark disagreements" switch (on by default, a dot) |
-| Gold underlines, ticks, dots and fills in the text | the orange dot; pink for the selected word |
+| Gold underlines, ticks, dots and fills in the text | the orange dot; white for the selected word |
 | Eva under every glyph word | Eva in the hover readout and the word panel |
 | The facet ranges, four setting dropdowns, the two-series strip | the ⓘ range, "More options", one series with ghosts |
 | The card as a floating box | the word panel |
@@ -154,3 +155,10 @@ progress file stay as they are; old `#read/…/text?r=GC` links open the compare
 
 The research agents' full reports (with every measurement) and their 250 screenshots are in the session scratchpad,
 not in the repo, since the screenshots are other sites' pages.
+
+## 7. Built (7 Oct 2026)
+
+Alina approved the direction and asked for white instead of pink, with the outline tight to the word. Built in
+`assets/text.js` (the words on the photographs, the page text, the word panel) and `assets/search.js` (the Text tab),
+with `tests/text.spec.js` and `tests/text.mobile.spec.js`. The Interlinear mode, the floating card, the reading switch
+and the marks menu are gone; the compare view, the transcribers' lines and the rarer settings are one step away.
