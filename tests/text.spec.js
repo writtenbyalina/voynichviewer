@@ -4,6 +4,11 @@
 // change them here too, on purpose.
 const { test, expect, openSite } = require("./fixtures");
 
+// Yale's image server, stood in for by a one-pixel photograph (an empty answer would fail to load, and a word's crop
+// would then give way to "could not be loaded" while a test looks at it)
+const PIXEL = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBwYHCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9mKKKKAP/2Q==", "base64");
+const fromYale = r => r.fulfill({ status: 200, contentType: "image/jpeg", body: PIXEL });
+
 const panel = page => page.locator("#rd-text");
 const line = (page, id) => page.locator(`#rd-text .ln[data-id="${id}"]`);
 const textReady = page => expect(page.locator("#rd-text .tx-page").first()).toBeVisible({ timeout: 15_000 });
@@ -44,7 +49,7 @@ test.describe("the text in the Reader", () => {
   });
 
   test("clicking a word on the photograph opens the word: a crop, its reading, one sentence, the readings", async ({ page }) => {
-    await page.route("https://collections.library.yale.edu/**", r => r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.alloc(0) }));
+    await page.route("https://collections.library.yale.edu/**", fromYale);
     await openSite(page, "#read/beinecke/2r/text");
     await textReady(page);
     const b = await box(page, "f2r|3|0").boundingBox();
@@ -93,6 +98,44 @@ test.describe("the text in the Reader", () => {
     await page.locator("#rd-text .tx-menu summary").click();
     await page.locator("#rd-text .tx-menu input[type=checkbox]").uncheck();
     await expect(page.locator("#rd-text .g.d")).toHaveCount(0);
+  });
+
+  test("a diagram drawn across two panels has its words on each, and every word of it has a box", async ({ page }) => {
+    await openSite(page, "#read/beinecke/70r2/text");
+    await textReady(page);
+    for (const img of ["f70r2-1", "f70r2-2"])
+      expect(await page.locator(`#rd-zoomer .seg:has(img[data-key="${img}"]) .wb[data-k^="f70r2|"]`).count(), img).toBeGreaterThan(70);
+    await expect(page.locator('#rd-zoomer .wb[data-k^="f70r2|"]')).toHaveCount(239);
+  });
+
+  test("a ring running over the cut onto the next page's panel is drawn there, and opens as its own page's word", async ({ page }) => {
+    await page.route("https://collections.library.yale.edu/**", fromYale);
+    await openSite(page, "#read/beinecke/72r2/text?w=f72r2.6.36");
+    await expect(page.locator("#rd-text .tx-where")).toHaveText("72r2 · line 6 · word 36", { timeout: 15_000 });
+    await expect(page.locator('#rd-zoomer .seg:has(img[data-key="f72r1"]) .wb[data-k="f72r2|5|35"]')).toHaveClass(/sel/);
+    await expect(page.locator('#rd-zoomer .wb[data-k^="f72r2|"]')).toHaveCount(108);
+    await expect(page.locator("#rd-text .tx-crop")).toHaveAttribute("src", /\/iiif\/2\/1006203\//);
+  });
+
+  test("a panel shown upside down, as it is bound, turns its word boxes with it", async ({ page }) => {
+    await openSite(page, "#read/beinecke/86v5/text");
+    await textReady(page);
+    const seg = page.locator('#rd-zoomer .seg[data-page="f85r2"]');
+    await expect(seg.locator(".wb")).toHaveCount(155);
+    // f85r2 line 1 word 3 is at [856, 695, 45, 38] in thousandths of the photo; turned half round it shows at 99, 267
+    const [s, b] = [await seg.boundingBox(), await box(page, "f85r2|0|2").boundingBox()];
+    expect(Math.round((b.x - s.x) / s.width * 1000)).toBeCloseTo(99, -1);
+    expect(Math.round((b.y - s.y) / s.height * 1000)).toBeCloseTo(267, -1);
+  });
+
+  test("a word whose place is estimated from the words beside it is drawn dashed and says so", async ({ page }) => {
+    await openSite(page, "#read/beinecke/57v/text");
+    await textReady(page);
+    const est = box(page, "f57v|2|9");
+    await expect(est).toHaveClass(/est/);
+    await est.hover();
+    await expect(page.locator("#tx-tip")).toContainText("place estimated");
+    expect(await est.evaluate(e => getComputedStyle(e).outlineStyle)).toBe("dashed");
   });
 
   test("glyphs: the manuscript's shapes, in Voynich VV", async ({ page }) => {
@@ -152,7 +195,7 @@ test.describe("the Text tab", () => {
   });
 
   test("a result opens in the Reader on its word, and steps on to the next", async ({ page }) => {
-    await page.route("https://collections.library.yale.edu/**", r => r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.alloc(0) }));
+    await page.route("https://collections.library.yale.edu/**", fromYale);
     await openSite(page, "#text/beinecke/search?q=chol%20daiin");
     await results(page);
     await page.locator(".sx-hit").nth(2).click();
@@ -285,7 +328,7 @@ test.describe("accessibility", () => {
       .filter(visible).filter(e => !name(e)).map(e => e.outerHTML.slice(0, 100));
   });
   test("the text, the word panel and the Text tab: every control has a name", async ({ page }) => {
-    await page.route("https://collections.library.yale.edu/**", r => r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.alloc(0) }));
+    await page.route("https://collections.library.yale.edu/**", fromYale);
     await openSite(page, "#read/beinecke/2r/text");
     await textReady(page);
     expect(await unnamed(page)).toEqual([]);

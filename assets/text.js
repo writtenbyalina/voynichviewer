@@ -197,12 +197,15 @@ const Boxes = {
     if (!this.pages) this.pages = new Set(await load("boxes/pages.json").catch(() => []));
     return this.pages;
   },
-  /* page -> Map("li:wi" -> [x, y, w, h] in thousandths of the page image), or null when it has none */
+  /* page -> Map("li:wi" -> [x, y, w, h, estimated, img]: in thousandths of the panel image img, the word's panel of
+     the page's (a foldout's page can span several); estimated 1 where its place is estimated from its line's words
+     around it), or null when it has none */
   async of(page) {
     const list = await this.list();
     if (!list.has(page)) return null;
     const b = await load(`boxes/${encodeURIComponent(page)}.json`).catch(() => null);
-    return b ? (b._map ||= new Map(b.words.map(([li, wi, ...r]) => [li + ":" + wi, r]))) : null;
+    if (b && !b._map) b._map = new Map(b.words.map(([li, wi, x, y, w, hh, est = 0, p = 0]) => [li + ":" + wi, [x, y, w, hh, est, b.imgs[p]]]));
+    return b ? b._map : null;
   },
 };
 
@@ -270,15 +273,19 @@ function diffMark(a, b) {
 /* A sharp crop of a word from Yale's full-size photograph (the Reader already loads from Yale to zoom): the page crop's
    corners on the photograph (seg.quad) carry the word's box across. */
 function cropUrl(seg, b, px = 656) {
-  if (!seg || !seg.iiif || !seg.quad || seg.rotate || seg.custom) return null;
+  const rot = ((seg?.rotate || 0) % 360 + 360) % 360;
+  if (!seg || !seg.iiif || !seg.quad || seg.custom || (rot && rot !== 180)) return null;
   const [q0, q1, q2, q3] = seg.quad;
-  const at = (u, v) => [0, 1].map(k => (1 - u) * (1 - v) * q0[k] + u * (1 - v) * q1[k] + u * v * q2[k] + (1 - u) * v * q3[k]);
-  const [x, y, w, hh] = b.map(v => v / 1000);
+  // a panel Yale serves turned half round (rotate 180): its corners count from the photograph's, the other way round
+  const bl = (u, v) => [0, 1].map(k => (1 - u) * (1 - v) * q0[k] + u * (1 - v) * q1[k] + u * v * q2[k] + (1 - u) * v * q3[k]);
+  const at = rot ? (u, v) => bl(1 - u, 1 - v) : bl;
+  const [x, y, w, hh] = b.slice(0, 4).map(v => v / 1000);
   const u0 = Math.max(0, x - w * .35), u1 = Math.min(1, x + w * 1.35), v0 = Math.max(0, y - hh * .9), v1 = Math.min(1, y + hh * 1.9);
   const pts = [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)];
   const X0 = Math.round(Math.min(...pts.map(p => p[0]))), X1 = Math.round(Math.max(...pts.map(p => p[0])));
   const Y0 = Math.round(Math.min(...pts.map(p => p[1]))), Y1 = Math.round(Math.max(...pts.map(p => p[1])));
-  return `${YALE_IIIF}${encodeURIComponent(seg.iiif)}/${X0},${Y0},${X1 - X0},${Y1 - Y0}/${px},/0/default.jpg`;
+  // within px by px: a word written down a ring's side is a tall strip, not a 656-wide enlargement thousands of px tall
+  return `${YALE_IIIF}${encodeURIComponent(seg.iiif)}/${X0},${Y0},${X1 - X0},${Y1 - Y0}/!${px},${px}/${rot}/default.jpg`;
 }
 
 const T = {
@@ -311,7 +318,7 @@ const T = {
       if (gen !== this.gen) return;
       this.loaded = new Map(got_.map(([p, d]) => [p, d]));
       this.boxes = new Map(got_.map(([p, , b]) => [p, b]));
-      this.segs = new Map(pages.map(x => [x.page, x.seg]));
+      this.segs = new Map(pages.map(x => [x.seg.img, x.seg]));   // the panels on show, by image, for the crops
       this.shownNow = shown;
       if (this.sel && !this.loaded.has(unkey(this.sel).page)) { this.sel = null; setHash(); }
       this.show();
@@ -403,18 +410,23 @@ const T = {
      the Reader draws the opening. */
   decorate() {
     for (const segEl of $$("#rd-zoomer .spread .seg[data-page]")) {
-      const page = segEl.dataset.page, b = this.boxes.get(page), seg = this.segs.get(page);
-      if (!b || !seg || seg.custom || seg.rot) { $(".seg-words", segEl)?.remove(); continue; }
+      // the boxes on this panel: its page's, and a neighbouring page's whose ring runs over the cut between them
+      // (a panel the Reader shows upside down, as bound, turns its boxes with it; other turns get none)
+      const img = $("img", segEl)?.dataset.key, seg = this.segs.get(img), rot = (((seg?.rot || 0) % 360) + 360) % 360;
+      const mine = seg && !seg.custom && (rot === 0 || rot === 180)
+        ? [...this.boxes].flatMap(([page, b]) => b ? [...b].filter(([, r]) => r[5] === img).map(([k, r]) => [page, k, r]) : []) : [];
+      if (!mine.length) { $(".seg-words", segEl)?.remove(); continue; }
       let layer = $(".seg-words", segEl);
-      if (!layer || layer.dataset.n !== String(b.size)) {
+      if (!layer || layer.dataset.n !== String(mine.length)) {
         layer?.remove();
-        layer = h("div", { class: "seg-words", "data-n": b.size, "aria-hidden": "true" });
-        for (const [k, [x, y, w, hh]] of b) {
+        layer = h("div", { class: "seg-words", "data-n": mine.length, "aria-hidden": "true" });
+        for (const [page, k, [x, y, w, hh, est]] of mine) {
           const [li, wi] = k.split(":");
-          layer.append(h("i", { class: "wb", "data-k": key(page, li, wi), style: { left: x / 10 + "%", top: y / 10 + "%", width: w / 10 + "%", height: hh / 10 + "%" } }));
+          layer.append(h("i", { class: est ? "wb est" : "wb", "data-k": key(page, li, wi), style: { left: x / 10 + "%", top: y / 10 + "%", width: w / 10 + "%", height: hh / 10 + "%" } }));
         }
         segEl.append(layer);
       }
+      layer.style.transform = rot ? "rotate(180deg)" : "";
     }
     this.marks();
   },
@@ -452,7 +464,8 @@ const T = {
     const glyph = this.font === "glyphs";
     t.replaceChildren(h("b", { class: glyph ? "gl" : "" }, glyph ? it.w.toks.map(x => x.sep ? " " : chOf(x.code)).join("") : it.w.eva.replace(/,/g, "·")),
       glyph ? h("span", { class: "ev" }, it.w.eva.replace(/,/g, "·")) : "",
-      h("span", { class: "say" }, this.short(it)), h("span", { class: "chev", "aria-hidden": "true" }, "›"));
+      h("span", { class: "say" }, this.short(it) + (box.classList.contains("est") ? " · place estimated" : "")),
+      h("span", { class: "chev", "aria-hidden": "true" }, "›"));
     if (!tip) st.append(t);
     t.style.left = Math.max(80, Math.min(sr.width - 80, r.left - sr.left + r.width / 2)) + "px";
     t.style.top = Math.max(44, r.top - sr.top) + "px";
@@ -699,7 +712,7 @@ const T = {
       h("button", { class: "tx-ic", title: "Next word", "aria-label": "Next word", disabled: at >= all.length - 1, onclick: () => this.stepWord(1) }, "›"),
       h("button", { class: "tx-ic", title: "Close the text (T)", "aria-label": "Close the text", onclick: () => TextUI.toggle(false) }, "✕"));
     const box = this.boxes.get(page)?.get(li + ":" + wi);
-    const url = box && cropUrl(this.segs.get(page), box);
+    const url = box && cropUrl(this.segs.get(box[5]), box);
     const glyphs = w.toks.filter(t => !t.sep), us = unitsIn(loc, w);
     const band = t => {
       const u = us.find(u => u[1] && t.off >= u[0] && t.off < u[0] + u[1]);
@@ -733,7 +746,8 @@ const T = {
     const crop = url ? h("img", { class: "tx-crop", src: url, alt: `${w.eva}, on the page`, loading: "eager",
       onerror: e => e.target.replaceWith(h("p", { class: "tx-msg" }, "Yale's photograph could not be loaded.")) }) : null;
     body.replaceChildren(
-      crop ? h("figure", { class: "tx-fig" }, crop, h("figcaption", {}, `From Yale's photograph of ${short(page)}`)) : "",
+      crop ? h("figure", { class: "tx-fig" }, crop, h("figcaption", {}, `From Yale's photograph of ${short(page)}`,
+        box[4] ? ". Where this word sits is estimated from the words beside it." : "")) : "",
       h("div", { class: "tx-reading" }, h("span", { class: "gl", "aria-hidden": "true" }, glyphs.map(t => chOf(t.code)).join("")),
         h("span", { class: "ev" }, cons)),
       h("p", { class: "tx-verdict" }, ...verdict(loc, w)),

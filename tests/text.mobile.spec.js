@@ -2,10 +2,15 @@
 // word on the photograph opens it there; the Text tab's filters open as a sheet. Nothing scrolls sideways.
 const { test, expect, openSite } = require("./fixtures");
 
+// Yale's image server, stood in for by a one-pixel photograph (an empty answer would fail to load, and a word's crop
+// would then give way to "could not be loaded" while a test looks at it)
+const PIXEL = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBwYHCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9mKKKKAP/2Q==", "base64");
+const fromYale = r => r.fulfill({ status: 200, contentType: "image/jpeg", body: PIXEL });
+
 const sideways = page => page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth);
 
 test("the text sits below the pages; tapping a word on the photograph opens it", async ({ page }) => {
-  await page.route("https://collections.library.yale.edu/**", r => r.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.alloc(0) }));
+  await page.route("https://collections.library.yale.edu/**", fromYale);
   await openSite(page, "#read/beinecke/2r/text");
   await expect(page.locator("#rd-text .tx-page").first()).toBeVisible({ timeout: 15_000 });
   const stage = await page.locator("#rd-stage").boundingBox(), text = await page.locator("#rd-text").boundingBox();

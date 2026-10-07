@@ -38,8 +38,8 @@ research agent (screenshots kept outside the repo; the four reports are summaris
 
 ### 2.1 Pointing at a word on the photograph
 
-Data: `data/text/boxes/<page>.json`, voynichese.com's boxes fitted to our photographs (`tools/text/boxes.py`;
-98.3% of words on 224 pages).
+Data: `data/text/boxes/<page>.json`, voynichese.com's boxes fitted to our photographs (`tools/text/boxes.py`,
+`wordmatch.py`; docs/text/boxes.md has the figures for each page).
 
 | Property | Reference values | Spec | Why |
 |---|---|---|---|
@@ -146,9 +146,13 @@ progress file stay as they are; old `#read/…/text?r=GC` links open the compare
 
 ## 5. Known gaps
 
-- The boxes of the round diagrams (f70r2, f86v3 and others) follow voynichese.com's word order, which differs from the
-  transcriptions', so fewer of their words have a box (docs/text/boxes.md). Matching line by line would recover most.
-- f101v has no boxes yet (its photograph did not match), nor do the Rosettes and f116v (voynichese.com has none).
+- No boxes for the Rosettes foldout (fRos, 517 words) and f116v: voynichese.com never covered them. The one public
+  set that does, daiin.net's word map (Konstantin Hamidullin, "farmerjohn"), states no licence, so it would need his
+  permission; Zandbergen has boxes for every RF1 word but has not published them. Asking either is Alina's call.
+- f101v's left panel (97 words) has none: voynichese.com's photograph of that page shows only its right panel, and
+  our left panel is cut from a different photograph of Yale's.
+- A few dozen words that voynichese.com never boxed (marginal letters, some labels) have none; 60 words have a place
+  estimated from the words beside them, drawn with a dashed outline and said so.
 - A word whose box is shared by two consensus words (one transcriber joined them) gets each half of the box.
 
 ## 6. The four reports

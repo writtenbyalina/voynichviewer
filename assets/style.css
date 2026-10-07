@@ -1044,6 +1044,9 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .wb.hov { box-shadow: 0 0 0 calc(1px * var(--iz, 1)) rgba(255, 255, 255, .85), 0 0 0 calc(2px * var(--iz, 1)) rgba(20, 16, 12, .35); }   /* Spec: hover, a thin white line */
 .wb.sel { z-index: 1; box-shadow: 0 0 0 calc(1.5px * var(--iz, 1)) #fff, 0 0 0 calc(2.5px * var(--iz, 1)) rgba(20, 16, 12, .55),   /* Spec: chosen, white, no gap */
   0 0 0 9999px rgba(45, 41, 37, .38); }                    /* Spec: the rest of the page dimmed (38%) */
+/* a box whose place is estimated from the words beside it (voynichese.com has none for it): a dashed line */
+.wb.est.hov { box-shadow: none; outline: calc(1px * var(--iz, 1)) dashed rgba(255, 255, 255, .9); }
+.wb.est.sel { box-shadow: 0 0 0 9999px rgba(45, 41, 37, .38); outline: calc(1.5px * var(--iz, 1)) dashed #fff; }
 .spread.has-sel .seg:not(.sel-seg) img { filter: brightness(.62); transition: filter .16s; }
 .tx-tip { position: absolute; z-index: 20; transform: translate(-50%, calc(-100% - 8px)); pointer-events: none; display: flex; align-items: baseline; gap: 8px;
   background: rgba(29, 26, 23, .96); color: #fff; border-radius: 99px; padding: 5px 12px; font-size: 13px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
