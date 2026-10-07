@@ -149,6 +149,24 @@ class Data(unittest.TestCase):
         self.assertEqual(n["ZL"], 0)
         self.assertLess(sum(n.values()), 300)
 
+    def test_word_boxes_cover_most_words_and_stay_on_the_page(self):
+        """data/text/boxes (tools/text/boxes.py): voynichese.com's boxes fitted to the site's page photos."""
+        files = list((DATA / "boxes").glob("*.json"))
+        self.assertGreaterEqual(len(files), 220)
+        boxed = total = 0
+        for f in files:
+            b = json.loads(f.read_text())
+            loci = page(b["page"])["loci"]
+            seen = set()
+            for li, wi, x, y, w, h in b["words"]:
+                self.assertLess(wi, len(loci[li]["c"].split(".")), (b["page"], li, wi))
+                self.assertTrue(0 <= x <= 1000 and 0 <= y <= 1000 and 0 < w <= 1000 and 0 < h <= 1000, (b["page"], li, wi))
+                self.assertNotIn((li, wi), seen)
+                seen.add((li, wi))
+            boxed += len(b["words"])
+            total += sum(len(l["c"].split(".")) for l in loci)
+        self.assertGreater(boxed / total, 0.95)
+
     def test_sizes(self):
         self.assertLess((DATA / "index.json").stat().st_size, 400_000)
         self.assertLess(max(f.stat().st_size for f in (DATA / "pages").glob("*.json")), 160_000)

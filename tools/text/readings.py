@@ -74,6 +74,61 @@ def reading_of(loc: dict, who: str) -> str | None:
     return "".join(out)
 
 
+def words_of(loc: dict, who: str) -> list[tuple[str, str]] | None:
+    """Their reading word by word of the consensus, as assets/text.js readingOf gives it: for each consensus word
+    (text, next), text with their own . and , inside it, next their mark at the break after it (. , or "")."""
+    if not present(loc, who):
+        return None
+    unit_at, empty_at, gap_at = {}, {}, {}
+    for u in loc["u"]:
+        if u[1]:
+            unit_at[u[0]] = u
+        else:
+            empty_at.setdefault(u[0], []).append(u)
+    for o, _st, m in loc["s"]:
+        gap_at[o] = marks(m)
+
+    def mark(o, d):
+        g = gap_at.get(o)
+        return g[who] if g is not None and who in g else d
+
+    c = loc["c"]
+    out = [["", "."] for _ in c.split(".")]
+    wi, i = 0, 0
+    while i <= len(c):
+        for u in empty_at.get(i, []):
+            t = unit_reading(u, who, "")
+            if t:
+                out[wi][0] += (marks(u[5]).get(who, "") if len(u) > 5 else "") + t
+        if i == len(c):
+            break
+        ch = c[i]
+        if ch == ".":
+            out[wi][1] = mark(i, ".")
+            wi += 1
+            i += 1
+            continue
+        if ch == ",":
+            out[wi][0] += mark(i, ",")
+            i += 1
+            continue
+        if i > 0 and c[i - 1] not in ".," and i in gap_at:
+            out[wi][0] += mark(i, "")
+        u = unit_at.get(i)
+        if u:
+            out[wi][0] += unit_reading(u, who, c[i:i + u[1]])
+            i += u[1]
+        else:
+            out[wi][0] += ch
+            i += 1
+    return [tuple(x) for x in out]
+
+
+def word_text(loc: dict, wi: int) -> str:
+    """Consensus word wi of a locus, in Eva."""
+    return loc["c"].split(".")[wi]
+
+
 def _norm(s: str) -> str:
     s = s.replace("@221;", "a").replace("@222;", "y")
     return re.sub(r"^[.,]+|[.,]+$", "", re.sub(r"[.,]+(?=[.,])", "", s))

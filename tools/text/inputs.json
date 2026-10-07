@@ -1,5 +1,5 @@
 {
- "about": "Inputs of tools/text/build.py, all from Ren\u00e9 Zandbergen's voynich.nu, where the transliterations are released under CC0 (https://www.voynich.nu/roadmap.html). fetch.py downloads them into tools/text/cache and refuses any file whose sha256 differs.",
+ "about": "Inputs of tools/text/build.py and boxes.py: the transliterations from René Zandbergen's voynich.nu, released under CC0 (https://www.voynich.nu/roadmap.html), and The Voynichese Project's word boxes (Apache License 2.0). fetch.py downloads them into tools/text/cache and refuses any file whose sha256 differs.",
  "files": [
   {
    "name": "ZL3b-n.txt",
@@ -126,6 +126,13 @@
    "sha256": "3e895365ee1b4375faa280acaa785ad84bb113e9f8af2c321127c215e9998c39",
    "bytes": null,
    "what": "STA to reduced STA"
+  },
+  {
+   "name": "voynichese_data.zip",
+   "url": "https://www.voynichese.com/1/data/folio/voynichese_data.zip",
+   "sha256": "402d99ca8191ae53a4f25912ee0af0a7e6b6d9a3714b2beaf86404a27d5b7ad5",
+   "bytes": 715214,
+   "what": "The Voynichese Project's word boxes (2014), XML, Apache License 2.0: used by boxes.py"
   }
  ]
 }

@@ -823,7 +823,9 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .tx .c-m { text-decoration-style: dotted; text-decoration-thickness: 1px; }
 /* an uncertain space: its comma, drawn as a gold dot (copying gives the comma) */
 .tx .us { position: relative; display: inline-block; width: .55em; color: transparent; }
-.tx .us::after { content: "·"; position: absolute; left: 0; right: 0; text-align: center; color: var(--tx-gold); font: 700 14.5px/inherit -apple-system, system-ui, sans-serif; }
+/* the dot is drawn in the system font: in the glyph font "·" is a glyph of its own */
+.tx .us::after { content: "·"; position: absolute; left: 0; right: 0; bottom: 0; text-align: center; color: var(--tx-gold);
+  font: 700 14.5px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
 /* where some wrote a space and the consensus has none, or a glyph only some read */
 .tx .dj { display: inline-block; width: 0; height: .75em; vertical-align: -.05em; border-left: 1.5px solid var(--tx-gold); margin: 0 1px; opacity: .85; }
 /* a space not everyone wrote */
