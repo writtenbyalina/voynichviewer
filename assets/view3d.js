@@ -37,6 +37,10 @@ const V = {
   unfoldOpening: false, slow: store.get("3d:slow", false), prevOrder: null, flash: null,
   overlay: store.get("3d:overlay", "none"),
   contact: { on: false, i: 0, newOnly: false, list: [] },
+  arrange: false,      // Rearrange: the quires lie open on the table as piles (arrangeLayout)
+  sel: new Set(), selQ: new Set(), selMain: null,   // there, the selected sheets (the main one) or quires (arrange.js)
+  hoverPile: null,     // and the stack under the pointer, opened out
+  hideLost: store.get("3d:hideLost", false),   // lost sheets left out of the 3D book
   objs: new Map(),     // current order: sheet id -> sheet object
   cache: new Map(),    // id + handling -> sheet object, reused across orders
 };
@@ -133,8 +137,10 @@ function modelOf(order) {
       const moved = order.id !== "beinecke" && (!w || w.q !== g.quire || w.i !== i);
       return { id, sheet: SHEETS.get(id), opts, quire: g.quire, type: g.type, idx: i, count: g.bifolia.length, note: g.note, qi,
                moved, resewn: order.id !== "beinecke" && !moved && !!w && w.o !== JSON.stringify(opts) };
-    });
-    quires.push({ qi, quire: g.quire, type: g.type, leaves: [] });
+    }).filter(e => !(V.hideLost && e.sheet.missing.every(Boolean)));   // Hide lost sheets: the book without them
+    if (!es.length) return;
+    const qd = { qi, quire: g.quire, type: g.type, leaves: [] };   // qi stays the gathering's place in the order
+    quires.push(qd);
     const groups = g.type === "singulions" ? es.map(e => [e]) : [es];
     for (const grp of groups) {
       const gi = gathers.length;
@@ -142,13 +148,14 @@ function modelOf(order) {
       const ga = { gi, qi, quire: g.quire, leaves: [] };
       ls.forEach(([e, k], j) => {
         const L = { key: `${e.id}:${k}`, e, k, gi, qi, j, depth: g.type === "singulions" ? 0 : e.idx, n: leaves.length };
-        ga.leaves.push(L); quires[qi].leaves.push(L); leaves.push(L);
+        ga.leaves.push(L); qd.leaves.push(L); leaves.push(L);
       });
       gathers.push(ga);
     }
     sheets.push(...es);
   });
-  const unplaced = unplacedOf(order).map(id => ({ id, sheet: SHEETS.get(id), opts: {}, quire: SHEETS.get(id).quire, unplaced: true, type: "aside", idx: 0, count: 1 }));
+  const unplaced = unplacedOf(order).filter(id => !(V.hideLost && SHEETS.get(id).missing.every(Boolean)))
+    .map(id => ({ id, sheet: SHEETS.get(id), opts: {}, quire: SHEETS.get(id).quire, unplaced: true, type: "aside", idx: 0, count: 1 }));
   return { sheets, gathers, leaves, quires, unplaced, all: [...sheets, ...unplaced] };
 }
 
@@ -392,7 +399,8 @@ function computeLayout() {
   }
   const worldBox = place.box.clone();
   if (model.unplaced.length) worldBox.max.z += 1.3 * H;
-  return { poses, sg, t, lie, beta, place, box: worldBox, al };
+  const out = { poses, sg, t, lie, beta, place, box: worldBox, al };
+  return V.arrange ? arrangeLayout(out) : out;
 }
 
 // ---------------------------------------------------------------- animation
@@ -417,13 +425,16 @@ function finishSwaps() {
 function relayout(dur = 650, morph = null) {
   if (!V.model) return;
   if (TW.on) finishSwaps();
+  const keys = ARR.plan?.keys;
   const L = V.layout = computeLayout();
+  const replan = V.arrange && keys && ARR.plan?.keys !== keys;
+  if (replan) setTimeout(keepFramed, 0);   // the table's plan changed: does it still fit?
   const poses = new Map(), sgs = new Map();
   for (const [key, b] of L.poses) poses.set(key, [[0, CUR.poses.get(key) || b], [1, b]]);
   for (const en of V.model.all) sgs.set(en.id, [[0, CUR.sg.get(en.id) || IDENT], [1, L.sg.get(en.id) || IDENT]]);
   const tw = { poses, sgs, g: [[0, { t: CUR.t, lie: CUR.lie, beta: CUR.beta }], [1, { t: L.t, lie: L.lie, beta: L.beta }]], swaps: [], leaving: [] };
   if (morph) morph(tw, L);
-  TW = { ...tw, t0: performance.now(), dur: REDUCED ? 0 : dur, on: true };
+  TW = { ...tw, t0: performance.now(), dur: REDUCED ? 0 : dur, on: true, replan };
   for (const sw of TW.swaps) sw.show.group.visible = false;
   updateDetail();
   if (!TW.dur) tweenStep(TW.t0); else wake();
@@ -439,7 +450,11 @@ function tweenStep(now) {
   Object.assign(CUR, at(TW.g, k, mixG));
   for (const sw of TW.swaps) { sw.hide.group.visible = k < sw.k && !hiddenObj(sw.hide); sw.show.group.visible = k >= sw.k && !hiddenObj(sw.show); }
   applyAll();
-  if (k >= 1) { TW.on = false; finishSwaps(); TW.swaps = []; TW.leaving = []; }
+  if (k >= 1) {
+    TW.on = false; finishSwaps(); TW.swaps = []; TW.leaving = [];
+    if (ARR.leaving) { ARR.leaving = false; applyAll(); }
+    if (ARR.after && V.arrange) { ARR.after = false; setTimeout(() => relayout(REDUCED ? 0 : 160), 0); }
+  }
   return TW.on;
 }
 
@@ -465,7 +480,9 @@ function applyAll() {
     shapeFold(o, id);
   }
   appliedT = t;
-  const place = bookPlacement(CUR.poses, V.model, t, CUR.lie, CUR.beta);
+  // on the table the sheets are placed in the room, so the book's frame holds still (and on the way back to the book)
+  const place = (V.arrange || ARR.leaving) && V.layout?.place ? V.layout.place : bookPlacement(CUR.poses, V.model, t, CUR.lie, CUR.beta);
+  shadow.visible = !V.arrange && !ARR.leaving;
   book.position.copy(place.pos);
   book.quaternion.setFromRotationMatrix(place.R);
   shadow.position.set((place.box.min.x + place.box.max.x) / 2, .05, (place.box.min.z + place.box.max.z) / 2);
@@ -535,10 +552,10 @@ function setGoal({ yaw, pitch, dist, target, fov }, k = 10) {
   wake();
 }
 /* How far back the camera must stand, looking from (yaw, pitch), for every point to fit the view. */
-function fitDist(points, center, yaw, pitch, margin = 1.1, fov = camera.fov) {
+function fitDist(points, center, yaw, pitch, margin = 1.1, fov = camera.fov, aspect = camera.aspect) {
   const f = camDir(yaw, pitch), right = new THREE.Vector3(0, 1, 0).cross(f).normalize(), up = f.clone().cross(right);
   if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
-  const tv = Math.tan(fov / 2 * DEG), th = tv * camera.aspect;
+  const tv = Math.tan(fov / 2 * DEG), th = tv * aspect;
   let need = 0;
   for (const p of points) {
     const d = p.clone().sub(center);
@@ -596,7 +613,7 @@ function frame(now) {
   raf = 0;
   const dt = lastT ? Math.min(.05, (now - lastT) / 1000) : 1 / 60;
   lastT = now;
-  const moving = camStep(dt);
+  const moving = camStep(dt) | shade(dt);
   const anim = tweenStep(now);
   renderer.render(scene, camera);
   drawLabels();
@@ -609,7 +626,7 @@ function resize() {
   camera.aspect = w / h2; camera.updateProjectionMatrix();
   // still at a named view (not turned, panned or zoomed since): keep it framed as the stage changes size
   clearTimeout(resize.t);
-  resize.t = setTimeout(() => { if (V.preset && V.layout && !V.hand.on) preset(V.preset, { instant: REDUCED }); }, 120);
+  resize.t = setTimeout(() => { if (V.arrange) { if (!TW.on) frameTable(); } else if (V.preset && V.layout && !V.hand.on) preset(V.preset, { instant: REDUCED }); }, 120);
   wake();
 }
 
@@ -637,6 +654,12 @@ function drawLabels() {
   if (!V.model) return;
   SW = stage.clientWidth; SH = stage.clientHeight;
   book.updateMatrixWorld();
+  if (V.arrange || ARR.leaving) {   // on the table the piles are named instead (placePiles)
+    for (const el of LBL.values()) if (el.style.display !== "none") el.style.display = "none";
+    placePiles();
+    return;
+  }
+  placePiles();
   const want = [];
   const lay = V.layout, e = V.mode === "opening" ? 0 : smooth(.55, 1, V.spread);
   const curEn = V.model.all[V.cur];
@@ -803,7 +826,8 @@ function tint() {
   const curEn = V.model.all[V.cur], ov = OVERLAYS[V.overlay];
   for (const en of V.model.all) {
     const o = V.objs.get(en.id); if (!o) continue;
-    const hi = en === curEn || V.flash?.has(en.id) ? GOLD : en === V.hover ? 0xf7dc9a : null;
+    const picked = V.arrange ? V.sel.has(en.id) : en === curEn;
+    const hi = picked || V.flash?.has(en.id) ? GOLD : en === V.hover ? 0xf7dc9a : null;
     const sheetCols = [];
     for (const L of o.leaves) {
       if (L.base == null) continue;   // a lost leaf stays a ghost
@@ -818,7 +842,8 @@ function tint() {
       o.fold.material = ov.cats && fc.length ? overlayMat(fc, true) : o.foldMat;
       o.foldMat.color.setHex(hi ?? FOLD);
     }
-    for (const m of o.panels) for (const mat of m.material.slice(0, 2)) if (mat.emissive) mat.emissive.setHex(en === V.hover ? 0x1c150a : 0);
+    const glow = V.arrange && V.sel.has(en.id) ? 0x3d2c08 : en === V.hover ? 0x1c150a : 0;
+    for (const m of o.panels) for (const mat of m.material.slice(0, 2)) if (mat.emissive) mat.emissive.setHex(glow);
   }
   wake();
 }
@@ -834,6 +859,7 @@ function info(en) {
   return { sides, names, v, pos, title: `Sheet ${en.id}`, sub: en.unplaced ? `Not placed · ${pos}` : `${qWord(en.quire)} · ${pos}` };
 }
 function tip(en, e) {
+  if (V.arrange) { tipEl.hidden = true; return hud(en); }   // on the table: in the panel, which stays put
   if (!en) { tipEl.hidden = true; return; }
   const { sides, names, v, sub, title } = info(en);
   tipEl.innerHTML = "";
@@ -911,6 +937,7 @@ function setCur(i, { follow = true } = {}) {
 }
 /* In a wide (exploded) layout, keep the current sheet on screen. */
 function followCur() {
+  if (V.arrange) return;
   const an = sheetAnchor(V.model.all[V.cur]?.id); if (!an || !V.layout) return;
   const lp = V.layout.poses.get(`${V.model.all[V.cur].id}:0`); if (!lp) return;
   book.updateMatrixWorld();
@@ -975,6 +1002,485 @@ function setThick(x) {
   relayout(500);
 }
 
+// ---------------------------------------------------------------- Rearrange: the book taken apart on the table
+/* In Rearrange (arrange.js) the book comes apart on the table, the background darkens, and every quire lies open as a
+   pile of open sheets, in the order of the book, row by row from the back. A quire whose sheets are tucked inside each
+   other is stacked the way it lies opened at its centre: the centre sheet on top, each sheet further out a little
+   lower and further forward, so its edge shows. Sheets read one by one are fanned left to right like cards, the first
+   on the left. Set-aside sheets lie in a last pile.
+   It works like a drawing program: click a sheet to select it, ⇧- or ⌘-click to add more, drag across the table to
+   select a box of them; drag the selection onto a pile (it opens where they will go) or into the gap between two piles
+   (a new quire there). The book's frame (posture, place) holds still while the sheets are on the table. */
+const ARR = { leaving: false, drag: null, gap: null, gapKey: "", cam: null, dk: 0, goal: 0, sig: "", tray: null, hl: null, ins: null,
+              qsel: [], plan: null, box: null, space: false, hudT: 0 };
+const ARR_UP = 7, ARR_FWD = 10, ARR_FAN = .42, ARR_LIFT = 46;
+const ARR_UP_OPEN = 12, ARR_FWD_OPEN = 22;   // a stack under the pointer opens out, so each of its sheets is easy to point at
+const BG = new THREE.Color(0x221e1a), BG_DARK = new THREE.Color(0x100e0c), TBL = new THREE.Color(0x3a3129), TBL_DARK = new THREE.Color(0x1f1a16);
+const TABLE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const nth = k => ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth"][k] || `${k + 1}th`;
+/* where a sheet is, in words (for screen readers): "the third sheet from the outside" */
+function whereText(en) {
+  if (en.unplaced) return en.sheet.missing.every(Boolean) ? "lost, and given no place" : "set aside, out of the book";
+  if (en.count === 1) return "the only sheet";
+  if (en.type === "singulions") return `the ${nth(en.idx)} of ${en.count}, read one by one`;
+  return en.idx === en.count - 1 ? "the centre sheet" : en.idx === 0 ? "the outermost sheet" : `the ${nth(en.idx)} sheet from the outside`;
+}
+const sheetWidth = id => { const o = V.objs.get(id); return o ? (o.leaves[0].w || o.leaves[1].w) + (o.leaves[1].w || o.leaves[0].w) : H * 1.4; };
+const GX = H * .38, CAP = H * .6;    // the gap between piles, and the room in front of a row for its names
+
+function arrangeLayout(base) {
+  const model = V.model, place = base.place, inv = place.matrix.clone().invert(), hid = hiddenQuires();
+  const lifted = new Set(ARR.drag?.ids || []), gap = ARR.gap;
+  const poses = new Map(), sg = new Map(), centers = new Map(), picks = new Map();
+  const W0 = H * 1.45;   // an empty pile's room (set aside)
+  const piles = model.quires.filter(q => !hid.has(String(q.quire))).map(q => ({ key: String(q.quire), gi: q.qi, quire: q.quire, type: q.type,
+    ens: model.sheets.filter(en => en.qi === q.qi) }));
+  piles.push({ key: "aside", gi: -1, quire: null, type: "aside", ens: model.unplaced });
+  for (const p of piles) {
+    p.ids = p.ens.map(en => en.id).filter(id => !lifted.has(id));       // what stays in it while sheets are dragged
+    p.slots = p.ids.slice();
+    if (gap?.kind === "into" && gap.key === p.key) p.slots.splice(gap.index, 0, ...[...lifted].map(() => null));   // room for them
+    p.fan = p.type !== "nested";
+    p.sw = Math.max(...p.ens.map(en => sheetWidth(en.id)), p.ens.length ? 0 : W0);   // its widest sheet, lying open
+    const open = !p.fan && (p.key === V.hoverPile || (gap?.kind === "into" && gap.key === p.key));
+    p.fwd = open ? ARR_FWD_OPEN : ARR_FWD; p.up = open ? ARR_UP_OPEN : ARR_UP;
+    const n = Math.max(1, p.slots.length);
+    p.d = H + (p.fan ? 0 : p.fwd * (n - 1));
+  }
+  /* The plan of the table: each quire has a room of its own, sized for what it holds and one sheet more, at a fixed
+     place. It is made when the book comes apart (or another order is chosen). Moving sheets about never changes it:
+     a pile grows back into the space behind it and nothing else moves. A quire made, merged or split changes only its
+     own row; a quire moved keeps every row as long as it was. Its shape doesn't depend on the window. */
+  const kind = p => p.fan ? "f" : "n";
+  const room = p => p.fan ? p.sw * (1 + ARR_FAN * p.ens.length) : p.sw;                  // a fan: room for one card more
+  const reach = p => p.fan ? H * 1.16 : H + (ARR_FWD_OPEN + ARR_UP_OPEN / 1.6) * p.ens.length;   // a fan: room for a card drawn out; a stack: open (its rise looks like depth from above), one sheet deeper
+  const keys = piles.map(p => `${p.key}:${kind(p)}`).join("|");
+  const depthOf = row => Math.max(...row.map(reach)) + CAP;
+  const place2 = rows => {   // x for every pile, each row centred; rows keep the depth they had (new ones after)
+    const at = new Map(), old = ARR.plan;
+    let z = -rows.reduce((a, row) => a + depthOf(row), 0) / 2;
+    const rowZ = rows.map((row, j) => old?.rowZ[j] ?? (z += depthOf(row), z - CAP));
+    if (old) for (let j = old.rowZ.length; j < rows.length; j++) rowZ[j] = rowZ[j - 1] + depthOf(rows[j]);
+    rows.forEach((row, j) => {
+      const w = p => { const a = old?.at.get(p.key); return a && a.kind === kind(p) ? a.w : room(p); };
+      let x = -row.reduce((a, p) => a + w(p) + GX, -GX) / 2;
+      for (const p of row) { at.set(p.key, { x0: x, w: w(p), row: j, z1: rowZ[j], kind: kind(p), r: reach(p) }); x += w(p) + GX; }
+    });
+    const base = old?.base ?? Math.max(...rows.map(row => row.reduce((a, p) => a + room(p) + GX, -GX)));   // the widest row, laid out afresh
+    return { keys, counts: rows.map(r => r.length), at, rowZ, base, order: V.order?.id };
+  };
+  if (!ARR.plan || ARR.plan.keys !== keys) {
+    let rows = null;
+    if (ARR.plan && ARR.plan.counts.reduce((a, c) => a + c, 0) === piles.length) {          // a quire moved: the rows as they were
+      let i = 0; rows = ARR.plan.counts.map(c => piles.slice(i, i += c));
+    } else if (ARR.plan) {   // quires made, merged or split: each stays in its row, a new one goes into the row before it
+      let r = 0;
+      const rowOf = piles.map(p => (r = Math.max(r, ARR.plan.at.get(p.key)?.row ?? r)));
+      rows = []; piles.forEach((p, i) => (rows[rowOf[i]] ||= []).push(p));
+      rows = rows.filter(Boolean);
+      // unless a row has grown a third wider than the widest was when the table was laid out (step by step or at once)
+      const width = row => row.reduce((a, p) => a + room(p) + GX, -GX);
+      if (Math.max(...rows.map(width)) > ARR.plan.base * 1.34) { ARR.plan = null; rows = null; }
+    }
+    if (!rows) {   // a fresh table: as many rows as make it closest to 7 by 4 (the camera then fits it to the window)
+      const total = piles.reduce((a, p) => a + room(p) + GX, -GX), aspect = 1.75, slant = .88;
+      const pack = limit => { const out = [[]]; let x = 0;
+        for (const p of piles) { if (x > 0 && x + room(p) > limit) { out.push([]); x = 0; } out.at(-1).push(p); x += room(p) + GX; }
+        return out; };
+      let best = Infinity;
+      for (let n = 1; n <= 9; n++) {
+        const cand = pack(Math.max(...piles.map(room), total / n + 1));
+        const fit = Math.max(Math.max(...cand.map(row => row.reduce((a, p) => a + room(p) + GX, -GX))) / aspect, cand.reduce((a, row) => a + depthOf(row), 0) * slant);
+        if (fit < best - 1e-6) { best = fit; rows = cand; }
+      }
+    }
+    ARR.plan = place2(rows);
+  }
+  for (const p of piles) {
+    Object.assign(p, ARR.plan.at.get(p.key));
+    p.z0 = p.z1 - p.d;
+    // a fan's cards sit in the middle of its room, closing up if more come than the room was made for
+    const fan = n => n > 1 ? Math.min(ARR_FAN * p.sw, (p.w - p.sw) / (n - 1)) : 0;
+    p.step = fan(p.slots.length); p.fx = p.x0 + (p.w - p.sw - p.step * Math.max(0, p.slots.length - 1)) / 2 + p.sw / 2;
+    p.step0 = fan(p.ids.length); p.fx0 = p.x0 + (p.w - p.sw - p.step0 * Math.max(0, p.ids.length - 1)) / 2 + p.sw / 2;
+  }
+  const flat = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+  const put = (en, wx, wy, wz) => {
+    const o = V.objs.get(en.id), wl = o?.leaves[0].w || 0, wr = o?.leaves[1].w || 0;
+    const world = new THREE.Matrix4().makeTranslation(wx + (wl - wr) / 2, wy, wz).multiply(flat);   // spine placed so the sheet is centred
+    const m = inv.clone().multiply(world), pp = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    m.decompose(pp, q, sc);
+    sg.set(en.id, { p: pp, q });
+    poses.set(`${en.id}:0`, { x: 0, y: 0, z: 0, a: -90, f: 1, lift: 0 });
+    poses.set(`${en.id}:1`, { x: 0, y: 0, z: 0, a: 90, f: 1, lift: 0 });
+  };
+  const byId = new Map(model.all.map(en => [en.id, en]));
+  for (const p of piles) {
+    p.anchors = [];
+    p.slots.forEach((id, j) => {
+      const cx = p.fan ? p.fx + j * p.step : p.x0 + p.w / 2;
+      const y = 1 + (p.fan ? j * 1.6 : j * p.up), z = p.fan ? p.z1 : p.z1 - j * p.fwd;
+      if (id == null) return;
+      // selected sheets are drawn a little out of their pile, toward you (the main one more); the one pointed at, less
+      const pull = V.sel.has(id) ? H * (id === V.selMain ? .16 : .1) : id === V.hover?.id ? H * .07 : 0;
+      put(byId.get(id), cx, y + (pull ? .6 : 0), z + pull);
+      centers.set(id, new THREE.Vector3(cx, y, z + pull - H / 2));
+      // a point on the part of it that shows: the strip in front of the sheet above, or (a fan) its own uncovered side
+      const top = j === p.slots.length - 1;
+      picks.set(id, new THREE.Vector3(p.fan && !top ? cx - p.sw / 2 + Math.max(4, p.step / 2) : cx, y, top ? z + pull - H / 2 : p.fan ? z - H / 2 : z + pull - Math.min(p.fwd, H) / 2));
+    });
+    // where a dragged sheet would land, slot by slot, measured without the room made for it (so the room doesn't move them)
+    for (let j = 0; j <= p.ids.length; j++) {
+      const cx = p.fan ? p.fx0 + (j - .5) * (p.step0 || ARR_FAN * p.sw) : p.x0 + p.w / 2;
+      p.anchors.push(new THREE.Vector3(cx, 1 + (p.fan ? 0 : (j - .5) * p.up), p.fan ? p.z1 : p.z1 - Math.max(0, j - .5) * p.fwd));
+    }
+    p.label = new THREE.Vector3(p.x0 + p.w / 2, 0, p.z1 + 6);   // its name is a caption, just in front of it
+  }
+  // sheets of hidden quires stay where they were; the ones in hand follow the pointer
+  for (const en of model.all) if (!sg.has(en.id)) { sg.set(en.id, CUR.sg.get(en.id) || IDENT); poses.set(`${en.id}:0`, CUR.poses.get(`${en.id}:0`) || base.poses.get(`${en.id}:0`)); poses.set(`${en.id}:1`, CUR.poses.get(`${en.id}:1`) || base.poses.get(`${en.id}:1`)); }
+  for (const id of lifted) {
+    const g = ARR.drag.gs?.get(id); if (!g) continue;
+    sg.set(id, g); poses.set(`${id}:0`, { x: 0, y: 0, z: 0, a: -90, f: 1, lift: 0 }); poses.set(`${id}:1`, { x: 0, y: 0, z: 0, a: 90, f: 1, lift: 0 });
+  }
+  const box = new THREE.Box3();
+  for (const p of piles) { box.expandByPoint(new THREE.Vector3(p.x0, 0, p.z0 - H * .05)); box.expandByPoint(new THREE.Vector3(p.x0 + p.w, 30, p.z1 + CAP * .8)); }
+  // what the camera frames: the plan's rooms (a stack's room has space for it open), so pointing at a stack, opening
+  // it or dragging over it never moves the camera
+  const frame = new THREE.Box3();
+  for (const a of ARR.plan.at.values()) { frame.expandByPoint(new THREE.Vector3(a.x0, 0, a.z1 - (a.r ?? H))); frame.expandByPoint(new THREE.Vector3(a.x0 + a.w, 30, a.z1 + CAP * .8)); }
+  return { ...base, poses, sg, place, box, frame, piles, centers, picks, W0 };
+}
+const rowsOf = piles => { const rows = []; for (const p of piles) (rows[p.row] ||= []).push(p); return rows.filter(Boolean); };
+
+/* Lost sheets in or out of the 3D book (the order keeps them; the Reader still shows where they were). */
+function setHideLost(on) {
+  V.hideLost = on; store.set("3d:hideLost", on);
+  const b = $("#v3-lost"); if (b) { b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); }
+  if (V.order) open(V.order, { ms: 600 });
+  toast(on ? "Lost sheets are hidden in 3D" : "Lost sheets are shown again");
+  Arrange.render();
+}
+
+/* Darken the room for Rearrange, and light it again after. */
+function shade(dt) {
+  if (ARR.dk === ARR.goal) return false;
+  ARR.dk = REDUCED ? ARR.goal : clamp(ARR.dk + Math.sign(ARR.goal - ARR.dk) * dt * 2.2);
+  scene.background.lerpColors(BG, BG_DARK, ARR.dk); scene.fog.color.copy(scene.background);
+  table.material.color.lerpColors(TBL, TBL_DARK, ARR.dk);
+  return ARR.dk !== ARR.goal;
+}
+
+/* Taking the book apart, and putting it back, one sheet after another in reading order: each rises straight up out of
+   its place in the book, then travels and lays itself open on its pile, its leaves opening on the way (and the same
+   backwards: up off its pile, across, and down into the book, closing as it goes). */
+function tableMorph(tw, L) {
+  const all = V.model.all, n = Math.max(1, all.length - 1);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion().setFromRotationMatrix(L.place.matrix).invert());   // the room's up, in the book's frame
+  all.forEach((en, i) => {
+    const sgt = tw.sgs.get(en.id); if (!sgt) return;
+    const a = sgt[0][1], b = sgt.at(-1)[1], st = .34 * i / n, w = .66;
+    const book = V.arrange ? a : b;   // where the sheet is in the book
+    const over = { p: book.p.clone().addScaledVector(up, H * 1.15), q: book.q.clone() };   // clear of the book, above its place
+    const k = V.arrange ? .4 : .6;
+    tw.sgs.set(en.id, [[0, a], [st, a], [st + w * k, over], [st + w, b], [1, b]]);
+    for (const key of [`${en.id}:0`, `${en.id}:1`]) {
+      const tr = tw.poses.get(key); if (!tr) continue;
+      const pa = tr[0][1], pb = tr.at(-1)[1];
+      tw.poses.set(key, V.arrange ? [[0, pa], [st + w * k, pa], [st + w, pb], [1, pb]] : [[0, pa], [st, pa], [st + w * k, pb], [1, pb]]);
+    }
+  });
+}
+
+/* The camera onto the table, which is fitted to the stage beside the panel on the left (#v3-hud). `pts`: fit those
+   instead (zoom to the selection). */
+function frameTable(instant = false, pts = null) {
+  const b = V.layout?.frame; if (!b || b.isEmpty()) return;
+  const pitch = 58;
+  if (!pts) {
+    pts = boxPoints(b);
+    pts.push(new THREE.Vector3(b.getCenter(new THREE.Vector3()).x, 0, b.max.z + H * .9));   // room in front for the selection's bar
+    ARR.box = b.clone();
+  }
+  const c = new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3());
+  const W = stage.clientWidth || 1, Hs = stage.clientHeight || 1, side = W > 900 && stage.contains($("#v3-hud")) ? HUD_W : 0;   // (with the list open, the panel is over the list)
+  stage.classList.toggle("hudcol", side > 0);   // the selection's bar keeps out of the column (style.css)
+  const dist = fitDist(pts, c, 0, pitch, 1.07, 32, (W - side) / Hs);
+  c.x -= side / 2 * (2 * Math.tan(16 * DEG) * dist / Hs);   // half the panel's column, in world units at the table
+  setGoal({ yaw: nearestYaw(0), pitch, target: c, fov: 32, dist }, instant ? 100 : 3.6);
+  V.preset = null; renderViews();
+}
+/* After the plan changed (a quire made, merged, split): frame the table again only if it no longer fits. */
+function keepFramed() {
+  const b = V.layout?.frame, was = ARR.box;
+  if (!b || !was) return;
+  const grow = (b.max.x - b.min.x) > (was.max.x - was.min.x) * 1.02 || (b.max.z - b.min.z) > (was.max.z - was.min.z) * 1.02
+    || b.min.x < was.min.x - 1 || b.max.x > was.max.x + 1;
+  if (grow) frameTable();
+}
+
+function setArrange(on) {
+  if (!V.model || on === V.arrange) return;
+  if (on) {
+    if (V.hand.on) putBack({ silent: true });
+    if (V.inspect) { V.inspect = false; renderInspector(); }
+    if (V.contact.on) setContactView(false);
+    if (V.mode === "opening") setMode("block", { view: false });
+    ARR.cam = { yaw: CAM.goal.yaw, pitch: CAM.goal.pitch, dist: CAM.goal.dist, fov: CAM.goal.fov, target: CAM.goal.target.clone(), preset: V.preset };
+  }
+  V.arrange = on; ARR.leaving = !on; ARR.goal = on ? 1 : 0;
+  ARR.drag = ARR.gap = null; ARR.gapKey = "";
+  if (on) ARR.plan = null; else { V.sel = new Set(); V.selQ = new Set(); V.selMain = null; }
+  $("#v-three").classList.toggle("table", on);
+  tip(null);
+  relayout(REDUCED ? 0 : 1500, tableMorph);
+  TW.long = true;   // a hover doesn't cut this move short (see wire)
+  if (on) frameTable();
+  else if (ARR.cam) { setGoal(ARR.cam, 3.6); V.preset = ARR.cam.preset; renderViews(); }
+  ARR.sig = ""; placePiles(); hud(null); tint(); wake();
+}
+
+/* The selection, from arrange.js: sheets (the main one is the current sheet) or whole quires. */
+function setSelection(ids, quires, main) {
+  V.sel = new Set(ids); V.selQ = new Set(quires.map(String)); V.selMain = main ?? null;
+  const i = main ? V.model?.all.findIndex(en => en.id === main) : -1;
+  if (i >= 0 && i !== V.cur) { V.cur = i; renderStrip(); pushHash(); report(); }
+  tint();
+  // selected sheets come a little out of their piles: now, or, while sheets are still moving, once they have landed
+  if (V.arrange) { if (TW.on) ARR.after = true; else relayout(REDUCED ? 0 : 160); }
+  placePiles();
+}
+
+/* The piles' names (from arrange.js) under each pile, the gold marks on the table, and the panel. */
+function placePiles() {
+  const host = $("#v3-piles"); if (!host) return;
+  const piles = V.arrange && V.layout?.piles;
+  if (!piles) {
+    if (host.childElementCount) host.replaceChildren();
+    for (const m of [ARR.tray, ARR.hl, ARR.ins, ...ARR.qsel, ...(ARR.ssel || [])]) if (m) m.visible = false;
+    return;
+  }
+  const sig = piles.map(p => `${p.key}:${p.ens.map(en => en.id).join(",")}`).join("|") + "#" + V.order?.id + "#" + [...(Arrange.ch?.booklets || [])].join(",");
+  if (sig !== ARR.sig) {   // the same element for the same quire, its contents renewed: a name being pointed at stays put
+    ARR.sig = sig;
+    const had = new Map([...host.children].map(e => [e.dataset.key, e]));
+    host.replaceChildren(...piles.map(p => {
+      const fresh = Arrange.pileLabel(p), el = had.get(p.key);
+      if (!el || el.querySelector("input")) return el || fresh;   // a name being typed stays as it is
+      el.className = fresh.className; el.title = fresh.title; el.dataset.gi = fresh.dataset.gi; el._fullW = null;
+      el.setAttribute("aria-pressed", fresh.getAttribute("aria-pressed"));
+      el.replaceChildren(...fresh.childNodes);
+      return el;
+    }));
+  }
+  host.classList.toggle("moving", TW.on && !!(TW.long || TW.replan));   // the names come once the sheets have landed
+  const t = ARR.drag && ARR.gap;   // where dragged sheets would go
+  for (const el of host.children) {
+    const p = piles.find(x => x.key === el.dataset.key); if (!p) continue;
+    el.classList.toggle("target", !!t && t.kind === "into" && t.key === p.key);
+    const on = V.selQ.has(p.key);
+    if (el.classList.contains("sel") !== on) { el.classList.toggle("sel", on); el.setAttribute("aria-pressed", String(on)); }
+    const xy = project(p.label, scene);
+    if (!xy) { el.style.display = "none"; continue; }
+    el.style.display = "";
+    el.style.transform = `translate(${Math.round(xy[0])}px, ${Math.round(xy[1])}px) translate(-50%, 0)`;
+    // a name wider than its pile (a small window) shows only the quire; the rest is in its tooltip
+    const a = project(new THREE.Vector3(p.x0 - GX * .45, 0, p.z1), scene), b = project(new THREE.Vector3(p.x0 + p.w + GX * .45, 0, p.z1), scene);
+    if (!el.classList.contains("tight") || el._fullW == null) el._fullW = el.offsetWidth;
+    if (a && b) el.classList.toggle("tight", el._fullW > b[0] - a[0] - 4);
+  }
+  const flatGold = (fill, line) => {   // a gold mark lying on the table: a wash and/or an outline
+    const g = new THREE.Group();
+    if (fill) g.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: fill, depthWrite: false })));
+    if (line) g.add(new THREE.Line(RECT, new THREE.LineBasicMaterial({ color: GOLD, transparent: true, opacity: line })));
+    g.rotation.x = -Math.PI / 2; scene.add(g); return g;
+  };
+  // an empty set-aside pile is a dashed place on the table
+  const aside = piles.find(p => p.key === "aside");
+  if (!ARR.tray) {
+    ARR.tray = new THREE.Line(RECT, new THREE.LineDashedMaterial({ color: 0x8f877a, dashSize: .025, gapSize: .018 }));
+    ARR.tray.rotation.x = -Math.PI / 2; scene.add(ARR.tray);
+  }
+  ARR.tray.visible = !aside.ids.length;
+  ARR.tray.position.set(aside.x0 + aside.sw / 2, .5, aside.z1 - H / 2);
+  ARR.tray.scale.set(aside.sw, H, 1); ARR.tray.computeLineDistances();
+  // selected quires: an outline under each
+  const sel = piles.filter(p => V.selQ.has(p.key));
+  while (ARR.qsel.length < sel.length) ARR.qsel.push(flatGold(.08, .9));
+  ARR.qsel.forEach((m, i) => {
+    const p = sel[i]; m.visible = !!p; if (!p) return;
+    m.position.set(p.x0 + p.w / 2, .3, (p.z0 + p.z1) / 2); m.scale.set(p.w + 14, p.d + 14, 1);
+  });
+  // selected sheets: a gold outline round each (the parts under other sheets stay hidden, as the sheets do)
+  ARR.ssel ||= [];
+  const ids = V.arrange ? [...V.sel].filter(id => V.layout.centers.has(id) && !ARR.drag?.ids.includes(id)) : [];
+  while (ARR.ssel.length < ids.length) { const l = new THREE.Line(RECT, new THREE.LineBasicMaterial({ color: GOLD })); l.rotation.x = -Math.PI / 2; scene.add(l); ARR.ssel.push(l); }
+  ARR.ssel.forEach((l, i) => {
+    const id = ids[i]; l.visible = !!id; if (!id) return;
+    const c = V.layout.centers.get(id);
+    l.position.set(c.x, c.y + 1.4, c.z); l.scale.set(sheetWidth(id) + 3, H + 3, 1);
+  });
+  // dragging: a gold wash under the pile they would go into, or a gold bar in the gap a new quire would fill
+  ARR.hl ||= flatGold(.2, 1);
+  ARR.ins ||= flatGold(.85, 0);
+  const tp = t?.kind === "into" && piles.find(x => x.key === t.key);
+  ARR.hl.visible = !!tp;
+  if (tp) { ARR.hl.position.set(tp.x0 + tp.w / 2, .4, (tp.z0 + tp.z1) / 2); ARR.hl.scale.set(tp.w + 18, tp.d + 18, 1); }
+  ARR.ins.visible = t?.kind === "new";
+  if (t?.kind === "new") { ARR.ins.position.set(t.x, .5, t.z); ARR.ins.scale.set(5, t.depth, 1); }
+  if (ARR.drag) hud(null, t || null);
+}
+
+/* A pile drawn small at the table's slant, for the panel and the selection's bar: a stack of layers (the outermost at
+   the bottom) or a row of cards, the sheets in `hi` in gold. `labels`: name each layer (in a fan, only the gold ones). */
+function glyph(ids, { fan = false, hi = new Set(), labels = false, size = "s" } = {}) {
+  const NS = "http://www.w3.org/2000/svg", el = (tag, at) => { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); return e; };
+  const pair = x => x.replace("|", "+");
+  const [W, D, S, G] = size === "s" ? [30, 7, 9, 6] : [54, 14, 16, 12];
+  const svg = el("svg", { "aria-hidden": "true", class: `glyph ${size}` });
+  const card = (x0, y, gold) => el("polygon", { points: `${x0},${y} ${x0 + W},${y} ${x0 + W + S},${y - D} ${x0 + S},${y - D}`, class: gold ? "g-hi" : "g-sh" });
+  const text = (x, y, s, gold) => { const t = el("text", { x, y, class: gold ? "g-thi" : "g-t" }); t.textContent = s; return t; };
+  const lw = labels ? 10 + 6.4 * Math.max(0, ...ids.map(x => pair(x).length)) : 0;
+  if (fan || ids.length <= 1) {
+    const step = ids.length > 1 ? Math.min(size === "s" ? 9 : 20, (size === "s" ? 70 : 190) / (ids.length - 1)) : 0;
+    const lift = size === "s" ? 5 : 9, w = W + S + step * Math.max(0, ids.length - 1) + 4, hh = D + lift + 4 + (labels ? 16 : 0);
+    svg.setAttribute("width", w); svg.setAttribute("height", hh); svg.setAttribute("viewBox", `0 0 ${w} ${hh}`);
+    ids.forEach((x, j) => svg.append(card(2 + j * step, D + lift + 2 - (hi.has(x) ? lift : 0), hi.has(x))));
+    if (labels) ids.forEach((x, j) => hi.has(x) && svg.append(text(2 + j * step, hh - 2, pair(x), true)));
+  } else {
+    const n = ids.length, w = W + S + 4 + lw, shift = size === "s" ? 5 : 9, hh = D + G * (n - 1) + 4;
+    svg.setAttribute("width", w + shift); svg.setAttribute("height", hh); svg.setAttribute("viewBox", `0 0 ${w + shift} ${hh}`);
+    ids.forEach((x, j) => {   // bottom (outermost) first, so each layer lies over the one under it
+      const y = hh - 2 - j * G, gold = hi.has(x);
+      svg.append(card(2 + (gold ? shift : 0), y, gold));
+      if (labels) svg.append(text(W + S + 10 + shift, y - D / 2 + 3.5, pair(x), gold));
+    });
+  }
+  return svg;
+}
+
+/* On the table, one panel in a fixed place (top left, a column of its own): the sheet pointed at (its place in its
+   pile, and both its sides in one piece), or, while sheets are dragged, where they would land. Hidden otherwise. */
+const HUD_W = 300;
+function hud(en, drop) {
+  const el = $("#v3-hud"); if (!el) return;
+  if (!V.arrange) { el.hidden = true; el._k = ""; return; }
+  const show = (k, kids) => { clearTimeout(ARR.hudT); el.hidden = false; if (el._k !== k) { el._k = k; el.replaceChildren(...kids); } };
+  const hide = () => { clearTimeout(ARR.hudT); ARR.hudT = setTimeout(() => { el.hidden = true; el._k = ""; }, 140); };
+  const name = (key, q) => key === "aside" ? "Set aside" : qTag(q);
+  if (ARR.drag) {
+    if (!drop) return hide();
+    const moving = ARR.drag.ids, set = new Set(moving);
+    const froms = new Set(moving.map(id => { const x = V.model.all.find(en => en.id === id); return x?.unplaced ? "aside" : String(x?.quire); }));
+    const from = V.model.all.find(x => x.id === ARR.drag.id), fromKey = froms.size === 1 ? [...froms][0] : null;
+    const src = fromKey ? h("b", {}, name(fromKey, from?.quire)) : `${moving.length} sheets`;
+    if (drop.kind === "new")
+      return show(`new:${drop.after}:${moving}`, [h("div", { class: "hud-head" }, src, " → ", h("b", {}, "new quire")),
+        glyph(moving, { hi: set, labels: true, size: "m" })]);
+    const p = V.layout.piles.find(x => x.key === drop.key), ids = p.ids.slice();
+    ids.splice(drop.index, 0, ...moving);
+    return show(`into:${drop.key}:${drop.index}:${moving}`, [
+      fromKey !== drop.key ? h("div", { class: "hud-head" }, src, " → ", h("b", {}, name(drop.key, p.quire))) : "",
+      glyph(ids, { fan: p.fan, hi: set, labels: true, size: "m" })].filter(Boolean));
+  }
+  if (!en) return hide();
+  const p = V.layout?.piles.find(x => x.key === (en.unplaced ? "aside" : String(en.quire)));
+  const ids = p ? p.ens.map(x => x.id) : [en.id];
+  show(`sheet:${en.id}:${JSON.stringify(en.opts)}:${ids}`, [
+    h("div", { class: "hud-where", role: "img", "aria-label": `${en.unplaced ? "" : qWord(en.quire) + ", "}${whereText(en)}` },
+      glyph(ids, { fan: p?.fan, hi: new Set([en.id]) }), h("span", {}, en.unplaced ? "Set aside" : qTag(en.quire))),
+    h("div", { class: "hud-id" }, en.id.replace("|", " + ")),
+    h("div", { class: "hud-faces" }, sheetFaces(en.id, en.opts, 110, HUD_W - 30, 150, { side: true }))]);
+}
+
+/* Whether the pointer is still over the open stack's room (between its sheets' edges the table shows through). */
+function hoverNear(e) {
+  const p = V.layout?.piles?.find(x => x.key === V.hoverPile); if (!p) return false;
+  const r = stage.getBoundingClientRect();
+  ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const P = ray.ray.intersectPlane(TABLE, new THREE.Vector3());
+  return !!P && P.x > p.x0 - 4 && P.x < p.x0 + p.w + 4 && P.z > p.z0 - 4 && P.z < p.z1 + 4;
+}
+
+/* Sheets taken from the table follow the pointer above it, fanned a little if there are several; the pile under them
+   opens where they would go, or the gap between two piles shows a gold bar for a new quire. */
+function dragSheet(e, en) {
+  if (!ARR.drag) {
+    const ids = Arrange.dragSet(en.id);   // the selection, if this sheet is in it; else this sheet alone (now selected)
+    ARR.drag = { id: en.id, ids, gs: new Map() }; V.hover = null; tip(null); stage.classList.add("lifting");
+    for (const id of ids) V.objs.get(id)?.group.scale.setScalar(.5);   // small in the hand, so they don't hide where they go
+  }
+  const r = stage.getBoundingClientRect();
+  ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const P = ray.ray.intersectPlane(TABLE, new THREE.Vector3()); if (!P) return;
+  const inv = V.layout.place.matrix.clone().invert(), flat = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+  ARR.drag.ids.forEach((id, j) => {
+    const o = V.objs.get(id), wl = o.leaves[0].w || 0, wr = o.leaves[1].w || 0;
+    const world = new THREE.Matrix4().makeTranslation(P.x + (wl - wr) / 4 + j * 5, ARR_LIFT + j * 2, P.z + H / 4 - j * 4).multiply(flat);
+    const m = inv.clone().multiply(world), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    m.decompose(p, q, sc);
+    ARR.drag.gs.set(id, { p, q });
+  });
+  const t = dropTarget(P, e), k = t ? `${t.kind}:${t.key ?? t.after}:${t.index ?? ""}` : "";
+  if (k !== ARR.gapKey) { ARR.gap = t; ARR.gapKey = k; relayout(REDUCED ? 0 : 180); }
+  for (const [id, g] of ARR.drag.gs) { CUR.sg.set(id, g); V.layout.sg.set(id, g); if (TW.on) TW.sgs.set(id, [[0, g], [1, g]]); }
+  applyAll(); placePiles(); wake();
+}
+/* Where dragged sheets would go: the gap between two piles of a row (or past either end of it) makes a new quire
+   there; over a pile, into it: for a stack, at the height of the pointer against its sheets' edges, for a fan, as far
+   along as the pointer. */
+function dropTarget(P, e) {
+  const piles = V.layout?.piles; if (!piles) return null;
+  const order = piles.filter(p => p.key !== "aside");
+  const EDGE = H * .12, END = H * 1.1;
+  for (const row of rowsOf(piles)) {
+    const z0 = Math.min(...row.map(p => p.z0)) - H * .15, z1 = Math.max(...row.map(p => p.z1)) + H * .2;
+    if (P.z < z0 || P.z > z1) continue;
+    for (let j = 0; j <= row.length; j++) {
+      const a = row[j - 1], b = row[j];
+      const left = a ? a.x0 + a.w - EDGE : b.x0 - END, right = b ? b.x0 + EDGE : a.x0 + a.w + END;
+      if (P.x <= left || P.x >= right) continue;
+      // the new quire comes after the quire on the left (or, at the start of a row, after the one before it)
+      const prev = a && a.key !== "aside" ? a : order[order.indexOf(b) - 1] || (b?.key === "aside" ? order.at(-1) : null);
+      const x = a && b ? (a.x0 + a.w + b.x0) / 2 : a ? a.x0 + a.w + GX / 2 : b.x0 - GX / 2;
+      return { kind: "new", after: prev ? prev.key : null, x, z: (z0 + z1) / 2, depth: z1 - z0 };
+    }
+  }
+  const m = H * .3;
+  const p = piles.find(q => P.x > q.x0 - m && P.x < q.x0 + q.w + m && P.z > q.z0 - m * 2 && P.z < q.z1 + m);
+  if (!p) return null;
+  let index;
+  if (p.fan) index = p.anchors.filter(a => a.x < P.x).length - 1;
+  else {
+    const r = stage.getBoundingClientRect(), y = e.clientY - r.top;
+    index = p.anchors.filter(a => { const xy = project(a, scene); return xy && xy[1] > y; }).length - 1;
+  }
+  return { kind: "into", key: p.key, gi: p.gi, index: clamp(index, 0, p.ids.length), ids: p.ids };
+}
+function dropSheet(cancel = false) {
+  const d = ARR.drag, t = ARR.gap;
+  for (const id of d?.ids || []) V.objs.get(id)?.group.scale.setScalar(1);
+  ARR.drag = ARR.gap = null; ARR.gapKey = "";
+  stage.classList.remove("lifting");
+  placePiles(); hud(null);
+  if (!d) return;
+  const done = !cancel && t && (t.kind === "new" ? Arrange.newQuireAt(d.ids, t.after) : Arrange.dropAt(d.ids, t.gi, t.ids, t.index));
+  if (!done) relayout(REDUCED ? 0 : 380);   // nowhere, or where they were: back they go
+}
+
+/* Drag across empty table: a box, and every sheet whose middle is in it is selected (with ⇧, ⌘ or Ctrl, added). */
+function marquee(e, end = false) {
+  const box = $("#v3-marquee"), r = stage.getBoundingClientRect();
+  const x0 = DRAG.downAt.x - r.left, y0 = DRAG.downAt.y - r.top, x1 = e.clientX - r.left, y1 = e.clientY - r.top;
+  const [l, t, rr, b] = [Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1)];
+  Object.assign(box.style, { left: l + "px", top: t + "px", width: rr - l + "px", height: b - t + "px" });
+  box.hidden = end;
+  const ids = [];
+  for (const [id, c] of V.layout?.centers || []) { const xy = project(c, scene); if (xy && xy[0] >= l && xy[0] <= rr && xy[1] >= t && xy[1] <= b) ids.push(id); }
+  Arrange.marquee(ids, DRAG.add, end);
+}
+
 // ---------------------------------------------------------------- input
 const DRAG = { on: false, id: null, x: 0, y: 0, moved: false, mode: "orbit", pts: new Map(), pinch: 0 };
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
@@ -1011,13 +1517,25 @@ function zoomBy(f, e) {
 
 function wire() {
   const cv = renderer.domElement;
-  cv.addEventListener("contextmenu", e => e.preventDefault());
+  cv.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    if (V.arrange) { const hit = pick(e); Arrange.context(e.clientX, e.clientY, hit?.en.id || null); }
+  });
+  // Space held: drag pans the table (as in drawing programs)
+  addEventListener("keydown", e => { if (V.arrange && e.key === " " && !e.target.closest?.("input, textarea, button, select")) { ARR.space = true; stage.classList.add("panning"); e.preventDefault(); } });
+  addEventListener("keyup", e => { if (e.key === " ") { ARR.space = false; stage.classList.remove("panning"); } });
   cv.addEventListener("pointerdown", e => {
     DRAG.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { cv.setPointerCapture(e.pointerId); } catch { /* gone */ }
     if (DRAG.pts.size === 2) { DRAG.mode = "pinch"; DRAG.pinch = 0; return; }
     DRAG.on = true; DRAG.moved = false; DRAG.x = e.clientX; DRAG.y = e.clientY; DRAG.downAt = { x: e.clientX, y: e.clientY };
     DRAG.mode = e.button === 2 || e.button === 1 || e.shiftKey ? "pan" : "orbit";
+    if (V.arrange) {   // on the table: a sheet is taken, empty table draws a box; the middle button or Space+drag pans
+      if (e.button === 2) { DRAG.on = false; return; }   // the context menu (below)
+      const hit = e.button === 0 && !ARR.space ? pick(e) : null;
+      DRAG.en = hit?.en || null; DRAG.add = e.shiftKey || e.metaKey || e.ctrlKey;
+      DRAG.mode = e.button === 1 || ARR.space ? "pan" : DRAG.en ? "sheet" : "marquee";
+    }
     tip(null);
     stage.classList.add("dragging");
   });
@@ -1035,12 +1553,19 @@ function wire() {
       DRAG.x = e.clientX; DRAG.y = e.clientY;
       if (Math.hypot(e.clientX - DRAG.downAt.x, e.clientY - DRAG.downAt.y) > 4) DRAG.moved = true;
       if (!DRAG.moved) return;
-      if (DRAG.mode === "pan") panBy(dx, dy); else orbitBy(dx, dy);
+      if (DRAG.mode === "sheet") dragSheet(e, DRAG.en);
+      else if (DRAG.mode === "marquee") marquee(e);
+      else if (DRAG.mode === "pan") panBy(dx, dy); else orbitBy(dx, dy);
       return;
     }
     const hit = pick(e);
     const en = hit?.en || null;
-    if (en !== V.hover) { V.hover = en; tint(); stage.style.cursor = en ? "pointer" : ""; }
+    if (en !== V.hover) {
+      V.hover = en; tint(); stage.style.cursor = en ? (V.arrange ? "grab" : "pointer") : "";
+      const pile = en ? (en.unplaced ? "aside" : String(en.quire)) : null;
+      if (V.arrange && pile !== V.hoverPile && (pile || !hoverNear(e))) V.hoverPile = pile;   // leaving a stack's edge for the table: close it
+      if (V.arrange && !(TW.on && TW.long)) relayout(REDUCED ? 0 : 160);   // the sheet pointed at slides a little out of its pile
+    } else if (V.arrange && !en && V.hoverPile && !hoverNear(e)) { V.hoverPile = null; relayout(REDUCED ? 0 : 160); }
     tip(en, e);
   });
   const up = e => {
@@ -1048,8 +1573,11 @@ function wire() {
     if (DRAG.mode === "pinch") { if (!DRAG.pts.size) DRAG.mode = "orbit"; DRAG.on = false; stage.classList.remove("dragging"); return; }
     if (!DRAG.on) return;
     DRAG.on = false; stage.classList.remove("dragging");
+    if (DRAG.mode === "sheet" && DRAG.moved) { dropSheet(e.type === "pointercancel"); return; }
+    if (DRAG.mode === "marquee" && DRAG.moved) { marquee(e, true); return; }
     if (DRAG.moved) return;
     const hit = pick(e);
+    if (V.arrange) { Arrange.click(hit?.en.id || null, e); return; }   // on the table: select (no inspector)
     if (!hit) return;
     clearTimeout(DRAG.click);
     const i = V.model.all.indexOf(hit.en);
@@ -1057,14 +1585,19 @@ function wire() {
   };
   cv.addEventListener("pointerup", up);
   cv.addEventListener("pointercancel", up);
-  cv.addEventListener("pointerleave", () => { if (!DRAG.on && V.hover) { V.hover = null; tint(); } tip(null); });
+  cv.addEventListener("pointerleave", () => { if (!DRAG.on && (V.hover || V.hoverPile)) { V.hover = null; V.hoverPile = null; tint(); if (V.arrange) relayout(160); } tip(null); });
   cv.addEventListener("dblclick", e => {
+    if (V.arrange) return;   // on the table a double click is two clicks
     clearTimeout(DRAG.click);
     const hit = pick(e);
     if (hit) readSheet(hit.en);
   });
   cv.addEventListener("wheel", e => {
     e.preventDefault();
+    if (V.arrange && !e.ctrlKey && !e.metaKey) {   // on the table, as in drawing programs: scroll pans, pinch or ⌘ zooms
+      const k = e.deltaMode === 1 ? 16 : 1;
+      panBy(-e.deltaX * k, -e.deltaY * k); tip(null); return;
+    }
     const d = Math.max(-60, Math.min(60, e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY));
     zoomBy(Math.exp(d * (e.ctrlKey ? .012 : .0022)), e);
     tip(null);
@@ -1173,6 +1706,7 @@ function build() {
         (() => { const s2 = h("select", { id: "v3-overlay", "aria-label": "Colour the edges by", onchange: e => setOverlay(e.target.value) },
           OVERLAY_KEYS.map(k2 => h("option", { value: k2 }, OVERLAYS[k2].name))); s2.value = V.overlay; return s2; })()),
       h("button", { id: "v3-contacts", title: "Faces that lay against each other when the book was closed (K)", onclick: () => setContactView(!V.contact.on) }, "Touching faces"),
+      h("button", { id: "v3-lost", class: V.hideLost ? "on" : "", "aria-pressed": String(V.hideLost), title: "Leave the lost sheets out of the 3D book (L)", onclick: () => setHideLost(!V.hideLost) }, "Hide lost sheets"),
       h("button", { id: "v3-arr-btn", class: `v3-arr-btn${Arrange.on ? " on" : ""}`, title: "Put the sheets in your own order (A)", onclick: () => Arrange.toggle() }, "✎ Rearrange"),
       h("label", { class: "v3-thick", title: "Sheet thickness. Real vellum is too thin to see the structure, so it is exaggerated." }, "Thickness",
         (() => { const s = h("select", { "aria-label": "Sheet thickness", onchange: e => setThick(+e.target.value) },
@@ -1181,9 +1715,12 @@ function build() {
         PRESETS.slice(1).map((p, i) => h("button", { "data-n": i + 1, title: `${p.name} (${p.key})`, onclick: () => preset(i + 1) }, h("kbd", {}, p.key), h("span", { class: "vn" }, " " + p.name))),
         h("button", { title: "Reset view (0)", "aria-label": "Reset view", onclick: () => preset(1) }, "⟲"))),
     h("div", { class: "v3-body" },
-    h("aside", { class: "v3-arrange", id: "v3-arrange", hidden: true, "aria-label": "Rearrange the sheets" }),
     stage = h("div", { class: "v3-stage", id: "v3-stage" },
       labelsEl = h("div", { class: "v3-labels", "aria-hidden": "true" }),
+      h("div", { class: "v3-piles", id: "v3-piles", "aria-label": "Quires on the table" }),   // Rearrange: the piles' names
+      h("div", { class: "v3-arr-acts", id: "v3-arr-acts", hidden: true }),                  // and the picked sheet's buttons
+      h("div", { class: "v3-hud", id: "v3-hud", hidden: true }),                              // and a panel: the sheet pointed at, or where dragged ones would go
+      h("div", { class: "v3-marquee", id: "v3-marquee", hidden: true }),                      // and the box drawn to select sheets
       tipEl = h("div", { class: "v3-tip", hidden: true }),
       h("div", { class: "v3-note", id: "v3-note", hidden: true }),
       h("div", { class: "v3-legend", id: "v3-legend", hidden: true }),
@@ -1191,7 +1728,9 @@ function build() {
       store.get("3d:hinted", false) ? "" : h("div", { class: "v3-hint", id: "v3-hint" },
         h("span", {}, "Drag to turn the book · ⇧-drag to pan · scroll to zoom · ", h("kbd", {}, "1"), "–", h("kbd", {}, "5"), " views · ", h("kbd", {}, "←"), h("kbd", {}, "→"), " thumb through · double-click to read"),
         h("button", { onclick: () => { store.set("3d:hinted", true); $("#v3-hint").remove(); } }, "Got it"))),
-      h("aside", { class: "v3-insp", id: "v3-insp", hidden: true, "aria-label": "Sheet inspector" })),
+      h("aside", { class: "v3-insp", id: "v3-insp", hidden: true, "aria-label": "Sheet inspector" }),
+      h("aside", { class: "v3-list", id: "v3-list", hidden: true, "aria-label": "Quires and their sheets, as a list" })),   // Rearrange's list (arrange.js)
+    h("section", { class: "v3-arrange", id: "v3-arrange", hidden: true, "aria-label": "Rearrange the sheets" }),
     h("div", { class: "v3-strip", id: "v3-strip", title: "Every sheet in reading order. Scroll here to thumb through the book.",
       onwheel: e => { e.preventDefault(); const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; STRIP.acc += d;
         if (Math.abs(STRIP.acc) > 40) { if (V.mode === "opening") setOpening(V.opening + Math.sign(STRIP.acc)); else step(Math.sign(STRIP.acc)); STRIP.acc = 0; } } }));
@@ -1345,6 +1884,8 @@ function open(order, { instant = false, ms, moved } = {}) {
   const keep = V.model?.all[V.cur]?.id;
   const first = !V.model;
   const prev = !first && V.order !== order ? { model: V.model, objs: V.objs } : null;
+  const other = V.order && order.id !== V.order.id && !(order.mine && order.from === V.order.title);
+  if (V.arrange && other) ARR.plan = null;   // another order on the table: its own plan (and the camera follows, below)
   if (prev && V.order.id !== order.id) V.prevOrder = V.order.id;
   if (ms === 0) instant = true;
   if (V.hand.on) Object.assign(V.hand, { on: false, turned: false, folded: true, flat: false });
@@ -1360,7 +1901,7 @@ function open(order, { instant = false, ms, moved } = {}) {
   if (k < 0) V.inspect = false;
   if (V.mode === "opening") V.opening = clamp(V.opening, 0, V.model.leaves.length);
   renderBar(); renderStrip(); renderOpening(); renderInspector();
-  relayout(first || instant ? 0 : ms ?? morphMs(), prev && !instant ? morphFrom(prev, moved) : null);
+  relayout(first || instant ? 0 : V.arrange ? Math.min(ms ?? 700, 700) : ms ?? morphMs(), prev && !instant && !V.arrange ? morphFrom(prev, moved) : null);
   if (first) preset(V.preset || 1, { instant: true });
   if (prev && !instant && REDUCED) {   // no motion: flash what moved instead
     V.flash = new Set(V.model.all.filter(en => en.moved || en.resewn || prev.objs.get(en.id) !== V.objs.get(en.id)).map(en => en.id));
@@ -1371,6 +1912,7 @@ function open(order, { instant = false, ms, moved } = {}) {
   if (V.preset === 2) setTimeout(() => showThreads(true), first ? 0 : morphMs() + 50);
   Arrange.mark(curSheet());
   marks();
+  if (V.arrange && other) frameTable();
 }
 
 // ---------------------------------------------------------------- quires hidden like layers (3D only; the order is not changed)
@@ -1390,6 +1932,7 @@ function setHidden(quire, hide, { quiet = false } = {}) {
     if (vis.length) { if (V.inspect) closeInspector(); V.cur = vis[0][1]; renderInspector(); pushHash(); }
   }
   if (!quiet) toast(hide ? `${qWord(quire)} hidden in 3D` : `${qWord(quire)} shown again`);
+  if (V.arrange) relayout(REDUCED ? 0 : 400);   // on the table the other piles close up (or make room)
   tint(); marks(); wake(); Arrange.render();
 }
 function showAllQuires() { for (const q of hiddenQuires()) setHidden(q, false, { quiet: true }); toast("Every quire is shown"); }
@@ -1412,6 +1955,7 @@ const NARROW = () => matchMedia("(max-width: 760px)").matches;   // phones: the 
 function setPanel(on) {
   if (on && NARROW() && V.inspect) closeInspector();
   $("#v3-arr-btn")?.classList.toggle("on", on);
+  $("#v-three")?.classList.toggle("arranging", on);   // the dock takes the place of the strip of sheets
   setTimeout(resize, 0);
 }
 const curSheet = () => V.model?.all[V.cur]?.id || null;
@@ -1735,6 +2279,7 @@ function stepSel(d) {
 function key(e) {
   const k = e.key;
   if (!V.model) return;
+  if (V.arrange && !["ArrowLeft", "ArrowRight", "Home", "End", "l", "L", "+", "=", "-", "_", "Escape"].includes(k)) return;   // the book's own keys rest
   if (e.altKey) {
     const big = e.shiftKey;
     if (k === "ArrowLeft") big ? panBy(60, 0) : orbitBy(-30, 0);
@@ -1773,6 +2318,8 @@ function key(e) {
   else if (k === "p" || k === "P") setPosture(V.posture === "stand" ? "lie" : "stand");
   else if (k === "m" || k === "M") setMode(V.mode === "block" ? "opening" : "block");
   else if (k === "Enter") { V.mode === "opening" && !V.inspect ? readOpening() : readSheet(V.model.all[V.cur]); e.preventDefault(); }
+  else if (k === "Escape" && V.arrange) { if (ARR.drag) { DRAG.on = false; dropSheet(true); } else Arrange.close(); }
+  else if (k === "l" || k === "L") setHideLost(!V.hideLost);
   else if (k === "Escape") {
     if (V.contact.on) setContactView(false);
     else if (V.hand.on) putBack();
@@ -1820,6 +2367,21 @@ export default {
   curSheet,
   focusSheet,
   setPanel,
+  setArrange,
+  setHideLost,
+  setSelection,
+  glyph,
+  frameTable(sel) {   // ⇧1: the whole table; ⇧2: the selection
+    if (!sel) return frameTable();
+    const pts = [];
+    for (const id of sel) { const c = V.layout?.centers.get(id); if (c) pts.push(c.clone().add(new THREE.Vector3(-H * .8, 0, -H * .6)), c.clone().add(new THREE.Vector3(H * .8, 30, H * .6))); }
+    if (pts.length) frameTable(false, pts);
+  },
+  cancelDrag() { if (ARR.drag) { DRAG.on = false; dropSheet(true); return true; } return false; },
+  get hideLost() { return V.hideLost; },
+  get arranging() { return V.arrange; },
+  whereOf(id) { const en = V.model?.all.find(x => x.id === id); return en ? whereText(en) : ""; },
+  relayout() { relayout(REDUCED ? 0 : 200); },
   refresh,
   // for checking in the browser: (await import("./assets/view3d.js")).default.debug
   debug: {
@@ -1827,5 +2389,7 @@ export default {
     selectSheet, act, putBack, closeInspector, replay, setOverlay, setContactView, showContact, contactsOf,
     seek(k) { if (!TW.on) return; TW.t0 = performance.now() - k * TW.dur; tweenStep(performance.now()); renderer.render(scene, camera); drawLabels(); },
     get renderer() { return renderer; },
+    get camera() { return camera; },
+    pickAt(x, y) { return pick({ clientX: x, clientY: y })?.en.id ?? null; },
   },
 };

@@ -1431,7 +1431,7 @@ const View3D = {
       if (!st && POS.by && POS.by !== "three") m.sync(POS);
     });
   },
-  open(order, opts) { this.load().then(m => m.open(order, opts)); },
+  open(order, opts) { if (this.mod) this.mod.open(order, opts); else this.load().then(m => m.open(order, opts)); },   // at once when loaded: what follows sees the new book
   refresh(ids) { this.mod?.refresh(ids); },
   key(e) { this.mod?.key(e); },
   state() { return this.pending || (this.mod ? this.mod.state() : ""); },
@@ -1839,10 +1839,12 @@ const Info = {
         h("h3", {}, "Re-cut a page"),
         h("p", {}, "Every page picture is cut out of one of Yale's photographs, and some cuts are a little loose. To re-cut a page, hover over it in the Reader and click ", h("b", {}, "✂ Crop"), " (or press ", h("kbd", {}, "C"), "), or use ", h("b", {}, "✂ Crop a page"), " when you pull a sheet out in 3D. Drag the gold corners onto the edges of the page; ", h("b", {}, "Fit to the page edge"), " does it for you wherever the page meets the dark background. The editor loads the photograph straight from Yale, so you need to be online."),
         h("h3", {}, "Put the sheets in your own order"),
-        h("p", {}, "In 3D, press ", h("b", {}, "✎ Rearrange"), " (or ", h("kbd", {}, "A"), "). A list of every gathering and its sheets opens beside the book. Drag a sheet, or a whole gathering, by ", h("b", {}, "⠿"), " to move it, or click a sheet to move it to another gathering, start a new one, set it aside, turn it inside out or upside down, or sew a foldout at another fold. ", h("b", {}, "Quire"), " / ", h("b", {}, "Separate"), " switches a gathering between sheets tucked inside each other and sheets read one by one. Each change plays out in 3D; ", h("kbd", {}, "⌘Z"), " (", h("kbd", {}, "Ctrl Z"), ") undoes it."),
-        h("p", {}, "The built-in orders never change: your first move makes your own copy, which appears in the Order menu. The Reader and the Folio order tables follow it too."),
+        h("p", {}, "In 3D, press ", h("b", {}, "✎ Rearrange"), " (or ", h("kbd", {}, "A"), "). The room darkens and the book comes apart on the table: each quire lies open as a pile, in the order of the book. A quire whose sheets are tucked inside each other is stacked the way it lies opened at its centre, the centre sheet on top; sheets read one by one are fanned out like cards. Point at a sheet and the panel at the top left shows where it is in its pile and the sheet from both sides; a stack opens out as you point at it."),
+        h("p", {}, "It works like a drawing program. Click a sheet to select it, ", h("kbd", {}, "⇧"), "- or ", h("kbd", {}, "⌘"), "-click to add more, or drag across the table to select a box of them. Drag the selection onto a pile to put it there (the pile lights up and opens where it will go, and the panel shows the quire with your sheets in gold), or into the gap between two piles to make a new quire there. ", h("kbd", {}, "⌘G"), " makes a new quire of the selected sheets, or merges selected quires; ", h("kbd", {}, "⇧⌘G"), " splits a quire into single sheets; ", h("kbd", {}, "⌘]"), " and ", h("kbd", {}, "⌘["), " move a sheet toward the centre or outward (", h("kbd", {}, "⌥"), ": all the way); ", h("kbd", {}, "⌫"), " sets it aside; ", h("kbd", {}, "⌘X"), " and ", h("kbd", {}, "⌘V"), " cut and paste. Click a quire's name to select the quire, double-click it to rename it, drag it to move the quire. Right-click anything for its menu; ", h("b", {}, "⌨"), " lists every shortcut. The list button beside it opens Rearrange as it used to be: every quire and its sheets in a column, dragged by ", h("b", {}, "⠿"), "; a change made there plays out on the table, and the selection is shared. ", h("b", {}, "Done"), " (or ", h("kbd", {}, "Esc"), ") puts the book back together, and each change plays out in 3D; ", h("kbd", {}, "⌘Z"), " (", h("kbd", {}, "Ctrl Z"), ") undoes it. On a phone, Rearrange opens as a panel under the book instead."),
+        h("p", {}, "A gold dot marks a quire or sheet you have changed; a sheet's menu has ", h("b", {}, "Put back"), " to return it to where it was. ", h("b", {}, "Hide lost sheets"), " (", h("kbd", {}, "L"), ") leaves the lost sheets out of the 3D book, in Rearrange or not."),
+        h("p", {}, "The built-in orders never change: your first move makes your own copy, which appears in the Order menu, and the message that says so has an ", h("b", {}, "Undo"), ". The Reader and the Folio order tables follow your copy too."),
         h("h3", {}, "Hide gatherings like layers"),
-        h("p", {}, "In the Rearrange list, the eye next to a gathering hides it in 3D, so you can look at the rest of the book without it, the way you hide a layer in a drawing program. Nothing about the order changes, and the Reader still shows every page. Click the eye again, or ", h("b", {}, "Show all"), ", to bring it back; picking a sheet in a hidden gathering brings it back too."),
+        h("p", {}, "In Rearrange, right-click a quire's name and choose ", h("b", {}, "Hide in 3D"), ": it hides in 3D, so you can look at the rest of the book without it, the way you hide a layer in a drawing program. Nothing about the order changes, and the Reader still shows every page. ", h("b", {}, "Show every quire in 3D"), " in Rearrange's ", h("b", {}, "⋯"), " brings it back, and so does picking one of its sheets."),
         h("h3", {}, "Bookmarks"),
         h("p", {}, "In the Reader, click the ☆ in the corner of a page to bookmark exactly that page; in 3D, the ☆ next to a page when you pull a sheet out. ", h("kbd", {}, "B"), " or the ", h("b", {}, "☆ Bookmark"), " button lets you pick a page of the opening or sheet you are on. ", h("button", { class: "linkish", onclick: () => Bookmarks.open() }, "★"), " at the top lists your bookmarks: give each one a name (✎), and click one to go there. 3D and the Reader both go to it, and bookmarked pages carry a gold mark in the strip at the bottom and in the grid."),
         h("h3", {}, "Keeping your work"),
@@ -1900,7 +1902,7 @@ const Info = {
         h("p", {}, "They left the plant sheets in their current sequence, because each page is about a different plant, and they did not test the recipe (pharmaceutical) quires."),
         h("div", { class: "callout" }, h("b", {}, "How sure is this? "),
           "Davis and Layfield call it a hypothesis: until the text can be read, the order cannot be confirmed. They tested only quires 13 and 20. In her Toronto lecture (", cite("LFD2025talk"), ") Davis also described work in progress on using the shrinking waterstains in the early quires to recover their original nesting, with no firm results yet (", cite("Pelling2025"), "). Nick Pelling argues that LSA similarity is a prompt for codicology rather than codicological evidence."),
-        h("p", {}, "The top sequences, with quire 9 re-sewn, are in the Order menu as ", h("b", {}, "Davis: complete proposed order"), ". To try the runner-up, choose that order, open ", h("button", { class: "linkish", onclick: () => this.go("yours") }, "Rearrange"), " in 3D and drag quire 13's sheets into the order 76|83, 77|82, 79|80, 75|84, 78|81.")),
+        h("p", {}, "The top sequences, with quire 9 re-sewn, are in the Order menu as ", h("b", {}, "Davis: complete proposed order"), ". To try the runner-up, choose that order, open ", h("button", { class: "linkish", onclick: () => this.go("yours") }, "Rearrange"), " in 3D, and drag quire 13's sheets into the order 76|83, 77|82, 79|80, 75|84, 78|81.")),
 
       // ---------------------------------------------------------------- reference
       h("div", { class: "info-part" }, "Reference"),
@@ -2035,6 +2037,8 @@ async function boot() {
   });
   document.addEventListener("keydown", e => {
     if (e.target.closest?.("input, select, textarea, dialog")) return;
+    if ((e.key === "Enter" || e.key === " ") && e.target.closest?.(".v3-arrange, .ar-menu, .v3-arr-acts")) return;   // they press the Rearrange button in focus
+    if (S.view === "three" && typeof Arrange !== "undefined" && Arrange.key(e)) { e.preventDefault(); return; }   // Rearrange's table keys (⌘G, ⌘], ⌫…)
     if ((e.metaKey || e.ctrlKey) && S.view === "three" && e.key.toLowerCase() === "z" && MyOrders.isMine(S.order)) {
       e.preventDefault(); e.shiftKey ? Arrange.redo() : Arrange.undo(); return;
     }

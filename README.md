@@ -11,10 +11,14 @@ Site: [voynichviewer.com](https://voynichviewer.com).
 
 - **3D** (opens first): the book block in WebGL. Fan the sheets apart, pull one out, turn it over, unfold it, colour the edges by
   scribe, section, illustration, language or quire, and see which faces touched when the book was closed.
-  **Rearrange** (key A) puts the sheets in your own order: drag sheets, or whole gatherings, by their handle; start
-  new gatherings, set sheets aside, read a gathering as separate sheets, turn a sheet inside out or upside down, sew a
-  foldout at another fold. Only the sheet you move lifts in the animation. The eye next to a gathering hides it in 3D,
-  like a layer, without changing the order.
+  **Rearrange** (key A) takes the book apart on the table: each quire lies open as a pile (sheets tucked inside each
+  other stacked with the centre sheet on top; sheets read one by one fanned like cards). It works like a drawing
+  program: click, ⇧/⌘-click or drag a box to select; drag onto a pile or between piles (a new quire); ⌘G new quire or
+  merge, ⇧⌘G split, ⌘] / ⌘[ toward the centre / outward, ⌫ set aside, ⌘X / ⌘V; a quire's name selects, renames
+  (double-click) or moves it; right-click menus. A panel in a fixed place shows the sheet pointed at (its place in its
+  pile, both its sides) or where dragged sheets will land. On a phone it opens as a panel under the book instead.
+  **Hide lost sheets** (key L) leaves the lost sheets out of the 3D book. A quire can be hidden in 3D, like a layer,
+  without changing the order.
 - **Reader**: turn the pages two at a time, unfold the foldouts, zoom, jump to a folio. Zoomed in, a page is shown at
   full size (about 3,600 px tall), loaded from Yale's IIIF image server. The Reader loads these ahead as you read (the
   opening you are on, the next two and the one behind), so zooming in is sharp at once; not where zooming in gains
@@ -61,7 +65,7 @@ local files.)
 index.html              the page
 assets/app.js           the Reader, Info (with the Folio order tables), the order logic and the shared place (POS)
 assets/work.js          your work: crops (cut in the browser), your own orders, export and import
-assets/arrange.js       the Rearrange panel of the 3D view
+assets/arrange.js       the Rearrange dock of the 3D view
 assets/view3d.js        the 3D view (ES module, loaded when the 3D tab first opens)
 assets/privacy.js       the cookie strip and consent; loads Microsoft Clarity only after "Accept"
 assets/style.css
