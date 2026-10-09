@@ -26,10 +26,13 @@ const screen = (page, fn, arg) => page.evaluate(([src, arg]) => {
 }, [fn, arg]);
 /** point at a sheet as a person would: its pile first (a stack opens out), then the part of the sheet that shows */
 async function at(page, id) {
-  let q = await screen(page, "return L.picks.get(arg)", id);
-  await page.mouse.move(q.x, q.y); await page.waitForTimeout(120);
-  q = await screen(page, "return L.picks.get(arg)", id);
-  await page.mouse.move(q.x, q.y);
+  let q;
+  for (let i = 0; i < 5; i++) {   // aim, let the stack there open out (the sheets move under the pointer), and aim again
+    q = await screen(page, "return L.picks.get(arg)", id);
+    await page.mouse.move(q.x, q.y);
+    await still(page);
+    if (await page.evaluate(() => View3D.mod.debug.V.hover?.id) === id) return q;
+  }
   await expect.poll(() => page.evaluate(() => View3D.mod.debug.V.hover?.id), { message: `pointing at ${id}` }).toBe(id);
   return q;
 }

@@ -112,9 +112,12 @@ const Arrange = {
   hist: new Map(),    // order id -> { undo: [snapshot], redo: [snapshot] }
   selected: new Set(), selQ: new Set(),   // on the table: the selected sheets, or the selected quires (by name)
   clip: null,         // sheets cut with ⌘X, waiting for ⌘V
+  kept: new Set(),    // your orders changed since Rearrange opened, and of those, the ones kept as they were (work.js Versions)
+  versioned: new Set(),
 
   // ---------------------------------------------------------------- opening
   async open() {
+    this.kept = new Set(); this.versioned = new Set();
     if (S.view !== "three") show("three");
     const m = await View3D.load();
     this.on = true;
@@ -128,6 +131,9 @@ const Arrange = {
     if (id) this.mark(id); else this.render();
   },
   close() {
+    // nothing to save (it was saved as it changed), and nothing lost: the order as it was before is in its versions
+    if (this.on && this.versioned.has(S.order) && MyOrders.isMine(S.order))
+      toast("Your changes are saved. The order as it was before is kept too.", { label: "Earlier versions", fn: () => Versions.open(S.order) });
     this.on = false; this.closeMenu(); this.selected = new Set(); this.selQ = new Set(); this.clip = null;
     if (this.table) View3D.mod?.setArrange(false);
     View3D.mod?.setPanel(false); this.render();
@@ -153,6 +159,9 @@ const Arrange = {
     // a change that changes nothing (a sheet let go where it was) is no change, and doesn't start a copy either
     const changed = this.snap(next) !== before;
     if (!changed && !copy) return false;
+    // your order as it was before this visit's first change: kept (and a new copy has the order it came from)
+    if (changed && !started && !this.kept.has(o.id)) { Versions.keep(o, "before"); this.versioned.add(o.id); }
+    this.kept.add(next.id);
     if (changed) {
       const hst = this.histOf(next.id);
       hst.undo.push({ s: before, moved }); hst.redo = [];
@@ -434,6 +443,7 @@ const Arrange = {
       { text: "Export a progress file", fn: () => Work.exportFile(), disabled: !MyOrders.list.length && !Crops.mine.size && !Bookmarks.list.length },
       { text: "Import a progress file…", fn: () => Work.pickFile() },
       { text: "All your work…", fn: () => Work.open() },
+      mine ? { text: `Earlier versions${Versions.list(o.id).length ? ` (${Versions.list(o.id).length})` : ""}…`, disabled: !Versions.list(o.id).length, fn: () => Versions.open(o.id) } : null,
       hidden ? { text: `Show every quire in 3D (${hidden} hidden)`, fn: () => View3D.mod.showAllQuires() } : null,
       mine ? "-" : null,
       mine ? { text: "Delete this order…", danger: true, fn: async () => {

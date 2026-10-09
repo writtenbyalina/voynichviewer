@@ -811,11 +811,97 @@ const MyOrders = {
     const from = ORDERS.get(id)?.fromId;
     this.list = this.list.filter(o => o.id !== id);
     ORDERS.delete(id);
-    if (typeof Arrange !== "undefined") Arrange.hist.delete(id);   // its undo steps, and the quires it hid in 3D, go with it
+    if (typeof Arrange !== "undefined") Arrange.hist.delete(id);   // its undo steps, versions and the quires it hid in 3D go with it
+    Versions.drop(id);
     View3D.mod?.dropHidden(id);
     this.persist();
     if (S.order === id) setOrder(ORDERS.has(from) && !this.isMine(from) ? from : "beinecke");   // back to the order it was made from
     fillOrderSelect();
+  },
+};
+
+// ================================================================ earlier versions of your orders
+/* Your orders are saved as you change them, so that nothing has to be remembered to save. So that no version is lost
+   either, the order as it was is kept here: before the first change each time you rearrange it, before a progress file is
+   imported over it, and before an earlier version is brought back (so that going back loses nothing either). Up to 20 for
+   each order, the oldest going first. Kept in this browser, beside the orders. */
+const Versions = {
+  MAX: 20,
+  all: (() => { const v = store.get("versions", {}); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; })(),
+  WHY: { before: "before you rearranged it", import: "before a file was imported over it", restore: "before an earlier version was restored" },
+  list(id) { return Array.isArray(this.all[id]) ? this.all[id] : []; },
+  key: o => JSON.stringify({ g: o.gatherings, u: o.unplaced || [] }),
+  /* Keep `o` as it is now (nothing if the newest kept version is the same). */
+  keep(o, why) {
+    if (!o || !MyOrders.isMine(o.id)) return;
+    const list = this.list(o.id);
+    if (list.length && this.key(list.at(-1)) === this.key(o)) return;
+    list.push({ at: new Date().toISOString(), why, title: o.title, gatherings: JSON.parse(JSON.stringify(o.gatherings)), unplaced: [...(o.unplaced || [])] });
+    while (list.length > this.MAX) list.shift();
+    this.all[o.id] = list;
+    store.set("versions", this.all);
+  },
+  drop(id) { if (this.all[id]) { delete this.all[id]; store.set("versions", this.all); } },
+  /* How a version differs from the order now, in a few words: how many sheets were moved (in another quire, out of step
+     with the sheets around them, or folded another way: not the ones a move only pushed along, as Rearrange's gold dots). */
+  diff(v, o) {
+    const was = new Map();
+    v.gatherings.forEach(g => g.bifolia.forEach((id, i) => was.set(id, { q: String(g.quire), i, o: JSON.stringify((g.sheets || {})[id] || {}) })));
+    (v.unplaced || []).forEach((id, i) => was.set(id, { q: "\u0000aside", i, o: "{}" }));
+    let n = 0;
+    const count = (q, ids, opts) => {
+      const mine = ids.map((id, i) => [id, i]).filter(([id]) => was.get(id)?.q === q);
+      const stays = new Set(mine.filter((_, j) => keptOrder(mine.map(([id]) => was.get(id).i)).has(j)).map(([id]) => id));
+      for (const id of ids) if (!stays.has(id) || was.get(id).o !== JSON.stringify(opts[id] || {})) n++;
+    };
+    o.gatherings.forEach(g => count(String(g.quire), g.bifolia, g.sheets || {}));
+    count("\u0000aside", o.unplaced || [], {});
+    return n ? `${n} sheet${n === 1 ? "" : "s"} moved since` : "the same as now";
+  },
+  /* Make a kept version the order again; the order as it is now is kept first. */
+  restore(id, v) {
+    const o = ORDERS.get(id); if (!o) return;
+    this.keep(o, "restore");
+    if (typeof Arrange !== "undefined" && S.order === id) { const hst = Arrange.histOf(id); hst.undo.push({ s: Arrange.snap(o), moved: null }); hst.redo = []; }
+    MyOrders.put({ ...o, gatherings: JSON.parse(JSON.stringify(v.gatherings)), unplaced: [...v.unplaced] }, { ms: 900 });
+    if (S.order !== id) setOrder(id);
+    toast(`Restored the version of ${this.when(v.at)}. The order as it was is kept too.`);
+  },
+  /* A kept version as an order of its own, beside the order as it is now. */
+  copy(id, v) {
+    const o = ORDERS.get(id); if (!o) return;
+    const c = MyOrders.put(MyOrders.clean({ id: MyOrders.newId(), title: MyOrders.freeTitle(`${o.title}, ${this.when(v.at)}`), from: o.from, fromId: o.fromId,
+      gatherings: JSON.parse(JSON.stringify(v.gatherings)), unplaced: [...v.unplaced] }), { show: false });
+    setOrder(c.id);
+    toast(`Opened the version of ${this.when(v.at)} as “${c.title}”`);
+  },
+  when(at) {
+    const d = new Date(at), now = new Date(), t = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const day = (x, y) => x.toDateString() === y.toDateString();
+    if (day(d, now)) return `today, ${t}`;
+    if (day(d, new Date(now - 864e5))) return `yesterday, ${t}`;
+    return `${d.toLocaleDateString([], { day: "numeric", month: "short", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric" })}, ${t}`;
+  },
+  /* The list, newest first: when, why, how it differs from now; Restore or open it as a copy. */
+  open(id) {
+    const o = ORDERS.get(id); if (!o) return;
+    const list = this.list(id).slice().reverse();
+    // closed and gone at once: a closed dialog keeps the focus on its button until it is removed, and keys sent there are lost
+    const done = () => { d.close(); d.remove(); };
+    const d = h("dialog", { class: "ask versions-dlg" },
+      h("h3", {}, `Earlier versions of “${o.title}”`),
+      h("p", {}, "Your order is saved as you change it. Each time before you rearrange it, the order as it was is kept here."),
+      list.length ? h("ul", { class: "work-list" }, list.map(v => h("li", {},
+        h("span", {}, h("b", {}, this.when(v.at).replace(/^./, c => c.toUpperCase())), h("span", { class: "muted" }, ` ${this.WHY[v.why] || ""} · ${this.diff(v, o)}`)),
+        h("span", { class: "work-row-acts" },
+          h("button", { onclick: () => { done(); this.restore(id, v); } }, "Restore"),
+          h("button", { onclick: () => { done(); this.copy(id, v); } }, "Open as a copy")))))
+        : h("p", { class: "muted" }, "None yet: the first is kept when you next rearrange it."),
+      h("div", { class: "ask-acts" }, h("button", { class: "primary", onclick: () => d.close() }, "Close")));
+    const top = [...document.querySelectorAll("dialog[open]")].pop();
+    (top || document.body).append(d);
+    d.addEventListener("close", () => d.remove());
+    d.showModal();
   },
 };
 
@@ -986,6 +1072,7 @@ const Work = {
         h("span", { class: "work-row-acts" },
           h("button", { onclick: () => { setOrder(o.id); show("three"); Arrange.open(); d.close(); } }, "Rearrange"),
           h("button", { onclick: async () => { const t = await askText("Rename this order", { value: o.title, ok: "Rename" }); if (t) MyOrders.put({ ...o, title: t }, { show: false }); } }, "Rename"),
+          Versions.list(o.id).length ? h("button", { title: "The order as it was before each time you rearranged it", onclick: () => Versions.open(o.id) }, `Versions (${Versions.list(o.id).length})`) : "",
           h("button", { onclick: async () => { if (await askYes(`Delete “${o.title}”?`, "This cannot be undone, unless you exported it.", "Delete", true)) MyOrders.remove(o.id); } }, "Delete")))))
         : h("p", { class: "muted" }, "None yet. In 3D, press ", h("b", {}, "Rearrange"), " to make your own order of the sheets."),
       h("h4", {}, `Your bookmarks (${Bookmarks.list.length})`),
@@ -1019,7 +1106,8 @@ const Work = {
     let nOrders = 0, current = false;
     for (const o of Array.isArray(data.orders) ? data.orders : []) {
       const c = MyOrders.clean(o);
-      if (c) { MyOrders.put(c, { show: false }); nOrders++; current ||= c.id === S.order; if (typeof Arrange !== "undefined") Arrange.hist.delete(c.id); }   // its undo steps were for the version it replaced
+      if (c) { const was = ORDERS.get(c.id); if (was && MyOrders.isMine(was.id) && Versions.key(was) !== Versions.key(c)) Versions.keep(was, "import");
+        MyOrders.put(c, { show: false }); nOrders++; current ||= c.id === S.order; if (typeof Arrange !== "undefined") Arrange.hist.delete(c.id); }   // its undo steps were for the version it replaced
     }
     if (current) setOrder(S.order);   // the order on screen came in again: every view shows the imported version
     const keys = [];
