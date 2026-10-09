@@ -380,10 +380,12 @@ test.describe("while folding", () => {
         return [el.title, m.transformPoint(new DOMPoint(el.offsetWidth, 0, 0)).z - m.transformPoint(new DOMPoint(0, 0, 0)).z];
       }));
       let seen = null;
-      for (let i = 0; i < 160 && R.busy; i++) {   // a frame where 72r2 is plainly turning
+      // every frame the Reader draws, until it is done: a frame where 72r2 is plainly turning (on a slow machine the frames
+      // are few and far between, and a timer can run out before one comes)
+      while (R.busy && !seen) {
         const now = lift(), w = document.querySelector('.rd-page.right .seg.ext[title="f72r2"]').offsetWidth;
-        if (Math.abs(now["f72r2"]) > .3 * w) { seen = now; break; }
-        await wait(25);
+        if (Math.abs(now["f72r2"]) > .3 * w) seen = now;
+        else await new Promise(r => requestAnimationFrame(() => r()));
       }
       await done;
       return seen;

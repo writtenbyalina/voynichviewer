@@ -26,8 +26,9 @@ module.exports = defineConfig({
   forbidOnly: CI,                       // a stray test.only must never let a broken build through
   retries: CI ? 1 : 0,                  // one retry in CI, so a blip is not a red build but a real failure still is
   workers: CI ? 2 : 4,                  // software-drawn 3D is heavy; this many keeps a busy laptop steady
-  timeout: 45_000,
-  expect: { timeout: 8_000 },
+  // GitHub's machines draw the 3D view in software about four times slower than a laptop: the same tests get more time there
+  timeout: CI ? 120_000 : 45_000,
+  expect: { timeout: CI ? 15_000 : 8_000 },
   reporter: CI ? [["github"], ["list"], ["html", { open: "never" }]] : [["list"], ["html", { open: "never" }]],
 
   use: {
