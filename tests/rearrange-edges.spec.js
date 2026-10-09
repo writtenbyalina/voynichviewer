@@ -211,3 +211,11 @@ test("a sheet's menu offers no move it can't make", async ({ page }) => {
   await expect(page.getByRole("menuitem", { name: "Toward the centre" })).toBeDisabled();
   await expect(page.getByRole("menuitem", { name: "Outward" })).toBeEnabled();
 });
+
+test("the folds a foldout can be sewn at are named so each reads differently (the Rosettes' 86r is two panels: a crease)", async ({ page }) => {
+  await openTable(page);
+  const q = await at(page, "85|86");
+  await page.mouse.click(q.x, q.y, { button: "right" });
+  const folds = await page.getByRole("menuitemradio").allTextContents();
+  expect(folds.map(t => t.replace(/^✓/, "").trim())).toEqual(["the fold between Ros 85v and Ros 86r (as bound)", "the crease in Ros 86r"]);
+});

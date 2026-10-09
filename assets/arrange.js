@@ -30,6 +30,12 @@ const icon = (key, size = 18, cls = "ar-ic") => svgEl(`<svg class="${cls}" viewB
   stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SECTION_ICON[key] || SECTION_ICON.lost}</svg>`);
 
 const pairName = id => id.replace("|", " + ");
+/* a fold a foldout could be sewn at, between panels a and b: "the fold between 85v and 86r", or within one page (the
+   Rosettes' 86r is two panels), "the crease in Ros 86r" */
+const foldBetween = (a, b) => {
+  const [x, y] = [a, b].map(s => short(pageName(s)).replace(/ (top|bottom|middle)$/, ""));
+  return x === y ? `the crease in ${x}` : `the fold between ${x} and ${y}`;
+};
 const sectionOf = id => {
   const sh = SHEETS.get(id);
   for (const s of [...sh.inside.flat(), ...sh.outside.flat()]) if (!s.missing && s.section) return s.section.split("/")[0].trim();
@@ -570,9 +576,9 @@ const Arrange = {
     const row = sh.inside[sh.proper_row ?? (sh.inside.length - 1)];
     return [
       { text: "Start a new quire with it", fn: () => this.newGathering(id) },
-      ...(b.g && n > 2 ? ["-", { label: "Sewn at the fold between" },
+      ...(b.g && n > 2 ? ["-", { label: "Sewn at" },
         ...Array.from({ length: n - 1 }, (_, k) => k + 1).map(k => ({ check: cur === k, radio: true,
-          text: `${short(pageName(row[k - 1]))} and ${short(pageName(row[k]))}${k === sh.spine ? " (as bound)" : ""}`,
+          text: `${foldBetween(row[k - 1], row[k])}${k === sh.spine ? " (as bound)" : ""}`,
           fn: () => this.setOpt(id, "spine", k === sh.spine ? null : k) }))] : []),
       ...(this.ch.sheets.has(id) ? ["-", { text: `Put it back as in “${this.source(o).title}”`, fn: () => this.putBack(id) }] : [])];
   },
@@ -1067,8 +1073,8 @@ const Arrange = {
       ...(opts ? ["-",
         { check: !!opts.inside_out, text: "Inside out", fn: () => this.setOpt(one, "inside_out", !opts.inside_out) },
         { check: !!opts.rot180, text: "Upside down", fn: () => this.setOpt(one, "rot180", !opts.rot180) },
-        ...(cols > 2 ? [{ label: "Sewn at the fold between" }, ...Array.from({ length: cols - 1 }, (_, k) => k + 1).map(k => ({ check: spine === k, radio: true,
-          text: `${short(pageName(row[k - 1]))} and ${short(pageName(row[k]))}${k === sh.spine ? " (as bound)" : ""}`,
+        ...(cols > 2 ? [{ label: "Sewn at" }, ...Array.from({ length: cols - 1 }, (_, k) => k + 1).map(k => ({ check: spine === k, radio: true,
+          text: `${foldBetween(row[k - 1], row[k])}${k === sh.spine ? " (as bound)" : ""}`,
           fn: () => this.setOpt(one, "spine", k === sh.spine ? null : k) }))] : [])] : []),
       ...(ids.some(id => this.ch?.sheets.has(id)) ? ["-", { text: `Put back as in “${this.source(o).title}”`, fn: () => this.putBackMany(ids) }] : []),
       "-", { text: "Select the whole quire", kbd: "⇧↵", fn: () => this.key({ key: "Enter", shiftKey: true, code: "Enter" }) }];
@@ -1482,7 +1488,7 @@ const ArrangeList = {
     const folds = n > 2 ? h("label", { class: "al-opt" }, "Sewn at ",
       h("select", { onchange: e => Arrange.setOpt(id, "spine", +e.target.value === sh.spine ? null : +e.target.value) },
         Array.from({ length: n - 1 }, (_, k) => k + 1).map(k => h("option", { value: k, selected: (opts.spine ?? sh.spine) === k },
-          `the fold between ${short(pageName(row[k - 1]))} and ${short(pageName(row[k]))}${k === sh.spine ? " (as bound)" : ""}`)))) : "";
+          `${foldBetween(row[k - 1], row[k])}${k === sh.spine ? " (as bound)" : ""}`)))) : "";
     const segs = [...sh.inside.flat(), ...sh.outside.flat()].filter(s => s.img && !s.missing);
     return h("div", { class: "al-opts" },
       to,
