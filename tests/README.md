@@ -13,7 +13,7 @@ to start fresh computers, install the tests, run them, and mark the commit with 
 | Check | Takes | Checks |
 | --- | --- | --- |
 | **Data and files** | seconds | the JSON files, every page picture, `index.html`, that every script parses |
-| **Browser, part 1 of 4** … **part 4 of 4** | about ten minutes each, side by side | the site in Chromium, on a desktop and on a phone (a screen-sized window with touch); the tests are split over four computers because the 3D view is drawn in software there, which is slow |
+| **Browser, part 1 of 4** … **part 4 of 4** | a few minutes each, side by side | the site in Chromium, on a desktop and on a phone (a screen-sized window with touch); the tests are split over four computers because the 3D view is drawn in software there, which is slow |
 | **Site in a browser** | a minute, after the four parts | puts the four parts' results into one report, and is red if any part was |
 
 If a run fails, open it under the repository's **Actions** tab. **Site in a browser** keeps one report for all four parts
