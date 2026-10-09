@@ -94,7 +94,8 @@ test.describe("old data: the site's own data changes under their saved work", ()
     }
     await page.waitForFunction(() => View3D.mod?.debug?.V?.built, null, { timeout: 20_000 });
     await page.keyboard.press("a");
-    await expect(page.locator("#v3-arrange")).toContainText("200|201");
+    // Rearrange lays the book out on the table: the new sheet lies in the set-aside pile
+    await expect.poll(() => page.evaluate(() => View3D.mod.debug.V.layout?.piles?.find(p => p.key === "aside")?.ids.includes("200|201"))).toBe(true);
     await sameStorage(page);
   });
 

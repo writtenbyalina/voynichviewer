@@ -77,3 +77,14 @@ test("Info is readable without sideways scrolling, and its contents list jumps t
   const wide = await page.evaluate(() => [...document.querySelectorAll("#v-info .info-sec")].filter(el => el.scrollWidth > el.clientWidth + 2).map(el => el.id));
   expect(wide, "sections whose content is wider than the screen").toEqual([]);
 });
+
+test("on a phone Rearrange is a panel under the book: a tab per quire, the open quire as a pile, and buttons that move a sheet", async ({ page }) => {
+  await openThree(page);
+  await page.evaluate(() => Arrange.open());
+  const panel = page.locator("#v3-arrange");
+  await expect(panel.locator(".ar-tabs")).toBeVisible();
+  await expect(page.locator("#v-three"), "no table on a phone").not.toHaveClass(/table/);
+  await panel.locator('.ar-lbl[data-id="1|8"]').tap();
+  await panel.getByRole("button", { name: /Toward the centre/ }).tap();
+  await expect.poll(() => page.evaluate(() => ORDERS.get(S.order).gatherings[0].bifolia[0])).toBe("2|7");
+});

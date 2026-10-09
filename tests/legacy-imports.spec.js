@@ -187,14 +187,15 @@ test.describe("old data: nothing is lost on the way out and back in", () => {
   }
 });
 
-test("the Import button in the Rearrange panel takes the same files", async ({ page }) => {
+test("Import in the Rearrange menu takes the same files", async ({ page }) => {
   const latest = gens[gens.length - 1];
   await L.standInForYale(page);
   await openSite(page, "#three/beinecke");
   await page.waitForFunction(() => View3D.mod?.debug?.V?.built, null, { timeout: 20_000 });
   await page.keyboard.press("a");
   await expect(page.locator("#v3-arrange")).toBeVisible();
-  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator("#v3-arrange").getByRole("button", { name: /Import/ }).click()]);
+  await page.locator("#v3-arrange").getByRole("button", { name: "More", exact: true }).click();
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.getByRole("menuitem", { name: /Import/ }).click()]);
   await chooser.setFiles(path.join(latest.dir, "progress.json"));
   await page.waitForFunction(w => MyOrders.list.length >= w.orders && Bookmarks.list.length >= w.bookmarks && !Crops.pending.size,
     { orders: latest.meta.orders, bookmarks: latest.meta.bookmarks }, { timeout: 20_000 });

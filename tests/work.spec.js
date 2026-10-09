@@ -189,12 +189,31 @@ test.fixme("importing a progress file says what it imported", async ({ page }) =
 
 test.describe("your own orders (Rearrange)", () => {
   const firstSheet = page => page.evaluate(() => ORDERS.get(S.order).gatherings[0].bifolia[0]);
+  const bar = page => page.locator("#v3-arrange");           // Rearrange's own bar, over the table
+  const acts = page => page.locator("#v3-arr-acts");         // the picked sheet's buttons, at the foot of the table
+  const pile = (page, key) => page.locator(`.v3-pile[data-key="${key}"]`);   // a quire's name, under its pile
+  /* a point on a pile: just above its name */
+  const box = async loc => { await expect(loc).toBeVisible(); return loc.boundingBox(); };
+  const onPile = async (page, key) => { const r = await box(pile(page, key)); return { x: r.x + r.width / 2, y: r.y - 30 }; };
+  /* press, move a little (a click is not a drag), then glide to the target and let go */
+  async function drag(page, a, b) {
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(a.x + 6, a.y - 6, { steps: 2 });
+    await page.mouse.move(b.x, b.y, { steps: 14 });
+    await page.mouse.up();
+  }
+  const centre = async loc => { const r = await box(loc); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; };
 
-  async function startOwn(page) {
+  async function openTable(page) {
     await openThree(page);
     await page.keyboard.press("a");
-    await expect(page.locator("#v3-arrange")).toBeVisible();
-    await page.getByRole("button", { name: "Make my own copy now" }).click();
+    await expect(page.locator("#v-three"), "the book comes apart on the table").toHaveClass(/table/);
+  }
+  async function startOwn(page) {
+    await openTable(page);
+    await bar(page).getByRole("button", { name: "More", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Make my own copy now" }).click();
     await expect.poll(() => page.evaluate(() => S.order)).toMatch(/^my-/);
     await expect(page.locator("#cx-order optgroup[label='Your orders'] option")).toHaveCount(1);
   }
@@ -202,7 +221,9 @@ test.describe("your own orders (Rearrange)", () => {
   test("making a copy, moving a sheet, undo and redo, and the Reader follows the new order", async ({ page }) => {
     await startOwn(page);
     expect(await firstSheet(page)).toBe("1|8");
-    await page.locator("#v3-arrange button[aria-label='Move 1|8 down']").click();
+    await page.keyboard.press("Tab");   // the first sheet selected
+    await expect(acts(page)).toContainText("1+8");
+    await acts(page).getByRole("button", { name: /Toward the centre/ }).click();
     await expect.poll(() => firstSheet(page)).toBe("2|7");
     expect(await paintedFraction(page, page.locator("#v-three canvas"))).toBeGreaterThan(0.05);
 
@@ -220,7 +241,8 @@ test.describe("your own orders (Rearrange)", () => {
 
   test("your order is still there after a reload, and can be renamed and deleted from Your work", async ({ page }) => {
     await startOwn(page);
-    await page.locator("#v3-arrange button[aria-label='Move 1|8 down']").click();
+    await page.keyboard.press("Tab");
+    await acts(page).getByRole("button", { name: /Toward the centre/ }).click();
     await expect.poll(() => firstSheet(page)).toBe("2|7");
     const id = await page.evaluate(() => S.order);
     await page.reload();
@@ -243,18 +265,33 @@ test.describe("your own orders (Rearrange)", () => {
     expect(await stored(page, "mine")).toEqual([]);
   });
 
-  test("gatherings can be turned into separate sheets, hidden in 3D and set aside, and every sheet stays accounted for", async ({ page }) => {
+  test("quires can be read sheet by sheet, hidden in 3D and set aside, lost sheets left out, and every sheet stays accounted for", async ({ page }) => {
     await startOwn(page);
     const total = await page.evaluate(() => SHEETS.size);
     const accounted = () => page.evaluate(() => { const o = ORDERS.get(S.order); return o.gatherings.flatMap(g => g.bifolia).length + o.unplaced.length; });
-    await page.locator("#v3-arrange").getByRole("button", { name: "Separate" }).first().click();
+    await pile(page, "1").click({ button: "right" });
+    await page.getByRole("menuitemradio", { name: /Separate/ }).click();
     await expect.poll(() => page.evaluate(() => ORDERS.get(S.order).gatherings[0].type)).toBe("singulions");
-    await page.locator("#v3-arrange button[title^='Hide this gathering']").first().click();
-    await expect(page.locator("#v3-arrange button[title^='Hidden in 3D']")).toHaveCount(1);
-    expect(await paintedFraction(page, page.locator("#v-three canvas"))).toBeGreaterThan(0.02);
-    await page.locator("#v3-arrange button[title^='Hidden in 3D']").click();
-    await expect(page.locator("#v3-arrange button[title^='Hidden in 3D']")).toHaveCount(0);
+    await pile(page, "2").click({ button: "right" });
+    await page.getByRole("menuitem", { name: /Hide in 3D/ }).click();
+    await expect(pile(page, "2"), "a hidden quire leaves the table").toHaveCount(0);
+    await bar(page).getByRole("button", { name: "More", exact: true }).click();
+    await page.getByRole("menuitem", { name: /Show every quire/ }).click();
+    await expect(pile(page, "2")).toHaveCount(1);
+
+    await page.keyboard.press("Tab");   // a sheet selected: the first
+    await acts(page).getByRole("button", { name: "Move to…" }).click();
+    await page.getByRole("menuitem", { name: /Set aside/ }).click();
+    await expect.poll(() => page.evaluate(() => ORDERS.get(S.order).unplaced.length)).toBe(1);
     expect(await accounted()).toBe(total);
+
+    const shown = () => page.evaluate(() => View3D.mod.debug.V.model.all.length);
+    const before = await shown();
+    await bar(page).getByRole("button", { name: "Hide lost sheets" }).click();
+    await expect.poll(shown, "the lost sheets leave the 3D book").toBeLessThan(before);
+    await bar(page).getByRole("button", { name: "Hide lost sheets" }).click();
+    await expect.poll(shown).toBe(before);
+    expect(await accounted(), "the order still has them").toBe(total);
     // the Reader still reads the changed order from cover to cover
     await page.locator("#cx-tabs button[data-view=read]").click();
     await readerPicturesLoaded(page);
@@ -262,10 +299,30 @@ test.describe("your own orders (Rearrange)", () => {
     await readerPicturesLoaded(page);
   });
 
-  test("Rearrange panel: export and import of an order works from the panel too", async ({ page }) => {
-    await startOwn(page);
-    await expect(page.locator("#v3-arrange").getByRole("button", { name: /Export/ })).toBeVisible();
-    await expect(page.locator("#v3-arrange").getByRole("button", { name: /Import/ })).toBeVisible();
+  test("the table has the same shape in any window, and another order chosen on the table gets its own layout", async ({ page }) => {
+    const rows = () => page.evaluate(() => View3D.mod.debug.V.layout.piles.map(p => `${p.key}:${p.row}`).join(" "));
+    await openTable(page);
+    const binding = await rows();
+    await bar(page).getByRole("button", { name: "Done" }).click();
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await page.keyboard.press("a");
+    await expect(page.locator("#v-three")).toHaveClass(/table/);
+    expect(await rows(), "a narrower, taller window: the same rows").toBe(binding);
+    await page.locator("#cx-order").selectOption("davis");
+    await expect.poll(() => page.evaluate(() => View3D.mod.debug.V.layout.piles.every(p => p.fan))).toBe(true);
+    await page.locator("#cx-order").selectOption("beinecke");
+    await expect.poll(rows, "back to the binding: laid out as the binding, not as Davis's fans").toBe(binding);
+  });
+
+  test("export and import are in Rearrange's menu, and Done puts the book back together", async ({ page }) => {
+    await openTable(page);
+    await bar(page).getByRole("button", { name: "More", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: /Export/ })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /Import/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await bar(page).getByRole("button", { name: "Done" }).click();
+    await expect(page.locator("#v-three")).not.toHaveClass(/table/);
+    await expect(page.locator(".v3-bar")).toBeVisible();
   });
 });
 
