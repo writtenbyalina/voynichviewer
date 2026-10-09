@@ -828,6 +828,8 @@ svg.glyph { display: block; flex: none; overflow: visible; }
 .v3-insp .fx-arr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; }
 .v3-insp .fx-arr button { padding: 2px 9px; }
 @media (max-width: 760px) {
+  /* the book's own controls rest while its sheets are moved (the panel has its own ✕), so the book keeps some room */
+  #v-three.arranging .v3-bar, #v-three.arranging .v3-hint { display: none; }
   .v3-arrange { max-height: 62%; overflow: auto; padding: 8px 10px; }
   .ar-who { display: none; }
   .ar-book { height: auto; }

@@ -84,6 +84,9 @@ test("on a phone Rearrange is a panel under the book: a tab per quire, the open 
   const panel = page.locator("#v3-arrange");
   await expect(panel.locator(".ar-tabs")).toBeVisible();
   await expect(page.locator("#v-three"), "no table on a phone").not.toHaveClass(/table/);
+  const stage = await page.locator("#v3-stage").boundingBox();
+  expect(stage.height, "the book keeps room enough to see it move (its controls rest meanwhile)").toBeGreaterThan(page.viewportSize().height * .25);
+  await expect(page.locator(".v3-bar")).toBeHidden();
   await panel.locator('.ar-lbl[data-id="1|8"]').tap();
   await panel.getByRole("button", { name: /Toward the centre/ }).tap();
   await expect.poll(() => page.evaluate(() => ORDERS.get(S.order).gatherings[0].bifolia[0])).toBe("2|7");
