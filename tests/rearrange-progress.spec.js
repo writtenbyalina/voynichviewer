@@ -49,7 +49,7 @@ test("an order made on the table, with every kind of change, comes back from a p
   await click(page, "1|8"); await page.locator("#v3-arr-acts").getByRole("button", { name: "Inside out" }).click();
   await click(page, "9|16"); await page.locator("#v3-arr-acts").getByRole("button", { name: "Upside down" }).click();
   await click(page, "67|68"); await page.locator("#v3-arr-acts").getByRole("button", { name: "More", exact: true }).click();
-  await page.getByRole("menuitemradio", { name: /^67v2 and 67v1/ }).click();
+  await page.getByRole("menuitemradio", { name: /^the fold between 67v2 and 67v1/ }).click();
   await click(page, "33|40"); await page.keyboard.press("Backspace");
   await caption(page, "9").click(); await page.keyboard.press("Meta+BracketRight");
   const made = await G(page);
