@@ -6,7 +6,7 @@
    "date": "2026-10-10",
    "changes": [
     {"kind": "new", "text": "Text in the Reader (T): the text of the pages beside them, René Zandbergen's reference transliteration RF1b. Point at a word on the page to see what it reads; click it to see it cut from the photograph, with every other place in the book it appears."},
-    {"kind": "new", "text": "Find, at the top of the text: type a word in Eva (qokeedy, or qok* for words that begin so), or with the glyph keys, to see its places anywhere in the book."},
+    {"kind": "new", "text": "Find, under the title of the text: a search of the whole book as you type, in Eva or with the glyph keys. Words that begin with what you type count (the exact word first; whole word and contains are a click away), each with its count; the word picked opens on its places. It stays until you clear it, and the address keeps it."},
     {"kind": "improved", "text": "The text is shown as glyphs or in Eva, chosen from a dropdown. FSG and Currier are no longer offered."},
     {"kind": "improved", "text": "The text's ? says in a few lines how to use it and where the text, the word positions and the photographs come from; Sources at the foot opens the same. The keyboard list under the ? at the top right keeps only the keys that matter."},
     {"kind": "improved", "text": "“How the transcribers read it” and notes on words are gone from the word panel."}

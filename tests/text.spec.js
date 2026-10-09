@@ -245,47 +245,81 @@ test.describe("the text in the Reader", () => {
     await expect(page.locator("#rd-text .tx-src")).toContainText("RF1b · position: The Voynichese Project · photograph: Yale University");
   });
 
-  test("Find: a word typed in Eva (* for any glyphs) lists the words that match as you type; Enter opens their places, in the address", async ({ page }) => {
+  test("Find is a live search: results as you type, the exact word first, then words that begin with it; a word opens on its places; the address keeps it", async ({ page }) => {
     await page.route("https://collections.library.yale.edu/**", fromYale);
     await openSite(page, "#read/beinecke/2r/text");
     await textReady(page);
     const find = page.locator("#rd-text .tx-find-in");
-    await find.fill("qok*");
-    await expect(page.locator("#rd-text .tx-find-hits .tx-chip").first()).toContainText("qokeey");
-    await expect(page.locator("#rd-text .tx-find-hits")).toContainText("more: press Enter");
+    await expect(find).toBeVisible();
+    await find.pressSequentially("chol");
+    await expect(page.locator("#rd-text .tx-fsum")).toContainText(/\d+ words · [\d,]+ places · \d+ pages/);
+    const rows = page.locator("#rd-text .tx-fws .tx-fw");
+    await expect(rows.first().locator(".e")).toHaveText("chol");                   // the exact word first
+    await expect(rows.first().locator(".e mark")).toHaveText("chol");
+    await expect(rows.nth(1).locator(".e")).toContainText(/^chol./);              // then words that begin with it
+    await expect(page.locator("#rd-text .tx-fwi.on .tx-fw .e")).toHaveText("chol");
+    await expect(page.locator("#rd-text .tx-fdetail .tx-places .tx-h")).toContainText("Places (364)");
+    await expect(page.locator("#rd-text .tx-fdetail .tx-grid li").first()).toBeVisible();
     await expect(page.locator("#rd-text .tx-find-echo")).not.toBeEmpty();
-    await find.press("Enter");
-    await expect(page.locator("#rd-text .tx-where")).toContainText("qok*");
-    await expect(page.locator("#rd-text .tx-found .tx-chip.on")).toContainText("qokeey");
-    await expect(page.locator("#rd-text .tx-say")).toContainText("qokeey is found 307 times, on 80 pages");
-    await expect(page.locator("#rd-text .tx-places .tx-h")).toContainText("Places (307)");
-    await expect(page.locator("#rd-text .tx-grid li").first()).toBeVisible();
-    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text?find=qok*&fw=qokeey");
-    await page.locator("#rd-text .tx-found .tx-chip", { hasText: /^qokeedy/ }).click();
-    await expect(page.locator("#rd-text .tx-say")).toContainText("qokeedy is found");
-    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text?find=qok*&fw=qokeedy");
-    await expect(page.locator("#rd-text .tx-door > summary")).toHaveText(["Where it sits", "Similar spellings"]);
-    await page.locator("#rd-text .tx-ic[aria-label='Back to the page text (Esc)']").click();
+    await expect(page.locator("#rd-zoomer .seg-words .out.set").first()).toBeAttached();   // its places on 1v and 2r
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text?find=chol&fw=chol");
+    expect(await find.evaluate(e => document.activeElement === e), "typing never loses the caret").toBe(true);
+    // another word of the list opens instead
+    await rows.nth(1).click();
+    await expect(page.locator("#rd-text .tx-fwi.on .tx-fw .e")).toContainText(/^chol./);
+    await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/find=chol&fw=chol./);
+    // whole word: one result; contains: more
+    await page.locator("#rd-text .tx-fmodes .tx-chip", { hasText: "whole word" }).click();
+    await expect(page.locator("#rd-text .tx-fsum")).toContainText("1 word · 364 places");
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text?find=chol&fw=chol&fm=whole");
+    await page.locator("#rd-text .tx-fmodes .tx-chip", { hasText: "contains" }).click();
+    await expect(page.locator("#rd-text .tx-fsum")).not.toContainText("1 word ·");
+    await page.locator("#rd-text .tx-fmodes .tx-chip", { hasText: "begins with" }).click();
+    // Esc clears it, and the page text is back
+    await find.press("Escape");
+    await expect(find).toHaveValue("");
     await expect(page.locator("#rd-text .tx-page").first()).toBeVisible();
     await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text");
     expect(await page.evaluate(() => [R.zoom, R.rot]), "the page is not zoomed or turned").toEqual([1, 0]);
   });
 
-  test("Find from the address outlines the word's places on the pages on show; the glyph keys type Eva; nothing matches says so", async ({ page }) => {
+  test("Find: a pattern with *, from the address; nothing found says so and offers words one glyph away; the glyph keys type Eva; ↓ goes to the results", async ({ page }) => {
     await page.route("https://collections.library.yale.edu/**", fromYale);
-    await openSite(page, "#read/beinecke/2r/text?find=chol");
-    await expect(page.locator("#rd-text .tx-say")).toContainText("chol is found", { timeout: 15_000 });
-    await expect(page.locator("#rd-text .tx-find-in")).toHaveValue("chol");
-    await expect(page.locator("#rd-zoomer .seg-words .out.set").first()).toBeAttached();   // 1v has chol five times, 2r four
-    await page.keyboard.press("Escape");
+    await openSite(page, "#read/beinecke/2r/text?find=qok*");
+    await expect(page.locator("#rd-text .tx-fsum")).toContainText("places", { timeout: 15_000 });
+    await expect(page.locator("#rd-text .tx-find-in")).toHaveValue("qok*");
+    await expect(page.locator("#rd-text .tx-fmodes")).toContainText("A pattern");
+    await expect(page.locator("#rd-text .tx-fwi.on .tx-fw .e")).toHaveText("qokeey");   // the most frequent, no exact word
+    await expect(page.locator("#rd-text .tx-fdetail .tx-places .tx-h")).toContainText("Places (307)");
+    await page.locator("#rd-text .tx-find-in").fill("qokq");
+    await expect(page.locator("#rd-text .tx-say")).toContainText("No word in the book begins with qokq");
+    await expect(page.locator("#rd-text .tx-sim .tx-chip").first()).toBeVisible();   // one glyph away
+    await page.locator("#rd-text .tx-sim .tx-chip").first().click();
+    await expect(page.locator("#rd-text .tx-fsum")).toContainText("1 word");
+    await page.locator("#rd-text .tx-find-in").fill("");
     await textReady(page);
     await page.locator("#rd-text .tx-ic.tx-kb").click();
     await expect(page.locator("#rd-text .tx-keys")).toBeVisible();
     for (const e of ["d", "a", "i", "i", "n"]) await page.locator(`#rd-text .tx-key:has(.e:text-is("${e}"))`).click();
     await expect(page.locator("#rd-text .tx-find-in")).toHaveValue("daiin");
-    await expect(page.locator("#rd-text .tx-find-hits .tx-chip").first()).toContainText("daiin");
-    await page.locator("#rd-text .tx-find-in").fill("qqqq");
-    await expect(page.locator("#rd-text .tx-find-hits")).toContainText("No word in the book matches");
+    await expect(page.locator("#rd-text .tx-fwi.on .tx-fw .e")).toHaveText("daiin");
+    await page.locator("#rd-text .tx-find-in").press("ArrowDown");
+    expect(await page.evaluate(() => document.activeElement.className)).toContain("tx-fw");
+    await page.keyboard.press("Escape");
+    await textReady(page);
+    await expect(page.locator("#rd-text .tx-find-in")).toHaveValue("");
+  });
+
+  test("the glyphs picked in a word find their words in the panel, not in the Text tab", async ({ page }) => {
+    await page.route("https://collections.library.yale.edu/**", fromYale);
+    await openSite(page, "#read/beinecke/1r/text?w=f1r.15.8");
+    await expect(page.locator("#rd-text .tx-reading .gl .tx-g")).toHaveCount(3, { timeout: 15_000 });   // chol: ch, o, l
+    await page.locator("#rd-text .tx-reading .gl .tx-g").first().click();
+    await expect(page.locator("#rd-text .tx-gfind")).toBeVisible();
+    await page.locator("#rd-text .tx-gfind .tx-link").first().click();
+    await expect(page.locator("#rd-text .tx-find-in")).toHaveValue("ch");
+    await expect(page.locator("#rd-text .tx-fsum")).toContainText("words");
+    await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#read\/beinecke\/1r\/text\?find=ch/);
   });
 
   test("the panel's ? is short: how to use the text, a few keys, the sources; the site's ? keeps only the keys that matter", async ({ page }) => {
@@ -320,6 +354,12 @@ test.describe("the text in the Reader", () => {
     const seg = page.locator('#rd-zoomer .seg[data-page="f85r2"]');
     await expect(seg.locator(".wb")).toHaveCount(160);
     await expect(seg.locator(".seg-words")).toHaveAttribute("style", /rotate\(180deg\)/);
+  });
+
+  test("a word written with a rare form of a letter says so, since its count and places take every form", async ({ page }) => {
+    await openSite(page, "#read/beinecke/30r/text?w=f30r.1.9");   // RF1b code Ac: a rare o
+    await expect(page.locator("#rd-text .tx-say")).toContainText("more times", { timeout: 15_000 });
+    await expect(page.locator("#rd-text .tx-form")).toContainText("rare form of o");
   });
 
   test("a word whose place is estimated from the words beside it is drawn dashed and says so", async ({ page }) => {
@@ -402,11 +442,14 @@ test.describe("searching by glyphs", () => {
     await page.locator('#rd-text .tx-reading .tx-g[data-i="1"]').click();
     await page.locator('#rd-text .tx-reading .tx-g[data-i="2"]').click({ modifiers: ["Shift"] });
     await expect(page.locator("#rd-text .tx-reading .tx-g.on")).toHaveCount(2);
-    const find = page.locator("#rd-text .tx-gfind a").first();
+    const find = page.locator("#rd-text .tx-gfind .tx-link").first();
     await expect(find).toHaveText("ending words");
-    await expect(find).toHaveAttribute("href", "#text/beinecke/search?q=*ol");
-    await find.click();
-    await expect(page.locator("#sx-echo")).toContainText("Words that end with ol", { timeout: 15_000 });
+    await find.click();   // Find, in the panel: the pattern *ol
+    await expect(page.locator("#rd-text .tx-find-in")).toHaveValue("*ol");
+    await expect(page.locator("#rd-text .tx-fmodes")).toContainText("A pattern");
+    await expect(page.locator("#rd-text .tx-fwi.on .tx-fw .e")).toHaveText("ol");   // the most frequent word ending in ol
+    await expect(page.locator("#rd-text .tx-fws .tx-fw .e").nth(1)).toHaveText("chol");
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text?find=*ol&fw=ol");
   });
 });
 

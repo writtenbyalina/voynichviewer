@@ -2125,7 +2125,7 @@ const Info = {
           ...[["Glyphs", "the manuscript's own shapes, drawn with Glen Claston's font (words are matched as Eva)"], ["Eva", "the alphabet most people use today (Landini and Zandbergen, 1998)"]]
             .flatMap(([t, d]) => [h("dt", {}, t), h("dd", {}, d)])),
         h("ul", {},
-          h("li", {}, h("b", {}, "Find"), ", at the top of the text, finds a word anywhere in the book: type Eva (qokeedy, or qok* for words that begin so), or type with the glyph keys, and its places open beside the page you are on."),
+          h("li", {}, h("b", {}, "Find"), ", under the title of the text, finds a word anywhere in the book as you type: Eva (qokeedy), or the glyph keys. Words that begin with what you type count, the exact word first; chips under the box switch to the whole word or to words that contain it, and * stands for any run of glyphs. Each word that matches opens on its places, which open beside the page you are on."),
           h("li", {}, "A faint ", h("b", {}, "·"), " between two words is an ", h("b", {}, "uncertain space"), ": Zandbergen could not be sure it is a space."),
           h("li", {}, h("b", {}, "The strip under the pages"), " is the book's compass. Every page has its place on it; the page you are on is gold, a dot marks each page you have been to, and while you look at a word, every page it is on is lit. Point at a page there to see it without going."),
           h("li", {}, h("b", {}, "Its other places"), " open beside the page you are on, never in place of it: the line around the word, cut from its photograph, and where it is on its page. ", h("kbd", {}, "N"), " goes on to the next. ", h("b", {}, "Open page"), " turns the book there; the Back chip, or the browser's Back, returns you."),

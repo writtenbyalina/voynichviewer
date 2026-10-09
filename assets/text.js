@@ -113,7 +113,7 @@ const Text = {
   has(page) { return !!(this.pages && this.pages.get(page)); },
 };
 
-const chOf = code => (Text.glyphs[code] && Text.glyphs[code].ch) || "?";
+const chOf = code => (Text.glyphs && Text.glyphs[code] && Text.glyphs[code].ch) || "?";
 /* a word's glyphs written in an alphabet: bitrans's way, a rule for two glyphs first, then glyph by glyph */
 function writeAs(codes, script) {
   if (script === "glyphs") return codes.map(chOf).join("");
@@ -438,6 +438,7 @@ const T = {
     el.replaceChildren(
       h("div", { class: "tx-grip", role: "separator", tabindex: "0", "aria-label": "Resize the text panel", "aria-orientation": "vertical" }),
       h("div", { class: "tx-head" }),
+      this.findBar(),
       h("div", { class: "tx-step", hidden: true, role: "navigation", "aria-label": "Search results" }),
       h("div", { class: "tx-body", tabindex: "-1" }));
     this.grip($(".tx-grip", el), el);
@@ -796,6 +797,10 @@ const T = {
     if (!this.el) return;
     const body = $(".tx-body", this.el);
     const kind = this.view?.kind || (this.anchor ? "word" : "page");
+    const bar = $(".tx-find", this.el);
+    if (bar) bar.hidden = kind !== "page" && kind !== "find";
+    this.findUI?.fill();
+    if (kind !== "find" && this.findUI?.input.value) { this.findUI.input.value = ""; this.findUI.echo.hidden = true; }   // the search is over
     if (body.dataset.view === "page" && kind !== "page") this.pageScroll = body.scrollTop;
     if (kind === "set") this.setView(body);
     else if (kind === "ring") this.ringView(body);
@@ -854,7 +859,6 @@ const T = {
     this.head([h("span", { class: "tx-title" }, pages.map(pageName_).join(" · ") || "Text"), h("span", { class: "sp" })]);
     const kids = [];
     if (this.back) kids.push(this.returnChip());
-    kids.push(this.findBar());
     const seen = new Set();
     for (const x of this.shownNow || []) {
       if (x.folded) {
@@ -939,7 +943,7 @@ const T = {
         h("h3", { id: "tx-help-h" }, "The text"),
         h("div", { class: "tx-dlg-sec" },
           h("p", {}, "Point at any word on the page to see what it reads. Click it to see it on its own, with every other place in the book it appears. Shift-click takes in a phrase."),
-          h("p", {}, "Find, at the top of the text, finds a word anywhere in the book: type Eva (qokeedy, qok*, ch?dy), or type with the glyph keys."),
+          h("p", {}, "Find, under the title, finds a word anywhere in the book as you type: Eva (qokeedy), or the glyph keys. Words that begin with what you type count, the exact word first; the chips under the box change that. * stands for any run of glyphs, ? for one."),
           h("p", {}, "Glyphs or Eva, in the dropdown, is how the text is written. ", h("a", { href: "#info/beinecke/text", onclick: () => d.close() }, "What Eva is"), ".")),
         h("h4", {}, "Keys"),
         h("div", { class: "tx-dlg-sec tx-keys-list" },
@@ -959,100 +963,146 @@ const T = {
   },
 
   /* ---- Find: a word anywhere in the book, typed in Eva or with the glyph keys ---- */
-  /* the words of the book that match a query (Eva; * any run of glyphs, ? one glyph): [[word, how many places]],
-     the most frequent first */
-  findWords(q) {
+  /* The bar sits in the panel's frame, above the body, so the caret is never lost while the results below are
+     redrawn. It behaves as a search does: the results come as you type, with no Enter; the query stays until it is
+     cleared (Esc, or the ×); words that begin with what is typed count, the exact word first (chips: whole word,
+     contains); and the results are the places themselves, grouped by word, the word on show expanded. Eva is what is
+     typed, the glyph keys type Eva too, and the query is drawn as glyphs beside the box. */
+  MODES: [["begins", "begins with"], ["whole", "whole word"], ["contains", "contains"]],
+  findMode: ["begins", "whole", "contains"].includes(store.get("text:findMode", "begins")) ? store.get("text:findMode", "begins") : "begins",
+  findUI: null, findTimer: null,
+  /* the words of the book that match: [[word, how many places]], the exact word first, then the most frequent. A query
+     with * or ? is a pattern as typed (* any run of glyphs, ? one glyph); otherwise the mode says how it is matched. */
+  findWords(q, mode = this.findMode) {
     Find.build(this.script);
     if (!q) return [];
     const esc = t => t.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp("^" + q.split(/([*?])/).map((t, i) => i % 2 ? (t === "*" ? "[a-z]*" : "(?:ckh|cth|cph|cfh|ch|sh|[a-z])") : esc(t)).join("") + "$");
+    const wild = /[*?]/.test(q);
+    const core = wild ? q.split(/([*?])/).map((t, i) => i % 2 ? (t === "*" ? "[a-z]*" : "(?:ckh|cth|cph|cfh|ch|sh|[a-z])") : esc(t)).join("") : esc(q);
+    const re = new RegExp(wild || mode === "whole" ? `^${core}$` : mode === "contains" ? `^[a-z]*${core}[a-z]*$` : `^${core}[a-z]*$`);
     const out = [];
     for (const [w, idx] of Find.byWord) if (re.test(w)) out.push([w, idx.length]);
-    return out.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    return out.sort((a, b) => (b[0] === q) - (a[0] === q) || b[1] - a[1] || a[0].localeCompare(b[0]));
   },
-  /* a word as the text is shown: Eva, or its glyphs (from its first place in the book) */
-  showWord(w) {
-    if (this.script !== "glyphs") return w;
+  /* a word as its glyphs (from its first place in the book) */
+  glyphsOf(w) {
     const i = Find.byWord.get(w)?.[0], t = i != null && Find.toks[i];
-    return t ? Text.pages.get(t.page)[t.li].words[t.wi].codes.map(chOf).join("") : w;
+    return t ? Text.pages.get(t.page)[t.li].words[t.wi].codes.map(chOf).join("") : "";
   },
-  /* The bar: a box for the word, what it looks like in glyphs beside it, and a key for the glyph keys. In the page
-     text, the words that match appear under it as you type; Enter opens the first (or the one picked). */
-  findBar(q = "") {
-    const inFind = this.view?.kind === "find";
-    if (!inFind) q = this.findDraft || "";   // what was typed stays while the pages turn and the panel is redrawn
-    const input = h("input", { class: "tx-find-in", type: "search", value: q, autocomplete: "off", spellcheck: "false", enterkeyhint: "search",
-      placeholder: "Find a word in the book: Eva (qokeedy, qok*) or the glyph keys", "aria-label": "Find a word in the book, in Eva" });
-    const echo = h("span", { class: "tx-find-echo", "aria-hidden": "true" });
-    const hits = h("div", { class: "tx-find-hits", hidden: true });
+  showWord(w) { return this.script === "glyphs" ? this.glyphsOf(w) || w : w; },
+  /* the bar: made once, in the frame */
+  findBar() {
+    const input = h("input", { class: "tx-find-in", type: "search", autocomplete: "off", spellcheck: "false", autocapitalize: "off", enterkeyhint: "search",
+      placeholder: "Find a word (Eva, or the glyph keys)", "aria-label": "Find a word in the book, in Eva", "aria-controls": "tx-found" });
+    const echo = h("span", { class: "tx-find-echo", "aria-hidden": "true", hidden: true });
     const put = eva => { const a = input.selectionStart ?? input.value.length, b = input.selectionEnd ?? a;
-      input.value = input.value.slice(0, a) + eva + input.value.slice(b); input.focus(); input.setSelectionRange(a + eva.length, a + eva.length); update(); };
-    const keys = h("div", { class: "tx-keys", hidden: !this.keysOpen, role: "group", "aria-label": "Glyph keys: each puts its glyph in the box" },
-      GLYPH_KEYS.map(([code, eva]) => h("button", { type: "button", class: "tx-key", title: eva === "?" ? "any one glyph" : eva, onclick: () => put(eva) },
-        h("span", { class: "g", "aria-hidden": "true" }, eva === "?" ? "?" : chOf(code)), h("span", { class: "e" }, eva))),
-      h("button", { type: "button", class: "tx-key tx-key-x", title: "Delete the last glyph", "aria-label": "Delete the last glyph",
-        onclick: () => { const v = input.value, u = EVA_UNITS.find(([, e]) => v.endsWith(e)); input.value = v.slice(0, v.length - (u ? u[1].length : 1)); input.focus(); update(); } }, "⌫"));
-    const kb = h("button", { type: "button", class: `tx-ic tx-kb${this.keysOpen ? " on" : ""}`, title: "Type with the manuscript's glyphs", "aria-label": "Glyph keys",
-      "aria-expanded": String(!!this.keysOpen), onclick: () => { this.keysOpen = keys.hidden; keys.hidden = !this.keysOpen; kb.setAttribute("aria-expanded", String(this.keysOpen)); kb.classList.toggle("on", this.keysOpen); if (this.keysOpen) input.focus(); } },
-      h("span", { class: "g", "aria-hidden": "true" }, chOf("Q1")));
-    const go = word => { const v = evaQuery(input.value); if (v) { this.findDraft = ""; this.openFind(v, word); } };
-    const update = () => {
-      const v = evaQuery(input.value);
-      echo.textContent = v && Text.glyphs ? evaToGlyphs(v) : "";
-      echo.hidden = !echo.textContent || this.script === "glyphs" && !/[*?]/.test(v) && v === input.value.trim();
-      if (inFind) return;   // the view itself lists the words that match
-      const ws = v ? this.findWords(v) : [];
-      hits.hidden = !v;
-      hits.replaceChildren(...(!v ? [] : !ws.length ? [h("span", { class: "tx-dim" }, "No word in the book matches.")] :
-        [...ws.slice(0, 8).map(([w, n]) => h("button", { type: "button", class: `tx-chip${this.script === "glyphs" ? " glyph" : ""}`, title: `The ${plural(n, "place", "places")} of ${w}`, onclick: () => go(w) }, this.showWord(w), h("span", { class: "n" }, n))),
-          ...(ws.length > 8 ? [h("span", { class: "tx-dim" }, `and ${ws.length - 8} more: press Enter`)] : [])]));
+      input.value = input.value.slice(0, a) + eva + input.value.slice(b); input.focus(); input.setSelectionRange(a + eva.length, a + eva.length); this.setFind(input.value); };
+    const keys = h("div", { class: "tx-keys", hidden: !this.keysOpen, role: "group", "aria-label": "Glyph keys: each puts its glyph in the box" });
+    const kbG = h("span", { class: "g", "aria-hidden": "true" }, "k");
+    const fill = () => {   // the keys are drawn once the glyphs are known: the frame is built before the text has loaded
+      if (!Text.glyphs || keys.childElementCount) return;
+      kbG.textContent = chOf("Q1");
+      keys.append(...GLYPH_KEYS.map(([code, eva]) => h("button", { type: "button", class: "tx-key", title: eva === "?" ? "any one glyph" : `Eva ${eva}`, onclick: () => put(eva) },
+          h("span", { class: "g", "aria-hidden": "true" }, eva === "?" ? "?" : chOf(code)), h("span", { class: "e" }, eva))),
+        h("button", { type: "button", class: "tx-key", title: "any run of glyphs", onclick: () => put("*") }, h("span", { class: "g", "aria-hidden": "true" }, "*"), h("span", { class: "e" }, "any")),
+        h("button", { type: "button", class: "tx-key tx-key-x", title: "Delete the last glyph", "aria-label": "Delete the last glyph",
+          onclick: () => { const v = input.value, u = EVA_UNITS.find(([, e]) => v.endsWith(e)); input.value = v.slice(0, v.length - (u ? u[1].length : 1)); input.focus(); this.setFind(input.value); } }, "⌫"));
     };
-    input.addEventListener("input", () => { if (!inFind) this.findDraft = input.value; update(); });
+    const kb = h("button", { type: "button", class: `tx-ic tx-kb${this.keysOpen ? " on" : ""}`, title: "Type with the manuscript's glyphs", "aria-label": "Glyph keys",
+      "aria-expanded": String(!!this.keysOpen), onclick: () => { fill(); this.keysOpen = keys.hidden; keys.hidden = !this.keysOpen; kb.setAttribute("aria-expanded", String(this.keysOpen)); kb.classList.toggle("on", this.keysOpen); if (this.keysOpen) input.focus(); } },
+      kbG);
+    input.addEventListener("input", () => { clearTimeout(this.findTimer); this.findTimer = setTimeout(() => this.setFind(input.value), 80); });
     input.addEventListener("keydown", e => {
-      if (e.key === "Enter") { e.preventDefault(); go(null); }
-      else if (e.key === "Escape") { if (input.value) { input.value = ""; update(); } else input.blur(); e.stopPropagation(); }
-      else e.stopPropagation();   // typing in the box is not a key for the Reader
+      e.stopPropagation();   // typing in the box is not a key for the Reader
+      if (e.key === "Enter") { e.preventDefault(); clearTimeout(this.findTimer); this.setFind(input.value); }
+      else if (e.key === "Escape") { if (input.value) this.setFind(""); else input.blur(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); ($(".tx-fw", this.el) || $(".tx-body", this.el))?.focus(); }
     });
-    if (q) update();
-    return h("div", { class: "tx-find", role: "search" }, h("div", { class: "tx-find-row" }, input, echo, kb), keys, hits);
+    this.findUI = { input, echo, keys, kb, fill };
+    return h("div", { class: "tx-find", role: "search", hidden: true }, h("div", { class: "tx-find-row" }, input, echo, kb), keys);
   },
-  /* the view: the query, the words that match (the one shown is marked), then that word's places as the word view
-     has them; its places on the pages on show are outlined */
-  openFind(q, word = null) {
-    $("#tx-tip")?.remove();
-    this.closePeek(); this.closeSky();
-    this.anchor = this.focus = null; this.set = []; this.similar = null; this.filter = null;
-    this.view = { kind: "find", q, word };
+  /* what is in the box becomes the view, at once: results while there is a query, the page text when it is cleared */
+  setFind(raw) {
+    clearTimeout(this.findTimer);
+    const ui = this.findUI, q = evaQuery(raw);
+    if (ui && ui.input.value !== raw) ui.input.value = raw;
+    if (ui) { ui.echo.textContent = q && Text.glyphs ? evaToGlyphs(q) : ""; ui.echo.hidden = !ui.echo.textContent; }
+    if (!q) {
+      if (this.view?.kind === "find") { this.view = null; this.closePeek(); this.closeSky(); this.show(); this.marks(); setHash(); }
+      return;
+    }
+    if (this.view?.kind === "find" && this.view.q === q) return;
+    const was = this.view?.kind === "find" ? this.view : null;
+    if (!was) { $("#tx-tip")?.remove(); this.closePeek(); this.closeSky(); this.anchor = this.focus = null; this.set = []; }
+    this.similar = null; this.filter = null;
+    this.view = { kind: "find", q, word: was ? was.word : null };
     this.show(); this.marks(); setHash();
-    $(".tx-body", this.el)?.focus({ preventScroll: true });
+  },
+  /* a search asked for from elsewhere: the address, or the glyphs picked in a word */
+  openFind(q, word = null, mode = null) {
+    if (mode && this.MODES.some(([m]) => m === mode)) { this.findMode = mode; store.set("text:findMode", mode); }
+    if (this.view?.kind !== "find") { $("#tx-tip")?.remove(); this.closePeek(); this.closeSky(); this.anchor = this.focus = null; this.set = []; }
+    this.view = { kind: "find", q: null, word };   // q is null so that setFind draws it, keeping the word asked for
+    this.setFind(q);
   },
   findView(body) {
-    const v = this.view, q = v.q;
-    this.head([this.backButton(), h("span", { class: "tx-where" }, "Find ", h("b", {}, q)), h("span", { class: "sp" })]);
-    const kids = [this.findBar(q)];
-    const matches = this.findWords(q);
-    if (!matches.length) {
+    const v = this.view, q = v.q, wild = /[*?]/.test(q), mode = this.findMode;
+    this.head([this.backButton("Back to the page text (Esc)"), h("span", { class: "tx-where" }, "Find"), h("span", { class: "sp" })]);
+    const words = this.findWords(q);
+    const kids = [];
+    // how it is matched
+    kids.push(h("div", { class: "tx-fmodes", role: "group", "aria-label": "How the word is matched" },
+      wild ? h("span", { class: "tx-dim" }, "A pattern: * is any run of glyphs, ? any one glyph.")
+        : this.MODES.map(([m, say]) => h("button", { type: "button", class: `tx-chip${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
+          onclick: () => { this.findMode = m; store.set("text:findMode", m); this.show(); this.marks(); setHash(); } }, say))));
+    if (!words.length) {
       v.word = null; v.onShow = [];
-      kids.push(h("p", { class: "tx-msg" }, `No word in the book matches ${q}.`));
+      const how = wild ? "matches" : mode === "whole" ? "reads" : mode === "contains" ? "contains" : "begins with";
+      kids.push(h("p", { class: "tx-say" }, `No word in the book ${how} `, h("b", { class: "mono" }, q), "."));
+      Find.build(this.script);
+      const near = [];
+      if (!wild) for (const [w, idx] of Find.byWord) if (lev(w, q) === 1) near.push([w, idx.length]);
+      near.sort((a, b) => b[1] - a[1]);
+      if (near.length) kids.push(h("p", { class: "tx-dim" }, "One glyph away:"), h("div", { class: "tx-sim" }, near.slice(0, 10).map(([w, n]) =>
+        h("button", { type: "button", class: "tx-chip", title: `Find ${w}`, onclick: () => this.openFind(w, w, "whole") }, this.showWord(w), h("span", { class: "n" }, n)))));
+      else if (!wild && mode !== "contains") kids.push(h("p", { class: "tx-dim" }, "Try ", h("button", { class: "tx-link", onclick: () => { this.findMode = "contains"; store.set("text:findMode", "contains"); this.show(); this.marks(); setHash(); } }, "contains"), ", or * for any run of glyphs."));
+      kids.push(h("p", { class: "tx-dim" }, "Eva letters name the glyphs' shapes (ch, sh, k, t, p, f, …); the glyph keys beside the box type them."));
     } else {
-      const word = v.word && matches.some(([w]) => w === v.word) ? v.word : matches[0][0];
+      const places = words.reduce((a, [, n]) => a + n, 0), pages = new Set();
+      for (const [w] of words) for (const i of Find.byWord.get(w)) pages.add(Find.toks[i].page);
+      kids.push(h("p", { class: "tx-fsum", "aria-live": "polite" }, `${plural(words.length, "word", "words")} · ${plural(places, "place", "places")} · ${plural(pages.size, "page", "pages")}`));
+      const word = v.word === "" ? null : v.word && words.some(([w]) => w === v.word) ? v.word : words[0][0];
       v.word = word;
-      if (matches.length > 1) kids.push(h("div", { class: "tx-sim tx-found", role: "group", "aria-label": "The words that match" },
-        matches.slice(0, 40).map(([w, n]) => h("button", { type: "button", class: `tx-chip${this.script === "glyphs" ? " glyph" : ""}${w === word ? " on" : ""}`, title: `The ${plural(n, "place", "places")} of ${w}`,
-          onclick: () => { v.word = w; this.similar = null; this.filter = null; this.keepScroll = true; this.show(); this.marks(); setHash(); } }, this.showWord(w), h("span", { class: "n" }, n))),
-        matches.length > 40 ? h("span", { class: "tx-dim" }, `and ${matches.length - 40} more`) : ""));
-      const places = this.placesOf([word]);
-      v.onShow = places.filter(x => this.loaded.has(x.page)).map(x => key(x.page, x.li, x.wi));
-      const pages = new Set(places.map(x => x.page)), shown = this.similar || word;
-      kids.push(h("p", { class: "tx-say" }, h("b", { class: this.script === "glyphs" ? "glyph" : "" }, this.showWord(shown)),
-        places.length ? ` is found ${plural(places.length, "time", "times")}, on ${plural(pages.size, "page", "pages")}${this.filter ? ` (${this.filter.say})` : ""}.` : ` is not found${this.filter ? ` (${this.filter.say})` : ""}.`));
-      kids.push(this.placesEl([word], places, null));
-      if (places.length) kids.push(this.sitsEl(places));
-      kids.push(this.similarEl(word));
+      v.onShow = word ? Find.find([word], this.script).filter(x => this.loaded.has(x.page)).map(x => key(x.page, x.li, x.wi)) : [];
+      // the words, a compact list to scan (the one on show marked); then, below the list, that word's places
+      const list = h("ol", { class: "tx-fws", id: "tx-found", "aria-label": "The words that match" });
+      const SHOW = 8, at = Math.max(0, words.findIndex(([w]) => w === word));
+      const add = (from, upto) => {
+        for (const [w, n] of words.slice(from, upto)) list.append(this.findRow(w, n, q, w === word));
+        if (words.length > upto) list.append(h("li", { class: "tx-more-li" }, h("button", { class: "tx-btn", onclick: e => { e.target.closest("li").remove(); add(upto, upto + 30); } }, `Show ${Math.min(30, words.length - upto)} more words`)));
+      };
+      add(0, Math.max(SHOW, at + 1));   // the word on show is always in the part of the list that is out
+      kids.push(list);
+      if (word) {
+        const places = this.placesOf([word]);
+        kids.push(h("section", { class: "tx-fdetail", "aria-label": `The places of ${word}` },
+          h("h4", { class: "tx-h tx-h2" }, h("span", { class: `tx-fd-w${this.script === "glyphs" ? " glyph" : ""}` }, this.showWord(this.similar || word)), words.length > 1 ? " · the word picked above" : ""),
+          this.placesEl([word], places, null), places.length > 1 ? this.sitsEl(places) : ""));
+      }
     }
     kids.push(this.sourceLine(false));
     body.classList.toggle("glyph", this.script === "glyphs");
     body.replaceChildren(...kids);
+  },
+  /* one word that matches: its glyphs, its Eva with the match marked, its count; a click shows its places below the list */
+  findRow(w, n, q, on) {
+    const pages = new Set((Find.byWord.get(w) || []).map(i => Find.toks[i].page)).size;
+    const wild = /[*?]/.test(q), at = wild ? -1 : this.findMode === "begins" ? (w.startsWith(q) ? 0 : -1) : w.indexOf(q);
+    const eva = at < 0 ? [w] : [w.slice(0, at), h("mark", {}, w.slice(at, at + q.length)), w.slice(at + q.length)];
+    return h("li", { class: `tx-fwi${on ? " on" : ""}` }, h("button", { type: "button", class: `tx-fw${on ? " on" : ""}`, "aria-pressed": String(on), title: `The ${plural(n, "place", "places")} of ${w}`,
+      onclick: () => { if (on) return; this.view.word = w; this.similar = null; this.filter = null; this.keepScroll = true; this.show(); this.marks(); setHash(); } },
+      h("span", { class: "g", "aria-hidden": "true" }, this.glyphsOf(w)), h("span", { class: "e" }, ...eva),
+      h("span", { class: "n" }, `${n.toLocaleString("en")} · ${plural(pages, "page", "pages")}`)));
   },
 
   /* ---- the word, or phrase, chosen ---- */
@@ -1075,9 +1125,10 @@ const T = {
     const q = whole ? eva : `${p.a === 0 ? "" : "*"}${eva}${p.b === codes.length - 1 ? "" : "*"}`;
     f.hidden = false;
     const where = whole ? "as a whole word" : p.a === 0 ? "starting words" : p.b === codes.length - 1 ? "ending words" : "inside words";
+    const go = (query, mode, label) => h("button", { type: "button", class: "tx-link", title: `Find ${query} in the book`, onclick: () => this.openFind(query, null, mode) }, label);
     f.replaceChildren(h("span", { class: "g", "aria-hidden": "true" }, run.map(chOf).join("")), ` ${eva}: find it `,
-      h("a", { href: `#text/beinecke/search?q=${encodeURIComponent(q)}`, title: `Search the book for ${q}` }, where),
-      ...(q === `*${eva}*` ? [] : [" · ", h("a", { href: `#text/beinecke/search?q=${encodeURIComponent(`*${eva}*`)}`, title: `Search the book for *${eva}*` }, "anywhere in a word")]));
+      go(whole || p.a === 0 ? eva : q, whole ? "whole" : p.a === 0 ? "begins" : null, where),
+      ...(q === `*${eva}*` ? [] : [" · ", go(`*${eva}*`, null, "anywhere in a word")]));
   },
   wordView(body) {
     const ks = this.chosenKeys(), its = ks.map(k => this.item(k)).filter(Boolean);
@@ -1117,6 +1168,12 @@ const T = {
       h("p", { class: "tx-gfind", hidden: true })));
     const words = its.map(it => this.wordText(it.w));
     const places = this.placesOf(words);
+    // a rare form of a letter (an STA code with a letter, not a digit: Ac is a rare o): the glyph above is drawn as
+    // written, while Eva, the count and the places take the letter in every form, so say so
+    const rare = [...new Set(its.flatMap(it => it.w.codes.filter(c => /^[A-Y][a-z]$/.test(c) && Text.glyphs[c] && Text.glyphs[c].eva)))];
+    if (rare.length) kids.push(h("p", { class: "tx-form tx-dim" }, rare.length > 1 ? "Written with rare forms of " : "Written with a rare form of ",
+      ...rare.flatMap((c, i) => [i ? ", " : "", h("b", { class: "mono" }, Text.glyphs[c].eva)]),
+      ". The count and the places below take the letter in every form."));
     kids.push(h("p", { class: "tx-say" }, this.sentence(words, places, first.page)));
     if (n === 1) {                                              // Claude's own reading from the photograph, where there is one
       const slot = h("p", { class: "tx-photo", hidden: true });
@@ -1915,7 +1972,7 @@ const T = {
     if (this.view?.kind === "set" && this.view.from !== "page") p.set("s", this.set.map(x => x.s).join(" "));
     if (this.view?.kind === "set" && this.view.from === "page") p.set("like", this.view.page + (this.view.scope ? "." + this.view.scope : ""));
     if (this.view?.kind === "ring") p.set("ring", Text.pages.get(this.view.page)[this.view.li].id);
-    if (this.view?.kind === "find") { p.set("find", this.view.q); if (this.view.word) p.set("fw", this.view.word); }
+    if (this.view?.kind === "find") { p.set("find", this.view.q); if (this.view.word) p.set("fw", this.view.word); if (this.findMode !== "begins" && !/[*?]/.test(this.view.q)) p.set("fm", this.findMode); }
     if (this.ask) {
       p.set("l", this.ask.l);
       if (this.ask.m) p.set("m", this.ask.m.join("-"));
@@ -1933,7 +1990,7 @@ const T = {
     this.wantSet = p.get("s") ? p.get("s").split(/[ +]/).filter(Boolean) : null;
     this.wantLike = p.get("like") || null;
     this.wantRing = p.get("ring") || null;
-    this.wantFind = p.get("find") ? { q: evaQuery(p.get("find")), word: p.get("fw") || null } : null;
+    this.wantFind = p.get("find") ? { q: evaQuery(p.get("find")), word: p.get("fw") || null, mode: p.get("fm") || null } : null;
     if (this.back && location.hash === this.back.hash) this.back = null;   // the browser's Back went there
     if (!w && !this.wantSet && !this.wantLike && !this.wantRing && !this.wantFind && (this.anchor || this.view)) { this.anchor = this.focus = null; this.view = null; this.set = []; }
     this.onShow = "";
@@ -1950,7 +2007,7 @@ const T = {
     if (this.wantSet) { const s = this.wantSet; this.wantSet = null; this.openSet(s.map(x => ({ s: x }))); }
     if (this.wantLike) { const [pg, sc] = this.wantLike.split("."); this.wantLike = null; if (Text.has(pg)) this.openPageSet(pg, KINDS[sc] ? sc : null); }
     if (this.wantRing) { const f = findLocus(this.wantRing); if (f) { this.wantRing = null; this.openRing(f.page, f.li); } }
-    if (this.wantFind) { const f = this.wantFind; this.wantFind = null; if (f.q && (this.view?.kind !== "find" || this.view.q !== f.q || this.view.word !== f.word)) this.openFind(f.q, f.word); }
+    if (this.wantFind) { const f = this.wantFind; this.wantFind = null; if (f.q && (this.view?.kind !== "find" || this.view.q !== f.q || this.view.word !== f.word)) this.openFind(f.q, f.word, f.mode); }
     const a = this.ask;
     if (!a) { bar.hidden = true; return; }
     const f = findLocus(a.l);
