@@ -10,8 +10,8 @@ with a confidence and a note. The readings are kept in tools/text/read/<page>.js
 
   {"locus": "fRos.2", "word": 1, "eva": "otol", "confidence": "high" | "medium" | "low", "note": "..."}
 
-("eva" is empty where the reader found no writing at the word's place: the place is then wrong, and its outline is
-marked approximate in the shapes.) They are an independent witness, not checked by a person, and never replace RF1b.
+("eva" is empty where the reader found no writing at the word's place, and has a space where the place held two words:
+either way the place is wrong, and its box is marked approximate in the shapes.) They are an independent witness, not checked by a person, and never replace RF1b.
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def build() -> dict:
             r = json.loads(line)
             li = li_of[page][r["locus"]]
             words.append([li, r["word"], r["eva"], r["confidence"], r.get("note", "")])
-            if not r["eva"]:
+            if not r["eva"] or " " in r["eva"]:               # no writing there, or two words: the box is wrong
                 empty.add((li, r["word"]))
         words.sort()
         (OUT / f"{page}.json").write_text(json.dumps({"page": page, "by": "Claude (Anthropic)", "about": ABOUT,

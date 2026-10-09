@@ -310,6 +310,21 @@ test.describe("the text in the Reader", () => {
   });
 });
 
+test.describe("the Rosettes read from the photograph", () => {
+  test("a Rosettes word shows Claude's reading beside RF1b, said for what it is", async ({ page }) => {
+    await page.route("https://collections.library.yale.edu/**", fromYale);
+    await openSite(page, "#read/beinecke/85r2/text");
+    await textReady(page);
+    await page.keyboard.press("u");
+    await expect(page.locator("#rd-stage .sv-over")).toBeVisible();
+    await page.locator('#rd-text .w[data-k="fRos|1|3"]').click();
+    const line = page.locator("#rd-text .tx-photo");
+    await expect(line).toContainText("Read from the photograph by Claude");
+    await expect(line).toContainText("confidence");
+    await expect(line.locator(".tx-i")).toHaveAttribute("title", /not checked by a person/);
+  });
+});
+
 test.describe("searching by glyphs", () => {
   test("the glyph keyboard types a word by its shapes, shows it back in glyphs, and the lines can be read in glyphs", async ({ page }) => {
     await openSite(page, "#text/beinecke/search?q=qokeedy");

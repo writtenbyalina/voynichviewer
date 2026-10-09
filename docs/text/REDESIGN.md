@@ -297,3 +297,54 @@ device below takes one reference's specific mechanism.
 | Ghost pages | basil.js "Frequency mapping" (pages blanked but for one word, which keeps its place) | Each page that shares the words as a parchment sheet: every other word a faint hairline along its line, the shared words printed in Voynich VV at their own place and angle, larger than life, with a paper halo | "Pages that share these words" and word sets |
 | Glowing marks on the strip | Nadieh Bremer, "Royal Constellations" (warm points of light on navy) | The strip's lit pages glow, brighter with more places | the page strip |
 | Type | Cipher Museum, Verso, Kemet Eternal (high-contrast serif with small caps on near-black, one gold accent) | Newsreader (SIL OFL, served from the site) for words about the words: italic titles, all-small-caps labels at 0.12em; monospace stays for Eva and loci | the panel, the overlay, the ghost pages |
+
+## 10. Round 5 (9 Oct 2026): boxes on the glyphs, the Rosettes read, f101v, glyph search
+
+Alina: many boxes are off or cover the script; they should surround the word, turned radially or diagonally with the
+writing, and not take in a letter of another word; scan the Rosettes and add your own readings; box f101v; search by
+glyphs. Then, on seeing stepped outlines: no polygons, keep it simple: a box round each word, turned for radial and
+diagonal labels.
+
+### 10.1 Boxes on the ink (`tools/text/inkfit.py`, run by rf.py)
+
+Every placed word's box is moved from the box it was given (The Voynichese Project's, or Placa's) onto its own glyphs:
+
+- **The ink**: darker than the parchment around it on the darkest colour channel (so red ink counts), relative to the
+  page's own darkest ink; a colour counts as paint only where it is laid in areas; parchment specks left out.
+- **Each line straightened**: a ring unrolled along the writing's own path (the circle rf.py fitted wanders off the
+  writing), a straight line at the slant its glyphs project sharpest; drawings and ruled circles left out of the strip.
+- **Its row**: the lines of a paragraph choose their rows together, one below the next; a lone line its strongest
+  row near where it was expected.
+- **Its words**: the row's ink is cut where the glyphs leave gaps and shared out among the line's words in order, by
+  how wide their glyphs are (i 0.5, e 0.75, c/h 0.8 of an o) and where their old boxes were; a word given no ink keeps
+  its old box, marked approximate (dashed).
+- **Its box**: the box round the word's own strokes between seams cut through the gaps to the lines above and below,
+  trimmed so it takes in no real part of another word; gallows and tails included. A band of its ring for ring text,
+  a box turned to its line otherwise.
+- **A lone label** the line fit cannot read: the cluster of glyph strokes over its old place, in a box turned the way
+  its ink runs.
+
+37,966 of 38,425 placed words sit on their ink (98.8%); the rest are dashed. Shapes stay boxes, in whole thousandths:
+1.7 MB in all.
+
+### 10.2 f101v's left panel
+
+voynichese.com's photograph of f101v shows only its right half, and our left panel is cut from another photograph:
+its words' layout (as the XML has it) is laid on the left panel's ink (scale and position by template matching,
+refined by ECC), then fitted like every other word. All 201 words of f101v now have boxes.
+
+### 10.3 The Rosettes, read from the photograph
+
+Every Rosettes word with a place was cut from Yale's full-size photograph (fetched once, kept in tools/text/cache),
+turned to read left to right and read in Eva by Claude, from the shapes alone, without being shown any transcription,
+with a confidence and a note (`tools/text/read/fRos.jsonl`, `read_photo.py`). The word panel shows it as one quiet
+line under the word: "Read from the photograph by Claude: … · the same as RF1b / RF1b has … · low confidence", with
+an ⓘ saying what it is. It never replaces RF1b. Where the reader found no writing at a word's place, the place is
+wrong: its box is marked approximate.
+
+### 10.4 Searching by glyphs
+
+A glyph key beside the search box opens a keyboard of the glyphs (a gallows on the key); it types Eva into the box,
+takes back a whole glyph, and the query is drawn back in the glyphs inside the box. Results can be read in Eva or in
+the glyphs (the Reader's switch). In the Reader, the word's glyphs are buttons: pick one, or shift-click a run, to find
+it starting, ending or inside other words.
