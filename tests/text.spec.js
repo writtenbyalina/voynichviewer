@@ -498,55 +498,21 @@ test.describe("the Text tab", () => {
     await expect(page.locator("#sx-echo .sx-err")).toContainText("Capitals stand for whole words");
   });
 
-  test("Compare: a second search beside the first, in blue, in the count, the strip, every filter and the lines (docs/text/TEXT_TAB_AUDIT.md)", async ({ page }) => {
-    await openSite(page, "#text/beinecke/search?q=qokeedy&cmp=qokedy");
-    await results(page);
-    const echo = page.locator("#sx-echo");
-    await expect(echo).toContainText("qokeedy appears 306 times on 56 of 227 pages");
-    await expect(echo.locator(".sx-cmpsay")).toContainText("qokedy appears 270 times on 63 of 227 pages");
-    await expect(page.locator("#sx-cmp-s")).toHaveText("Compared with qokedy");
-    await expect(page.locator(".sx-bars")).toHaveClass(/two/);
-    expect(await page.locator(".sx-bar i.cmp:not(.z)").count()).toBe(62);   // 63 pages, two of them panels of one side
-    // each filter row gives both counts
-    await expect(page.locator(".sx-frow", { hasText: "Recipes" }).locator(".n")).toHaveText("(133 · 60)");
-    await expect(page.locator(".sx-frow", { hasText: "Pharmaceutical" }).locator(".n")).toHaveText("(0 · 1)");
-    // a page's heading gives both, and a line holds both searches' marks, the second's in blue
-    await expect(page.locator(".sx-pg[data-page=f26r] header")).toContainText("3 · 6");
-    const l5 = page.locator(".sx-pg[data-page=f26r] .sx-line", { hasText: "saiin shedy chdy chdy" });
-    await expect(l5.locator("em:not(.b)")).toHaveText("qokeedy");
-    await expect(l5.locator("em.b")).toHaveText("qokedy");
-    // a line the first search has nothing on opens in the Reader without a result number
-    const only = page.locator(".sx-line.sx-cmp-only").first();
-    expect(await only.getAttribute("href")).not.toContain("hit=");
-    // the i: lines with both
-    await page.locator(".sx-why summary").click();
-    await expect(page.locator(".sx-why-m")).toContainText("41 lines hold both");
-    // narrowing applies to both; Remove takes the second away
-    await page.locator(".sx-frow", { hasText: "Recipes" }).click();
-    await expect(echo.locator(".sx-cmpsay")).toContainText("qokedy appears 60 times");
-    await page.locator("#sx-cmp-s").click();
-    await expect(page.locator("#sx-cmp-q")).toBeFocused();
-    await expect(page.locator("#sx-cmp-q")).toHaveValue("qokedy");
-    await page.locator(".sx-cmp-rm").click();
-    await expect(echo.locator(".sx-cmpsay")).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => location.hash)).not.toContain("cmp=");
-  });
-
-  test("the popovers (More options, Compare) close on a click elsewhere or Esc, and stay inside a narrow window", async ({ page }) => {
+  test("the popovers (More options, ?, i, Export) close on a click elsewhere or Esc, one at a time, and stay inside a narrow window", async ({ page }) => {
     await page.setViewportSize({ width: 750, height: 553 });
     await openSite(page, "#text/beinecke/search?q=qokeedy");
     await results(page);
     await page.locator(".sx-more-opts > summary").click();
     await expect(page.locator(".sx-more-opts")).toHaveAttribute("open", "");
     await expect.poll(async () => { const b = await page.locator(".sx-more-m").boundingBox(); return b.x + b.width; }, { message: "the popover's right edge" }).toBeLessThanOrEqual(750);
-    await page.locator("#sx-cmp-s").click();   // one open at a time
+    await page.locator(".sx-exp > summary").click();   // one open at a time
     await expect(page.locator(".sx-more-opts")).not.toHaveAttribute("open", "");
-    await expect(page.locator("#sx-cmp-d")).toHaveAttribute("open", "");
+    await expect(page.locator(".sx-exp")).toHaveAttribute("open", "");
     await page.keyboard.press("Escape");
-    await expect(page.locator("#sx-cmp-d")).not.toHaveAttribute("open", "");
-    await page.locator("#sx-cmp-s").click();
+    await expect(page.locator(".sx-exp")).not.toHaveAttribute("open", "");
+    await page.locator(".sx-more-opts > summary").click();
     await page.locator(".sx-res-h .sx-opt > span").click();   // anywhere outside it
-    await expect(page.locator("#sx-cmp-d")).not.toHaveAttribute("open", "");
+    await expect(page.locator(".sx-more-opts")).not.toHaveAttribute("open", "");
     expect(await page.evaluate(() => document.querySelector("#v-text").scrollLeft), "nothing scrolled sideways").toBe(0);
   });
 
@@ -568,6 +534,39 @@ test.describe("the Text tab", () => {
     await results(page);
     await expect(page.locator("#sx-echo")).toContainText("qokeedy appears 320 times");
     await expect(page.locator(".sx-pg[data-page=f26r] .sx-line", { hasText: "daiin shedy" }).locator("em")).toHaveCount(2);
+  });
+
+  test("a page set is made in one dialog: pages and ranges read back as you type, a section or a range added from menus, then edited", async ({ page }) => {
+    await openSite(page, "#text/beinecke/search?q=qokeedy");
+    await results(page);
+    await page.locator(".sx-more-opts > summary").click();
+    await page.locator(".sx-opts select[data-k=set]").selectOption("+new");
+    const d = page.locator("dialog.sx-setdlg");
+    await expect(d).toBeVisible();
+    await expect(page.locator(".sx-more-opts")).not.toHaveAttribute("open", "");
+    await expect.poll(() => page.evaluate(() => location.hash)).not.toContain("set=");
+    await expect(d.locator(".ask-acts .primary")).toBeDisabled();
+    await d.locator("input").fill("bath");
+    await d.locator("textarea").fill("75r–76v, 1r 2v-3r, 999x");
+    await expect(d.locator(".sx-set-say")).toHaveText("7 pages: 1r, 2v-3r, 75r-76v · not a page: 999x");
+    const baln = await d.locator(".sx-set-add select[aria-label='Add a section'] option", { hasText: "Balneological" }).getAttribute("value");
+    await d.locator(".sx-set-add select[aria-label='Add a section']").selectOption(baln);
+    await expect(d.locator(".sx-set-say")).toContainText("23 pages: 1r, 2v-3r, 75r-84v");
+    await d.locator("select[aria-label='From page']").selectOption("f103r");
+    await d.locator("select[aria-label='To page']").selectOption("f104v");
+    await d.locator(".sx-set-add button", { hasText: "Add" }).click();
+    await expect(d.locator(".sx-set-say")).toContainText("27 pages: 1r, 2v-3r, 75r-84v, 103r-104v");
+    await d.locator(".ask-acts .primary").click();
+    await expect(d).toBeHidden();
+    await expect(page.locator("#sx-echo")).toContainText("on the pages of set:bath");
+    await expect.poll(() => page.evaluate(() => location.hash)).toContain("set=bath");
+    await expect(page.locator(".sx-opts select[data-k=set] option", { hasText: "Edit set:bath" })).toHaveCount(1);
+    await page.locator(".sx-more-opts > summary").click();
+    await page.locator(".sx-opts select[data-k=set]").selectOption("+edit");
+    await expect(d.locator("textarea")).toHaveValue("1r 2v-3r 75r-84v 103r-104v");
+    await d.locator("textarea").fill("75r-84v");
+    await d.locator(".ask-acts .primary").click();
+    await expect(page.locator(".sx-opts select[data-k=set] option", { hasText: "set:bath (20 pages)" })).toHaveCount(1);
   });
 
   test("#text alone opens the search with a whole address", async ({ page }) => {
