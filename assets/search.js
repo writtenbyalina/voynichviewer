@@ -105,6 +105,7 @@ const T = {
     const before = this.state();
     if (fromHash.startsWith("search")) this.readState(fromHash);
     $("#sx-q").value = this.st.q;
+    Data.base().then(() => { const k = $("#sx-kb .g"); if (k && !k.textContent) k.textContent = (Data.glyphs.Q1 || {}).ch || "k"; this.echoGlyphs(); });
     this.syncControls();
     if (this.state() !== before || !this.res) this.run();
     else this.draw();
@@ -118,8 +119,12 @@ const T = {
           h("label", { class: "sx-lbl", for: "sx-q" }, "Search the text"),
           h("div", { class: "sx-box" },
             h("input", { id: "sx-q", type: "search", autocomplete: "off", autocapitalize: "off", spellcheck: "false",
-              placeholder: "a word, like qokeedy, or the start of one, like qok*", "aria-describedby": "sx-echo",
-              onkeydown: e => { if (e.key === "Escape") { e.target.value = ""; } if (e.key === "ArrowDown") { e.preventDefault(); $(".sx-hit")?.focus(); } } }),
+              placeholder: "a word, like qokeedy, or the start of one, like qok* (or type with glyphs)", "aria-describedby": "sx-echo",
+              oninput: () => this.echoGlyphs(),
+              onkeydown: e => { if (e.key === "Escape") { e.target.value = ""; this.echoGlyphs(); } if (e.key === "ArrowDown") { e.preventDefault(); $(".sx-hit")?.focus(); } } }),
+            h("span", { class: "sx-qg", id: "sx-qg", "aria-hidden": "true" }),
+            h("button", { type: "button", class: "sx-kb", id: "sx-kb", title: "Type with the manuscript's glyphs", "aria-label": "Type with glyphs", "aria-expanded": "false",
+              "aria-controls": "sx-pal", onclick: e => this.palette(e.currentTarget) }, h("span", { class: "g", "aria-hidden": "true" }, "")),
             h("details", { class: "sx-help" }, h("summary", { title: "How to search", "aria-label": "How to search" }, "?"), this.helpCard())),
           h("button", { class: "primary", type: "submit" }, "Search")),
         h("div", { class: "sx-opts" },
@@ -130,8 +135,7 @@ const T = {
               sel("eq", "Match", [["eva", "exact Eva"], ["family", "same STA family (a o y, r s, k t…)"]], false),
               sel("near", "Near", [["0", "off"], ["1", "words 1 edit away"], ["2", "words 2 edits away"]], false),
               sel("set", "Pages", [["", "the whole book"]], false),
-              h("button", { type: "button", class: "sx-cmp-b", onclick: () => this.compareOpen() }, "Compare with another search"),
-              h("button", { type: "button", class: "sx-cmp-b", onclick: e => this.palette(e.currentTarget) }, "Type with glyphs")))),
+              h("button", { type: "button", class: "sx-cmp-b", onclick: () => this.compareOpen() }, "Compare with another search")))),
         h("div", { class: "sx-pal", id: "sx-pal", hidden: true }),
         h("form", { class: "sx-cmp", hidden: true, onsubmit: e => { e.preventDefault(); this.st.cmp = $("#sx-cmp-q").value.trim(); this.go(); } },
           h("label", { for: "sx-cmp-q" }, "Compare with"),
@@ -457,6 +461,9 @@ const T = {
     const head = h("div", { class: "sx-res-h" },
       h("label", { class: "sx-opt" }, h("span", {}, "Show"), h("select", { onchange: e => { this.st.sort = e.target.value; this.go(); } },
         Object.entries(SORTS).map(([v, t]) => h("option", { value: v, selected: this.st.sort === v }, t)))),
+      h("span", { class: "sx-script", role: "group", "aria-label": "Show the lines in" },
+        [["eva", "Eva"], ["glyphs", "Glyphs"]].map(([v, t]) => h("button", { type: "button", "aria-pressed": String(glyphsOn() === (v === "glyphs")),
+          onclick: () => { store.set("text:script", v); this.drawResults(); } }, t))),
       h("span", { class: "sx-acts" },
         h("button", { type: "button", onclick: () => this.save(), title: "Keep this search in Your work" }, this.savedAs() ? "★ Saved" : "Save"),
         h("details", { class: "sx-exp" }, h("summary", {}, "Export"),
@@ -466,7 +473,9 @@ const T = {
             h("button", { type: "button", disabled: !hits.length, onclick: () => this.copyLoci() }, "Copy the list of lines")))));
     const kids = [head];
     if (!hits.length) kids.push(h("p", { class: "sx-none" }, this.res.hits.length ? "Nothing is left after narrowing: remove a step above." : "Nothing matches. Try * for any glyphs, or More options › Near for words a glyph or two away."));
-    const show = s => s.replace(/\./g, " ").replace(/,/g, "·");
+    const G = glyphsOn() && Data.glyphs;
+    const show = s => G ? evaToGlyphs(s) : s.replace(/\./g, " ").replace(/,/g, "·");
+    el.classList.toggle("glyph", !!G);
     const who = x => this.st.in === "all" ? h("span", { class: "sx-who", title: x.who.map(w => SHORT[w]).join(", ") }, `in ${x.who.length} of ${presentOn(x.i, this.res.lines)} transcriptions`) : "";
     const line = (x, k) => {
       const id = Book.ix[x.i][0], L = lineOf(x);
@@ -594,18 +603,53 @@ const T = {
     btn.setAttribute("aria-expanded", String(open));
     if (!open || el.firstChild) return;
     Data.base().then(() => {
-      const G = Data.glyphs, put = s => { const q = $("#sx-q"); const a = q.selectionStart ?? q.value.length, b = q.selectionEnd ?? a; q.value = q.value.slice(0, a) + s + q.value.slice(b); q.focus(); q.setSelectionRange(a + s.length, a + s.length); };
-      const glyphs = [["A1", "o"], ["A3", "a"], ["A2", "y"], ["D1", "q"], ["B1", "d"], ["B2", "l"], ["B3", "m"], ["B4", "g"], ["C1", "r"], ["C2", "s"],
-        ["E1", "i"], ["E2", "n"], ["J1", "e"], ["K1", "ch"], ["L1", "sh"], ["Q1", "k"], ["Q2", "t"], ["P1", "p"], ["P2", "f"],
-        ["U1", "ckh"], ["U2", "cth"], ["T1", "cph"], ["T2", "cfh"], ["X1", "x"], ["X2", "v"], ["Z1", "?"]];
+      const G = Data.glyphs, put = s => { const q = $("#sx-q"); const a = q.selectionStart ?? q.value.length, b = q.selectionEnd ?? a; q.value = q.value.slice(0, a) + s + q.value.slice(b); q.focus(); q.setSelectionRange(a + s.length, a + s.length); this.echoGlyphs(); };
+      const back = () => { const q = $("#sx-q"); const a = q.selectionStart ?? q.value.length, b = q.selectionEnd ?? a;
+        const from = a === b ? Math.max(0, a - ((EVA_UNITS.find(([, e]) => q.value.slice(0, a).endsWith(e)) || [, " "])[1].length)) : a;
+        q.value = q.value.slice(0, from) + q.value.slice(b); q.focus(); q.setSelectionRange(from, from); this.echoGlyphs(); };
       el.replaceChildren(
-        h("div", { class: "sx-pal-g" }, glyphs.map(([c, e]) => h("button", { type: "button", title: `Eva ${e}`, "aria-label": `Eva ${e}`, onclick: () => put(e) },
+        h("p", { class: "sx-pal-say" }, "Click the glyphs of a word (or part of one) in order; Search finds them. A glyph's Eva is under it."),
+        h("div", { class: "sx-pal-g" }, GLYPH_KEYS.map(([c, e]) => h("button", { type: "button", title: `Eva ${e}`, "aria-label": `Eva ${e}`, onclick: () => put(e) },
           h("span", { class: "g", "aria-hidden": "true" }, (G[c] && G[c].ch) || e), h("span", { class: "e" }, e)))),
         h("div", { class: "sx-pal-c" }, Object.entries(CLASSES).map(([k, c]) => h("button", { type: "button", title: c.say, onclick: () => put(`<${k}>`) }, `<${k}>`)),
-          ["*", "?", "-", "_", "~"].map(s => h("button", { type: "button", onclick: () => put(s) }, s))));
+          ["*", "?", "-", "_", "~"].map(s => h("button", { type: "button", onclick: () => put(s) }, s)),
+          h("button", { type: "button", onclick: () => put(" ") }, "space"),
+          h("button", { type: "button", title: "Take back the last glyph", "aria-label": "Take back the last glyph", onclick: back }, "⌫"),
+          h("button", { type: "button", class: "primary", onclick: () => { this.st.q = $("#sx-q").value.trim(); this.st.steps = ""; this.example = false; this.go(); } }, "Search")));
     });
   },
+  /* the query, as the glyphs it looks for, inside the box after what is typed */
+  echoGlyphs() {
+    const el = $("#sx-qg"), q = $("#sx-q");
+    if (!el || !q) return;
+    const v = q.value;
+    if (!v.trim() || !Data.glyphs || /[\/<>:]/.test(v)) { el.textContent = ""; el.hidden = true; return; }
+    el.hidden = false;
+    el.textContent = evaToGlyphs(v.trim().replace(/\s+/g, "."));
+  },
 };
+
+/* the glyphs one types with: [STA code, Eva], the common ones first; a long Eva unit (cth) before its parts (c, t, h) */
+const GLYPH_KEYS = [["A1", "o"], ["A3", "a"], ["A2", "y"], ["D1", "q"], ["B1", "d"], ["B2", "l"], ["B3", "m"], ["B4", "g"], ["C1", "r"], ["C2", "s"],
+  ["E1", "i"], ["E2", "n"], ["J1", "e"], ["K1", "ch"], ["L1", "sh"], ["Q1", "k"], ["Q2", "t"], ["P1", "p"], ["P2", "f"],
+  ["U1", "ckh"], ["U2", "cth"], ["T1", "cph"], ["T2", "cfh"], ["X1", "x"], ["X2", "v"], ["Z1", "?"]];
+const EVA_UNITS = GLYPH_KEYS.filter(([, e]) => e !== "?").sort((a, b) => b[1].length - a[1].length);
+/* Eva as the manuscript's glyphs (Voynich VV): spaces for word breaks, a dot for an uncertain one; what is not a glyph
+   (a wildcard, a bracket) stays as it is */
+function evaToGlyphs(s) {
+  const G = Data.glyphs || {};
+  let out = "";
+  for (let i = 0; i < s.length;) {
+    const c = s[i];
+    if (c === ".") { out += " "; i++; continue; }
+    if (c === ",") { out += "·"; i++; continue; }
+    const u = EVA_UNITS.find(([, e]) => s.startsWith(e, i));
+    if (u && G[u[0]]) { out += G[u[0]].ch; i += u[1].length; continue; }
+    out += c; i++;
+  }
+  return out;
+}
+const glyphsOn = () => store.get("text:script", "eva") === "glyphs";
 
 const SORTS = { book: "lines, in book order", right: "concordance, by what follows", left: "concordance, by what comes before", match: "concordance, by the match" };
 /* the sections' names as Info uses them, and a colour each for the book strip */

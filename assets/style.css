@@ -801,11 +801,20 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .sx-row { display: flex; gap: 8px; align-items: center; }
 .sx-lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .sx-box { flex: 1; min-width: 0; position: relative; display: flex; align-items: center; }
-#sx-q { flex: 1; min-width: 0; border: 1.5px solid var(--ink); border-radius: 10px; padding: 8px 48px 8px 14px; height: 48px;   /* Spec: one box, 48 px */
+#sx-q { flex: 1; min-width: 0; border: 1.5px solid var(--ink); border-radius: 10px; padding: 8px max(96px, 32%) 8px 14px; height: 48px;   /* Spec: one box, 48 px; room for the glyphs */
   font: 18px ui-monospace, "SF Mono", Menlo, monospace; background: #fff; color: var(--ink); }
 #sx-q:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .sx-row > button { height: 48px; padding: 0 20px; border-radius: 10px; font-weight: 600; }
 .sx-help { position: absolute; right: 10px; }
+/* the query as the glyphs it looks for, at the right of the box; and the key that opens the glyph keyboard */
+.sx-qg { position: absolute; right: 86px; max-width: calc(32% - 96px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none;
+  font: 24px/1 "Voynich VV", serif; color: #6b6253; }
+.sx-qg[hidden] { display: none; }
+.sx-kb { position: absolute; right: 44px; width: 34px; height: 34px; padding: 0; border-radius: 8px; border: 1px solid var(--line); background: #fff;
+  display: grid; place-items: center; cursor: pointer; }
+.sx-kb .g { font: 22px/1 "Voynich VV", serif; color: var(--ink); }
+.sx-kb[aria-expanded="true"] { background: #efece5; border-color: #cfc9bd; }
+.sx-pal-say { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
 .sx-help > summary { list-style: none; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center;
   color: var(--muted); cursor: pointer; font-size: 14px; background: #fff; }
 .sx-help > summary::-webkit-details-marker { display: none; }
@@ -896,6 +905,12 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .sx-frow.sel { background: #e7e3da; border-color: #cfc9bd; color: var(--ink); font-weight: 600; }
 .sx-frow .n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sx-res { flex: 1; min-width: 0; overflow: auto; padding: 10px 24px 40px; }
+/* the lines in the manuscript's glyphs (the Eva / Glyphs switch, shared with the Reader) */
+.sx-script { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.sx-script button { border: none; border-radius: 0; min-height: 32px; font-size: 13px; padding: 0 12px; background: #fff; }
+.sx-script button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.sx-res.glyph .sx-t, .sx-res.glyph .sx-l, .sx-res.glyph .sx-m, .sx-res.glyph .sx-r { font: 22px/1.5 "Voynich VV", serif; }
+.sx-res.glyph .sx-t em, .sx-res.glyph .sx-m { color: #8a2d12; }
 .sx-res-h { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 2px 0 6px; }
 .sx-ftog { display: none; }
 .sx-none { color: var(--ink); max-width: 760px; }
@@ -1106,6 +1121,14 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .tx-turn:hover { border-color: var(--table-muted); }
 .tx-reading { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
 .tx-reading .gl { font: 34px/1.15 "Voynich VV", serif; color: #f3ead9; overflow-wrap: anywhere; }
+.tx-reading .tx-g { font: inherit; color: inherit; background: none; border: none; padding: 0 1px; margin: 0; min-height: 0; border-radius: 4px;
+  cursor: pointer; line-height: inherit; }
+.tx-reading .tx-g:hover { background: rgba(243, 234, 217, .12); }
+.tx-reading .tx-g.on { background: rgba(243, 234, 217, .22); box-shadow: inset 0 -2px 0 #e8c47a; }
+.tx-gfind { margin: 6px 0 0; font-size: 14px; }
+.tx-gfind[hidden] { display: none; }
+.tx-gfind a { color: var(--table-ink); }
+.tx-gfind .g { font: 22px/1 "Voynich VV", serif; vertical-align: -3px; }
 .tx-reading .lt { font: 16px/1.3 ui-monospace, Menlo, monospace; color: var(--table-ink); overflow-wrap: anywhere; }
 .tx-reading .lt .rare { font: 1.2em/1 "Voynich VV", serif; }
 .tx-say { margin: 10px 0 0; font-size: 14px; line-height: 1.45; }

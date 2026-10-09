@@ -277,7 +277,7 @@ test.describe("the text in the Reader", () => {
   test("a word whose place is estimated from the words beside it is drawn dashed and says so", async ({ page }) => {
     await openSite(page, "#read/beinecke/57v/text");
     await textReady(page);
-    const est = box(page, "f57v|1|9");
+    const est = box(page, "f57v|2|15");   // a ring word the ink fit could not find (tools/text/inkfit.py)
     await expect(est).toHaveClass(/est/);
     await est.hover({ force: true });
     await expect(page.locator("#tx-tip")).toContainText("place estimated");
@@ -299,7 +299,7 @@ test.describe("the text in the Reader", () => {
     await page.keyboard.press("u");
     await expect(page.locator("#rd-stage .sv-over")).toBeVisible();
     await expect(page.locator("#rd-text .tx-page h3")).toHaveText(["Rosettes"]);
-    await expect(page.locator("#rd-stage .sv-over .wb")).toHaveCount(507);   // Alessandro Placa's positions, carried to RF1b
+    await expect(page.locator("#rd-stage .sv-over .wb")).toHaveCount(530);   // Placa's positions carried to RF1b, gaps filled
     await page.locator('#rd-text .w[data-k="fRos|1|0"]').click();
     await expect(page.locator("#rd-text .tx-where")).toHaveText("Rosettes · line 2");
     await expect(page.locator("#rd-stage .sv-over .seg-words .out.sel")).toHaveCount(2);
@@ -307,6 +307,43 @@ test.describe("the text in the Reader", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator("#rd-stage .sv-over")).toHaveCount(0);
     await expect(page.locator("#rd-text .tx-page h3").first()).toHaveText("85r2");
+  });
+});
+
+test.describe("searching by glyphs", () => {
+  test("the glyph keyboard types a word by its shapes, shows it back in glyphs, and the lines can be read in glyphs", async ({ page }) => {
+    await openSite(page, "#text/beinecke/search?q=qokeedy");
+    await results(page);
+    await page.locator("#sx-kb").click();
+    await expect(page.locator("#sx-pal")).toBeVisible();
+    await page.locator("#sx-q").fill("");
+    for (const e of ["ch", "o", "l"]) await page.locator(`#sx-pal .sx-pal-g button[aria-label="Eva ${e}"]`).click();
+    await expect(page.locator("#sx-q")).toHaveValue("chol");
+    await expect(page.locator("#sx-qg")).not.toHaveText("");        // the query, drawn in the manuscript's glyphs
+    await page.locator("#sx-pal button", { hasText: "⌫" }).click();
+    await expect(page.locator("#sx-q")).toHaveValue("cho");          // takes back a whole glyph
+    await page.locator('#sx-pal .sx-pal-g button[aria-label="Eva l"]').click();
+    await page.locator("#sx-pal button.primary", { hasText: "Search" }).click();
+    await expect(page.locator("#sx-echo")).toContainText("chol");
+    await page.locator(".sx-script button", { hasText: "Glyphs" }).click();
+    await expect(page.locator("#sx-res")).toHaveClass(/glyph/);
+    expect(await page.locator("#sx-res .sx-t").first().evaluate(e => getComputedStyle(e).fontFamily)).toContain("Voynich VV");
+    await page.locator(".sx-script button", { hasText: "Eva" }).click();
+    await expect(page.locator("#sx-res")).not.toHaveClass(/glyph/);
+  });
+
+  test("a word's glyphs on the page can be picked, one or a run, to find them in other words", async ({ page }) => {
+    await page.route("https://collections.library.yale.edu/**", fromYale);
+    await openSite(page, "#read/beinecke/2r/text?w=f2r.5.4");
+    await expect(page.locator("#rd-text .tx-reading .tx-g")).toHaveCount(3);   // chol: ch, o, l
+    await page.locator('#rd-text .tx-reading .tx-g[data-i="1"]').click();
+    await page.locator('#rd-text .tx-reading .tx-g[data-i="2"]').click({ modifiers: ["Shift"] });
+    await expect(page.locator("#rd-text .tx-reading .tx-g.on")).toHaveCount(2);
+    const find = page.locator("#rd-text .tx-gfind a").first();
+    await expect(find).toHaveText("ending words");
+    await expect(find).toHaveAttribute("href", "#text/beinecke/search?q=*ol");
+    await find.click();
+    await expect(page.locator("#sx-echo")).toContainText("Words that end with ol", { timeout: 15_000 });
   });
 });
 

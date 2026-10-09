@@ -887,6 +887,26 @@ const T = {
   /* Layer one is the word itself: cut upright from the photograph, its glyphs with its letters under them, and one
      sentence. Then its line, then its other places as crops; then, behind named doors, where it sits and its near
      spellings. */
+  /* glyphs picked in the word on show: one, or a run in one word (shift-click), and a way to find them elsewhere */
+  pickGlyph(its, wn, ci, extend) {
+    const g = this.gpick;
+    if (extend && g && g.w === wn) this.gpick = { w: wn, a: Math.min(g.a, ci), b: Math.max(g.b, ci) };
+    else if (g && g.w === wn && g.a === ci && g.b === ci) this.gpick = null;
+    else this.gpick = { w: wn, a: ci, b: ci };
+    const p = this.gpick, el = this.el;
+    $$(".tx-reading .tx-g", el).forEach(b => b.classList.toggle("on", !!p && +b.dataset.w === p.w && +b.dataset.i >= p.a && +b.dataset.i <= p.b));
+    const f = $(".tx-gfind", el);
+    if (!f) return;
+    if (!p) { f.hidden = true; f.replaceChildren(); return; }
+    const codes = its[p.w].w.codes, run = codes.slice(p.a, p.b + 1), eva = writeAs(run, "eva");
+    const whole = p.a === 0 && p.b === codes.length - 1;
+    const q = whole ? eva : `${p.a === 0 ? "" : "*"}${eva}${p.b === codes.length - 1 ? "" : "*"}`;
+    f.hidden = false;
+    const where = whole ? "as a whole word" : p.a === 0 ? "starting words" : p.b === codes.length - 1 ? "ending words" : "inside words";
+    f.replaceChildren(h("span", { class: "g", "aria-hidden": "true" }, run.map(chOf).join("")), ` ${eva}: find it `,
+      h("a", { href: `#text/beinecke/search?q=${encodeURIComponent(q)}`, title: `Search the book for ${q}` }, where),
+      ...(q === `*${eva}*` ? [] : [" · ", h("a", { href: `#text/beinecke/search?q=${encodeURIComponent(`*${eva}*`)}`, title: `Search the book for *${eva}*` }, "anywhere in a word")]));
+  },
   wordView(body) {
     const ks = this.chosenKeys(), its = ks.map(k => this.item(k)).filter(Boolean);
     if (!its.length) { this.anchor = this.focus = null; this.pageView(body); return; }
@@ -912,9 +932,18 @@ const T = {
     }
     kids.push(fig);
     const L = letters(this.script);
-    kids.push(h("div", { class: "tx-reading" },
-      h("span", { class: "gl", "aria-hidden": "true" }, its.map(it => it.w.codes.map(chOf).join("")).join(" ")),
-      h("span", { class: "lt" }, ...its.flatMap((it, i) => [i ? " " : "", ...wordNodes(it.w.codes, L)]))));
+    // the glyphs, each one a key: pick one (shift-click for a run) to find it in other words
+    this.gpick = null;
+    const gl = h("span", { class: "gl", role: "group", "aria-label": "The word's glyphs: pick one, or shift-click a run, to find them in other words" });
+    its.forEach((it, wn) => {
+      if (wn) gl.append(" ");
+      it.w.codes.forEach((c, ci) => gl.append(h("button", { type: "button", class: "tx-g", "data-w": wn, "data-i": ci,
+        title: `${writeAs([c], "eva")}: pick to find it in other words (shift-click for a run of glyphs)`, "aria-label": `glyph ${writeAs([c], "eva")}`,
+        onclick: e => this.pickGlyph(its, wn, ci, e.shiftKey) }, chOf(c))));
+    });
+    kids.push(h("div", { class: "tx-reading" }, gl,
+      h("span", { class: "lt" }, ...its.flatMap((it, i) => [i ? " " : "", ...wordNodes(it.w.codes, L)])),
+      h("p", { class: "tx-gfind", hidden: true })));
     const words = its.map(it => this.wordText(it.w));
     const places = this.placesOf(words);
     for (const x of Saved.placesAt(location.hash)) kids.push(h("p", { class: "tx-note" }, h("b", {}, "Your note: "), x.note, " ",
