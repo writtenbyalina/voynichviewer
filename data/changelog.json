@@ -6,7 +6,7 @@
    "date": "2026-10-05",
    "changes": [
     {"kind": "improved", "text": "Rearrange lays the book out on the table, a pile for each quire, to move sheets around."},
-    {"kind": "fixed", "text": "The foldouts fold as Lisa Fagin Davis describes them."},
+    {"kind": "fixed", "text": "Updates to the foldouts and notes as per review by Lisa Fagin Davis."},
     {"kind": "improved", "text": "The 3D book is smoother, with the paper curling round every fold."}
    ]
   },
