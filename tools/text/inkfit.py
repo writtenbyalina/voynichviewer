@@ -514,7 +514,9 @@ class Line:
         rows_ = np.arange(S.shape[0])[:, None]
         own_band = (rows_ >= lo_band[None, :]) & (rows_ < hi_band[None, :])
         cnt = lambda m: np.bincount(lab[m & (lab > 0)], minlength=ncomp)
+        near_band = (rows_ >= lo_band[None, :] - 0.5 * xh) & (rows_ < hi_band[None, :] + 0.5 * xh)
         own_n = cnt(own_band)
+        touches = cnt(near_band) > 0                               # a stroke of this line touches (or all but) its row
         other = np.zeros_like(own_band)
         for r_ in (ra, rb):
             if r_ is not None:
@@ -523,7 +525,7 @@ class Line:
         whole = (own_n > 0) & (oth_n == 0)
         whole[0] = False
         between = (rows_ >= up[None, :]) & (rows_ < dn[None, :])
-        mine = B.astype(bool) & between & ((own_n[lab] >= oth_n[lab]) | whole[lab])
+        mine = B.astype(bool) & between & touches[lab] & ((own_n[lab] >= oth_n[lab]) | whole[lab])
         self.debug = dict(vc=vc, xh=xh, top=top, bot=bot)
         out, good = {}, 0
         pad = PAD * xh
@@ -707,14 +709,14 @@ def nearest_row(ln: "Line"):
     return max(good)[1] if good else None
 
 
-def fit_label(kind, nums, glyphs, ink, H):
+def fit_label(kind, nums, glyphs, ink, H, t_page=None):
     """A label (a word alone) the line fit could not place: the word-shaped cluster of glyph strokes that overlaps its
     old shape most, outlined as a box turned to the way its ink runs. Returns (kind, nums, reading angle) or None."""
     k = H / 1000.0
     P = shape_poly(kind, nums) * k
-    t = max(6.0, thickness(kind, nums) * k)
+    t = max(6.0, (t_page if t_page else thickness(kind, nums)) * k)   # (a square box says nothing of the text's height)
     xh = 0.45 * t
-    x0, y0 = np.floor(P.min(0) - 2.5 * t).astype(int); x1, y1 = np.ceil(P.max(0) + 2.5 * t).astype(int)
+    x0, y0 = np.floor(P.min(0) - 1.0 * t).astype(int); x1, y1 = np.ceil(P.max(0) + 1.0 * t).astype(int)
     x0, y0 = max(0, x0), max(0, y0); x1, y1 = min(ink.shape[1], x1), min(ink.shape[0], y1)
     if x1 - x0 < 4 or y1 - y0 < 4:
         return None
@@ -746,7 +748,7 @@ def fit_label(kind, nums, glyphs, ink, H):
     if rw < rh:
         rw, rh, ang = rh, rw, ang + 90
     ang = ((ang + 90) % 180) - 90                              # read left to right (or downwards)
-    if rw < 0.4 * glyphs * xh or rw > 3.0 * glyphs * xh + 2 * xh:   # not the size of this word
+    if rw < 0.4 * glyphs * xh or rw > 3.0 * glyphs * xh + 2 * xh or rh > 3.6 * xh:   # not the size of this word
         return None
     pad = PAD * xh
     L, Hh = (rw + 2 * pad) / k, (rh + 2 * pad) / k
@@ -822,6 +824,9 @@ def refine(page: str, data: dict, loci_sta: list[str], panels: dict[int, np.ndar
                 row = [li, wi, pi, "o", *nums, ang, 1]
             ws.append((wi, row[3], row[4:-2], row))
     inks = {pi: ink_map(im) for pi, im in panels.items()}
+    long_ = [thickness(r[3], r[4:-2]) for r in data["words"] if r[3] != "a" and r[-1] == 0
+             and (lambda P: np.ptp(P[:, 0]) > 1.6 * np.ptp(P[:, 1]) or np.ptp(P[:, 1]) > 1.6 * np.ptp(P[:, 0]))(shape_poly(r[3], r[4:-2]))]
+    t_page = float(np.median(long_)) if len(long_) >= 5 else None   # the page's text height, from boxes that are word-shaped
     new, lines = {}, {}
     stats = {"lines": 0, "refit": 0, "words": 0, "words_refit": 0}
     for (li, pi), ws in words_by.items():
@@ -834,6 +839,17 @@ def refine(page: str, data: dict, loci_sta: list[str], panels: dict[int, np.ndar
         H = panels[pi].shape[0]
         ring = ring_of(items)
         plain = items
+        if len(items) == 1 and items[0][1] == "r" and t_page and items[0][3] >= 2.5:
+            wi, kind, nums, g = items[0]
+            P_ = shape_poly(kind, nums)
+            if max(np.ptp(P_[:, 0]), np.ptp(P_[:, 1])) < 1.6 * min(np.ptp(P_[:, 0]), np.ptp(P_[:, 1])):
+                fl = fit_label(kind, nums, g, inks[pi], panels[pi].shape[0], t_page)   # a square box round a word:
+                if fl:                                                                  # written aslant; its own ink
+                    stats["lines"] += 1; stats["words"] += 1; stats["refit"] += 1; stats["words_refit"] += 1
+                    k2, n2, ang = fl
+                    new[(li, wi)] = [li, wi, pi, k2, *[round(float(x)) for x in n2[:4]], *[round(float(x), 1) for x in n2[4:]],
+                                     round(((ang + 180) % 360) - 180, 1), 0]
+                    continue
         if len(items) == 1 and items[0][1] == "r":                # an upright label: turned if its ink clearly runs aslant
             wi, kind, nums, g = items[0]
             squarish = g >= 3 and max(nums[2], nums[3]) < 1.6 * min(nums[2], nums[3])   # too tall for a word written across
