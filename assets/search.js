@@ -5,7 +5,7 @@
    (defaults left out), so a search can be linked, saved and come back as it was. It reads RF1b, the Reader's text, unless
    asked for the consensus (in=cons), any transcriber (all) or one of them. */
 import { parse, describe, QueryError, CLASSES, QUALIFIERS } from "./query.js";
-import { Data, SHORT, load } from "./text.js";
+import { Data, SHORT, load, GLYPH_KEYS, EVA_UNITS, evaToGlyphs } from "./text.js";
 
 const DEFAULTS = { q: "", in: "RF", sp: "either", eq: "eva", near: "0", set: "", steps: "", sort: "book", cmp: "" };
 const FACETS = [
@@ -629,26 +629,7 @@ const T = {
   },
 };
 
-/* the glyphs one types with: [STA code, Eva], the common ones first; a long Eva unit (cth) before its parts (c, t, h) */
-const GLYPH_KEYS = [["A1", "o"], ["A3", "a"], ["A2", "y"], ["D1", "q"], ["B1", "d"], ["B2", "l"], ["B3", "m"], ["B4", "g"], ["C1", "r"], ["C2", "s"],
-  ["E1", "i"], ["E2", "n"], ["J1", "e"], ["K1", "ch"], ["L1", "sh"], ["Q1", "k"], ["Q2", "t"], ["P1", "p"], ["P2", "f"],
-  ["U1", "ckh"], ["U2", "cth"], ["T1", "cph"], ["T2", "cfh"], ["X1", "x"], ["X2", "v"], ["Z1", "?"]];
-const EVA_UNITS = GLYPH_KEYS.filter(([, e]) => e !== "?").sort((a, b) => b[1].length - a[1].length);
-/* Eva as the manuscript's glyphs (Voynich VV): spaces for word breaks, a dot for an uncertain one; what is not a glyph
-   (a wildcard, a bracket) stays as it is */
-function evaToGlyphs(s) {
-  const G = Data.glyphs || {};
-  let out = "";
-  for (let i = 0; i < s.length;) {
-    const c = s[i];
-    if (c === ".") { out += " "; i++; continue; }
-    if (c === ",") { out += "·"; i++; continue; }
-    const u = EVA_UNITS.find(([, e]) => s.startsWith(e, i));
-    if (u && G[u[0]]) { out += G[u[0]].ch; i += u[1].length; continue; }
-    out += c; i++;
-  }
-  return out;
-}
+/* the glyph keys (GLYPH_KEYS, EVA_UNITS) and evaToGlyphs come from text.js, which the Reader's Find shares */
 const glyphsOn = () => store.get("text:script", "eva") === "glyphs";
 
 const SORTS = { book: "lines, in book order", right: "concordance, by what follows", left: "concordance, by what comes before", match: "concordance, by the match" };

@@ -196,23 +196,30 @@ test.describe("the text in the Reader", () => {
     await expect.poll(() => page.evaluate(() => R.rot)).toBe(0);
   });
 
-  test("the text as glyphs, or in Eva, FSG or Currier, by Zandbergen's tables; and nothing else", async ({ page }) => {
+  test("the text as glyphs or in Eva, chosen from a dropdown, by Zandbergen's tables; and nothing else", async ({ page }) => {
     await openSite(page, "#read/beinecke/10r/text");
     await textReady(page);
-    await expect(page.locator("#rd-text .tx-seg button")).toHaveText(["Glyphs", "Eva", "FSG", "Currier"]);
-    const pick = name => page.locator("#rd-text .tx-seg button", { hasText: name }).click();
+    const sel = page.locator("#rd-text select.tx-script");
+    await expect(sel.locator("option")).toHaveText(["Glyphs", "Eva"]);
+    await expect(page.locator("#rd-text .tx-seg")).toHaveCount(0);
     const l6 = () => line(page, "f10r.6").locator(".t");
     await expect(l6()).toHaveText("ycheor cthy chor cthaiin qoctholy dy   chy taiin shy");
-    await pick("FSG");
-    await expect(l6()).toContainText("GTCOR HZG TOR HZAM");
-    await pick("Currier");
-    await expect(l6()).toContainText("9SCOR Q9 SOR QAM");
-    await pick("Glyphs");
+    await sel.selectOption("glyphs");
     await expect.poll(() => page.evaluate(async () => { await document.fonts.ready; return document.fonts.check('24px "Voynich VV"'); })).toBe(true);
     expect(await page.evaluate(() => getComputedStyle(document.querySelector("#rd-text .ln .t")).fontFamily)).toContain("Voynich VV");
     await page.reload();
     await textReady(page);
-    await expect(page.locator("#rd-text .tx-seg button[aria-pressed=true]")).toHaveText("Glyphs");
+    await expect(page.locator("#rd-text select.tx-script")).toHaveValue("glyphs");
+    await page.locator("#rd-text select.tx-script").selectOption("eva");
+    await expect(l6()).toHaveText("ycheor cthy chor cthaiin qoctholy dy   chy taiin shy");
+  });
+
+  test("an alphabet kept from before that is no longer offered (FSG, Currier) falls back to Eva", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("vv:text:script", JSON.stringify("fsg")));
+    await openSite(page, "#read/beinecke/10r/text");
+    await textReady(page);
+    await expect(page.locator("#rd-text select.tx-script")).toHaveValue("eva");
+    await expect(line(page, "f10r.6").locator(".t")).toHaveText("ycheor cthy chor cthaiin qoctholy dy   chy taiin shy");
   });
 
   test("one word, one count: the Reader and the Text tab agree, an uncertain space counted either way", async ({ page }) => {
@@ -224,39 +231,80 @@ test.describe("the text in the Reader", () => {
     await expect(page.locator("#sx-echo")).toContainText("okodar appears 4 times on 4 of");
   });
 
-  test("FSG and Currier write every glyph by its nearest basic form; the few no alphabet has a letter for are drawn as themselves", async ({ page }) => {
-    await openSite(page, "#read/beinecke/1r/text");
-    await textReady(page);
-    await page.locator("#rd-text .tx-seg button", { hasText: "FSG" }).click();
-    await expect(line(page, "f1r.1").locator(".t")).not.toContainText("?");
-    await expect(line(page, "f1r.4").locator(".t")).not.toContainText("?");
-    const bad = await page.evaluate(async () => {
-      const { Text, writeAs } = await import("/assets/text.js");
-      await Text.base();
-      let n = 0;
-      for (const [, loci] of Text.pages) for (const l of loci) for (const w of l.words) if (w.codes.length && /\?/.test(writeAs(w.codes, "fsg")) && !/\?/.test(writeAs(w.codes, "eva"))) n++;
-      return n;
-    });
-    expect(bad).toBeLessThan(40);   // was 277: only the glyphs basic Eva cannot write either (b, z, eeb), drawn in the glyph font
-    await page.locator("#rd-text .tx-seg button", { hasText: "Glyphs" }).click();
-  });
-
-  test("the places as a concordance: sorted by the word after, grouped under it; the transcribers one door deeper; a note kept in Your work", async ({ page }) => {
+  test("the places as a concordance: sorted by the word after, grouped under it; two doors (where it sits, similar spellings), no transcribers and no notes", async ({ page }) => {
     await page.route("https://collections.library.yale.edu/**", fromYale);
     await openSite(page, "#read/beinecke/1r/text?w=f1r.15.8");
     await expect(page.locator("#rd-text .tx-say")).toContainText("363 more times", { timeout: 15_000 });
     await page.locator("#rd-text .tx-places select").selectOption("after");
     await expect(page.locator("#rd-text .tx-grid .tx-group").first()).toBeVisible();
     expect(await page.locator("#rd-text .tx-grid .tx-group").count()).toBeGreaterThan(3);
-    await page.locator("#rd-text .tx-door summary", { hasText: "How the transcribers read it" }).click();
-    await expect(page.locator("#rd-text .tx-tr")).toContainText(/transcribers/, { timeout: 15_000 });
-    await page.locator('#rd-text .tx-ic[aria-label="Add a note"]').click();
-    await page.locator("dialog.ask input").fill("looks like chol with a long tail");
-    await page.locator("dialog.ask button", { hasText: "Keep" }).click();
-    await expect(page.locator("#rd-text .tx-note")).toContainText("long tail");
-    const file = await page.evaluate(() => { const d = JSON.parse(JSON.stringify({ places: Saved.places })); return d; });
-    expect(file.places.length).toBe(1);
-    expect(file.places[0].hash).toContain("w=f1r.15.8");
+    await expect(page.locator("#rd-text .tx-door > summary")).toHaveText(["Where it sits", "Similar spellings"]);
+    await expect(page.locator("#rd-text")).not.toContainText("How the transcribers read it");
+    await expect(page.locator('#rd-text .tx-ic[aria-label="Add a note"]')).toHaveCount(0);
+    await expect(page.locator("#rd-text .tx-stamp")).toHaveCount(0);
+    await expect(page.locator("#rd-text .tx-src")).toContainText("RF1b · position: The Voynichese Project · photograph: Yale University");
+  });
+
+  test("Find: a word typed in Eva (* for any glyphs) lists the words that match as you type; Enter opens their places, in the address", async ({ page }) => {
+    await page.route("https://collections.library.yale.edu/**", fromYale);
+    await openSite(page, "#read/beinecke/2r/text");
+    await textReady(page);
+    const find = page.locator("#rd-text .tx-find-in");
+    await find.fill("qok*");
+    await expect(page.locator("#rd-text .tx-find-hits .tx-chip").first()).toContainText("qokeey");
+    await expect(page.locator("#rd-text .tx-find-hits")).toContainText("more: press Enter");
+    await expect(page.locator("#rd-text .tx-find-echo")).not.toBeEmpty();
+    await find.press("Enter");
+    await expect(page.locator("#rd-text .tx-where")).toContainText("qok*");
+    await expect(page.locator("#rd-text .tx-found .tx-chip.on")).toContainText("qokeey");
+    await expect(page.locator("#rd-text .tx-say")).toContainText("qokeey is found 307 times, on 80 pages");
+    await expect(page.locator("#rd-text .tx-places .tx-h")).toContainText("Places (307)");
+    await expect(page.locator("#rd-text .tx-grid li").first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text?find=qok*&fw=qokeey");
+    await page.locator("#rd-text .tx-found .tx-chip", { hasText: /^qokeedy/ }).click();
+    await expect(page.locator("#rd-text .tx-say")).toContainText("qokeedy is found");
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text?find=qok*&fw=qokeedy");
+    await expect(page.locator("#rd-text .tx-door > summary")).toHaveText(["Where it sits", "Similar spellings"]);
+    await page.locator("#rd-text .tx-ic[aria-label='Back to the page text (Esc)']").click();
+    await expect(page.locator("#rd-text .tx-page").first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#read/beinecke/2r/text");
+    expect(await page.evaluate(() => [R.zoom, R.rot]), "the page is not zoomed or turned").toEqual([1, 0]);
+  });
+
+  test("Find from the address outlines the word's places on the pages on show; the glyph keys type Eva; nothing matches says so", async ({ page }) => {
+    await page.route("https://collections.library.yale.edu/**", fromYale);
+    await openSite(page, "#read/beinecke/2r/text?find=chol");
+    await expect(page.locator("#rd-text .tx-say")).toContainText("chol is found", { timeout: 15_000 });
+    await expect(page.locator("#rd-text .tx-find-in")).toHaveValue("chol");
+    await expect(page.locator("#rd-zoomer .seg-words .out.set").first()).toBeAttached();   // 1v has chol five times, 2r four
+    await page.keyboard.press("Escape");
+    await textReady(page);
+    await page.locator("#rd-text .tx-ic.tx-kb").click();
+    await expect(page.locator("#rd-text .tx-keys")).toBeVisible();
+    for (const e of ["d", "a", "i", "i", "n"]) await page.locator(`#rd-text .tx-key:has(.e:text-is("${e}"))`).click();
+    await expect(page.locator("#rd-text .tx-find-in")).toHaveValue("daiin");
+    await expect(page.locator("#rd-text .tx-find-hits .tx-chip").first()).toContainText("daiin");
+    await page.locator("#rd-text .tx-find-in").fill("qqqq");
+    await expect(page.locator("#rd-text .tx-find-hits")).toContainText("No word in the book matches");
+  });
+
+  test("the panel's ? is short: how to use the text, a few keys, the sources; the site's ? keeps only the keys that matter", async ({ page }) => {
+    await openSite(page, "#read/beinecke/2r/text");
+    await textReady(page);
+    await page.locator('#rd-text .tx-ic[aria-label="Help and sources"]').click();
+    const d = page.locator("#tx-help-dlg");
+    await expect(d).toBeVisible();
+    await expect(d).toContainText("RF1b");
+    await expect(d).toContainText("Voynichese Project");
+    await expect(d).toContainText("Yale University");
+    expect(await d.locator("kbd").count()).toBeLessThan(8);
+    await page.keyboard.press("Escape");
+    await expect(d).toBeHidden();
+    await page.locator("#rd-text .tx-foot .tx-link", { hasText: "Sources" }).click();
+    await expect(d).toBeVisible();
+    await page.keyboard.press("Escape");
+    expect(await page.locator("#cx-help-dlg kbd").count()).toBeLessThan(25);
+    await expect(page.locator("#cx-help-dlg")).not.toContainText("Crop editor");
   });
 
   test("a diagram drawn across two panels has its words on each", async ({ page }) => {

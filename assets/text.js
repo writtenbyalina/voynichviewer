@@ -1,8 +1,8 @@
 /* Text: the manuscript's text beside its pages in the Reader (docs/text/REDESIGN.md, section 9). Loaded the first time the
    text opens (TextUI in app.js); uses app.js's helpers (h, $, $$, store, toast, R, Reader, D, S, ...).
 
-   The text is RF1b, René Zandbergen's reference transliteration (tools/text/rf.py), written in Eva, FSG or Currier by his
-   own tables, or shown as the glyphs themselves. One rule runs through it all: never take the page away.
+   The text is RF1b, René Zandbergen's reference transliteration (tools/text/rf.py), written in Eva by his own tables, or
+   shown as the glyphs themselves. One rule runs through it all: never take the page away.
    - Pointing at a word outlines it and says what it reads. Clicking chooses it without moving the page; shift-click
      takes in a phrase, ⌘/Ctrl-click collects words into a set.
    - The panel opens on the word itself (cut upright from Yale's photograph, its glyphs, one sentence), then its other
@@ -41,15 +41,46 @@ export const Data = {
   },
 };
 
-/* ---- RF1b, and how it is written ---- */
+/* ---- RF1b, and how it is written: as the glyphs themselves, or in Eva ---- */
 const SCRIPTS = [
   ["glyphs", "Glyphs", "The manuscript's own shapes (Glen Claston's font); words are matched as Eva"],
   ["eva", "Eva", "Eva (Landini and Zandbergen, 1998), the alphabet most people use: letters that name the shapes, not sounds"],
-  ["fsg", "FSG", "The First Study Group's alphabet (William Friedman, 1944–46)"],
-  ["cur", "Currier", "Prescott Currier's alphabet (1970s), from the papers that found the two hands' “languages” A and B"],
 ];
 const SCRIPT_NAME = Object.fromEntries(SCRIPTS.map(([k, n]) => [k, n]));
 const letters = script => script === "glyphs" ? "eva" : script;   // the alphabet words are matched and captioned in
+/* the glyphs one types with: [STA code, Eva], the common ones first; a long Eva unit (cth) before its parts (c, t, h) */
+export const GLYPH_KEYS = [["A1", "o"], ["A3", "a"], ["A2", "y"], ["D1", "q"], ["B1", "d"], ["B2", "l"], ["B3", "m"], ["B4", "g"], ["C1", "r"], ["C2", "s"],
+  ["E1", "i"], ["E2", "n"], ["J1", "e"], ["K1", "ch"], ["L1", "sh"], ["Q1", "k"], ["Q2", "t"], ["P1", "p"], ["P2", "f"],
+  ["U1", "ckh"], ["U2", "cth"], ["T1", "cph"], ["T2", "cfh"], ["X1", "x"], ["X2", "v"], ["Z1", "?"]];
+export const EVA_UNITS = GLYPH_KEYS.filter(([, e]) => e !== "?").sort((a, b) => b[1].length - a[1].length);
+/* Eva as the manuscript's glyphs (Voynich VV): spaces for word breaks, a dot for an uncertain one; what is not a glyph
+   (a wildcard, a bracket) stays as it is */
+export function evaToGlyphs(s) {
+  const G = Text.glyphs || Data.glyphs || {};
+  let out = "";
+  for (let i = 0; i < s.length;) {
+    const c = s[i];
+    if (c === ".") { out += " "; i++; continue; }
+    if (c === ",") { out += "·"; i++; continue; }
+    const u = EVA_UNITS.find(([, e]) => s.startsWith(e, i));
+    if (u && G[u[0]]) { out += G[u[0]].ch; i += u[1].length; continue; }
+    out += c; i++;
+  }
+  return out;
+}
+/* what is typed into Find, as an Eva query: glyph characters (pasted, or from the keys) become their Eva; only Eva
+   letters and the wildcards * and ? stay */
+let GLYPH_EVA = null;
+function evaQuery(s) {
+  if (!GLYPH_EVA) { GLYPH_EVA = new Map(); for (const g of Object.values(Text.glyphs || {})) if (g.ch && g.eva && !GLYPH_EVA.has(g.ch)) GLYPH_EVA.set(g.ch, g.eva); }
+  let out = "";
+  for (const c of String(s).trim()) {
+    if (/[a-z*?]/.test(c)) out += c;
+    else if (/[A-Z]/.test(c)) out += c.toLowerCase();
+    else if (GLYPH_EVA.has(c)) out += GLYPH_EVA.get(c);
+  }
+  return out.replace(/\*+/g, "*");
+}
 const KINDS = { P: ["Paragraphs", "line", "lines"], L: ["Labels", "label", "labels"], C: ["Rings", "ring", "rings"],
   R: ["Radii", "radius", "radii"] };
 const kindOf = loc => KINDS[loc.t[0]] ? loc.t[0] : "P";
@@ -94,7 +125,6 @@ function writeAs(codes, script) {
   }
   return out;
 }
-const approxIn = (codes, script) => (script === "fsg" || script === "cur") && codes.some(c => Text.alpha[script].approxSet.has(c));
 /* A word as shown. In Eva a glyph that basic Eva has no letter for (one in two hundred) is drawn as itself, in the glyph
    font, and says so; an unreadable glyph stays a ?. */
 function wordNodes(codes, script) {
@@ -539,6 +569,7 @@ const T = {
   lit() {
     if (this.view?.kind === "set") return new Set(this.view.onShow || []);
     if (this.view?.kind === "ring") return new Set(this.view.keys || []);
+    if (this.view?.kind === "find") return new Set(this.view.onShow || []);
     return new Set(this.chosenKeys());
   },
   marks() {
@@ -555,7 +586,7 @@ const T = {
       if (sel.length && dimming) dim.setAttribute("d", `M0 0H${vb.width}V1000H0Z` + sel.map(p => p.getAttribute("d")).join(""));
       else dim.removeAttribute("d");
       if (sel.length) any = true;
-      for (const p of sel) outline(p, this.view?.kind === "set" ? "set" : "sel");
+      for (const p of sel) outline(p, this.view?.kind === "set" || this.view?.kind === "find" ? "set" : "sel");
       const hp = this.hov && !chosen.has(this.hov) && $(`.wb[data-k="${CSS.escape(this.hov)}"]`, layer);
       if (hp) outline(hp, "hov");
       layer.closest(".seg")?.classList.toggle("sel-seg", sel.length > 0);
@@ -564,7 +595,7 @@ const T = {
     holder?.classList.toggle("has-sel", any && dimming);
     if (this.el) {
       $$(".tx-body .w.lit, .tx-body .w.sel, .tx-body .w.inset", this.el).forEach(w => w.classList.remove("lit", "sel", "inset"));
-      for (const k of chosen) $$(`.tx-body .w[data-k="${CSS.escape(k)}"]`, this.el).forEach(w => w.classList.add(this.view?.kind === "set" ? "inset" : "sel"));
+      for (const k of chosen) $$(`.tx-body .w[data-k="${CSS.escape(k)}"]`, this.el).forEach(w => w.classList.add(this.view?.kind === "set" || this.view?.kind === "find" ? "inset" : "sel"));
       if (this.hov) $$(`.tx-body .w[data-k="${CSS.escape(this.hov)}"]`, this.el).forEach(w => w.classList.add("lit"));
     }
   },
@@ -769,18 +800,19 @@ const T = {
     if (kind === "set") this.setView(body);
     else if (kind === "ring") this.ringView(body);
     else if (kind === "word") this.wordView(body);
+    else if (kind === "find") this.findView(body);
     else this.pageView(body);
     const was = body.dataset.view;
     body.dataset.view = kind;
-    body.classList.toggle("caps", this.script === "fsg" || this.script === "cur");
     if (!this.keepScroll) body.scrollTop = kind === "page" ? this.pageScroll || 0 : was === kind ? body.scrollTop : 0;
     this.keepScroll = false;
     this.strip();
   },
-  /* how the text is shown: the glyphs, or one of three alphabets */
+  /* how the text is shown: the glyphs themselves, or Eva (a dropdown) */
   scriptMenu() {
-    return h("div", { class: "tx-seg", role: "group", "aria-label": "Show the text as" },
-      SCRIPTS.map(([v, n, what]) => h("button", { title: what, "aria-pressed": String(this.script === v), onclick: () => this.setScript(v) }, n)));
+    const cur = SCRIPTS.find(([v]) => v === this.script) || SCRIPTS[1];
+    return h("select", { class: "tx-script", "aria-label": "Show the text as", title: cur[2], onchange: e => this.setScript(e.target.value) },
+      SCRIPTS.map(([v, n]) => { const o = h("option", { value: v }, n); o.selected = v === this.script; return o; }));
   },
   setScript(v) {
     if (!SCRIPT_NAME[v] || v === this.script) return;
@@ -797,7 +829,7 @@ const T = {
   head(kids) {
     const head = $(".tx-head", this.el);
     head.replaceChildren(...kids, this.scriptMenu(),
-      h("button", { class: "tx-ic", title: "The keys and clicks (?)", "aria-label": "Help", onclick: () => $("#cx-help-dlg").showModal() }, "?"),
+      h("button", { class: "tx-ic", title: "How to use the text, and where it comes from", "aria-label": "Help and sources", onclick: () => this.helpDialog() }, "?"),
       h("button", { class: "tx-ic", title: "Close the text (T)", "aria-label": "Close the text", onclick: () => TextUI.toggle(false) }, "✕"));
   },
   backButton(title = "Back to the page text (Esc)") {
@@ -822,6 +854,7 @@ const T = {
     this.head([h("span", { class: "tx-title" }, pages.map(pageName_).join(" · ") || "Text"), h("span", { class: "sp" })]);
     const kids = [];
     if (this.back) kids.push(this.returnChip());
+    kids.push(this.findBar());
     const seen = new Set();
     for (const x of this.shownNow || []) {
       if (x.folded) {
@@ -889,16 +922,143 @@ const T = {
   },
   credits() {
     return h("footer", { class: "tx-foot" },
-      h("p", {}, "Text: RF1b, René Zandbergen's reference transliteration (",
-        h("a", { href: "https://www.voynich.nu/extra/sta-aaa.html", target: "_blank", rel: "noopener" }, "voynich.nu"),
-        ", CC0), written in each alphabet by his own tables. ", h("a", { href: "#info/beinecke/consensus" }, "About the text"), "."),
-      h("p", {}, "Word positions: The Voynichese Project (Apache 2.0), and on the Rosettes Alessandro Placa (CC BY 4.0), fitted to Yale's photographs."));
+      h("p", {}, "Text: RF1b, René Zandbergen's reference transliteration. ",
+        h("button", { class: "tx-link", onclick: () => this.helpDialog("source") }, "Sources"), "."));
+  },
+  /* the line at the foot of a word's panel: where it comes from, in a few words, and the way to the rest */
+  sourceLine(withShapes, page) {
+    return h("p", { class: "tx-src" }, `RF1b${withShapes ? " · position: " + (page === "fRos" ? "Alessandro Placa" : "The Voynichese Project") : ""}${withShapes ? " · photograph: Yale University" : ""} · `,
+      h("button", { class: "tx-link", onclick: () => this.helpDialog("source") }, "Sources"));
+  },
+  /* The panel's ?: how to use the text, in a few lines, and where it comes from. One dialog, made once. */
+  helpDialog(at = null) {
+    let d = $("#tx-help-dlg");
+    if (!d) {
+      const row = (k, say) => h("p", {}, h("kbd", {}, k), " ", say);
+      d = h("dialog", { id: "tx-help-dlg", class: "tx-dlg", "aria-labelledby": "tx-help-h" },
+        h("h3", { id: "tx-help-h" }, "The text"),
+        h("div", { class: "tx-dlg-sec" },
+          h("p", {}, "Point at any word on the page to see what it reads. Click it to see it on its own, with every other place in the book it appears. Shift-click takes in a phrase."),
+          h("p", {}, "Find, at the top of the text, finds a word anywhere in the book: type Eva (qokeedy, qok*, ch?dy), or type with the glyph keys."),
+          h("p", {}, "Glyphs or Eva, in the dropdown, is how the text is written. ", h("a", { href: "#info/beinecke/text", onclick: () => d.close() }, "What Eva is"), ".")),
+        h("h4", {}, "Keys"),
+        h("div", { class: "tx-dlg-sec tx-keys-list" },
+          row("T", "open or close the text"), row("Esc", "back"), row("N", "the next place, beside the page"), row("[ ]", "the word before or after")),
+        h("h4", { id: "tx-src-h" }, "Sources"),
+        h("div", { class: "tx-dlg-sec" },
+          h("p", {}, h("b", {}, "The text"), " is RF1b, René Zandbergen's reference transliteration of the manuscript (",
+            h("a", { href: "https://www.voynich.nu/extra/sta-aaa.html", target: "_blank", rel: "noopener" }, "voynich.nu"), ", CC0), written in Eva by his own tables. ",
+            h("a", { href: "#info/beinecke/consensus", onclick: () => d.close() }, "About the text"), "."),
+          h("p", {}, h("b", {}, "Where each word is"), " on the photographs: The Voynichese Project's word boxes (Apache License 2.0), and on the Rosettes Alessandro Placa's positions (CC BY 4.0), fitted to Yale's photographs."),
+          h("p", {}, h("b", {}, "The photographs"), ": Beinecke Rare Book & Manuscript Library, Yale University. ", h("b", {}, "The glyphs"), " are drawn with Glen Claston's Voynich font (public domain).")),
+        h("form", { method: "dialog", class: "bug-acts" }, h("button", { class: "primary" }, "Close")));
+      document.body.append(d);
+    }
+    d.showModal();
+    if (at === "source") $("#tx-src-h", d)?.scrollIntoView({ block: "start" });
+  },
+
+  /* ---- Find: a word anywhere in the book, typed in Eva or with the glyph keys ---- */
+  /* the words of the book that match a query (Eva; * any run of glyphs, ? one glyph): [[word, how many places]],
+     the most frequent first */
+  findWords(q) {
+    Find.build(this.script);
+    if (!q) return [];
+    const esc = t => t.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp("^" + q.split(/([*?])/).map((t, i) => i % 2 ? (t === "*" ? "[a-z]*" : "(?:ckh|cth|cph|cfh|ch|sh|[a-z])") : esc(t)).join("") + "$");
+    const out = [];
+    for (const [w, idx] of Find.byWord) if (re.test(w)) out.push([w, idx.length]);
+    return out.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  },
+  /* a word as the text is shown: Eva, or its glyphs (from its first place in the book) */
+  showWord(w) {
+    if (this.script !== "glyphs") return w;
+    const i = Find.byWord.get(w)?.[0], t = i != null && Find.toks[i];
+    return t ? Text.pages.get(t.page)[t.li].words[t.wi].codes.map(chOf).join("") : w;
+  },
+  /* The bar: a box for the word, what it looks like in glyphs beside it, and a key for the glyph keys. In the page
+     text, the words that match appear under it as you type; Enter opens the first (or the one picked). */
+  findBar(q = "") {
+    const inFind = this.view?.kind === "find";
+    if (!inFind) q = this.findDraft || "";   // what was typed stays while the pages turn and the panel is redrawn
+    const input = h("input", { class: "tx-find-in", type: "search", value: q, autocomplete: "off", spellcheck: "false", enterkeyhint: "search",
+      placeholder: "Find a word in the book: Eva (qokeedy, qok*) or the glyph keys", "aria-label": "Find a word in the book, in Eva" });
+    const echo = h("span", { class: "tx-find-echo", "aria-hidden": "true" });
+    const hits = h("div", { class: "tx-find-hits", hidden: true });
+    const put = eva => { const a = input.selectionStart ?? input.value.length, b = input.selectionEnd ?? a;
+      input.value = input.value.slice(0, a) + eva + input.value.slice(b); input.focus(); input.setSelectionRange(a + eva.length, a + eva.length); update(); };
+    const keys = h("div", { class: "tx-keys", hidden: !this.keysOpen, role: "group", "aria-label": "Glyph keys: each puts its glyph in the box" },
+      GLYPH_KEYS.map(([code, eva]) => h("button", { type: "button", class: "tx-key", title: eva === "?" ? "any one glyph" : eva, onclick: () => put(eva) },
+        h("span", { class: "g", "aria-hidden": "true" }, eva === "?" ? "?" : chOf(code)), h("span", { class: "e" }, eva))),
+      h("button", { type: "button", class: "tx-key tx-key-x", title: "Delete the last glyph", "aria-label": "Delete the last glyph",
+        onclick: () => { const v = input.value, u = EVA_UNITS.find(([, e]) => v.endsWith(e)); input.value = v.slice(0, v.length - (u ? u[1].length : 1)); input.focus(); update(); } }, "⌫"));
+    const kb = h("button", { type: "button", class: `tx-ic tx-kb${this.keysOpen ? " on" : ""}`, title: "Type with the manuscript's glyphs", "aria-label": "Glyph keys",
+      "aria-expanded": String(!!this.keysOpen), onclick: () => { this.keysOpen = keys.hidden; keys.hidden = !this.keysOpen; kb.setAttribute("aria-expanded", String(this.keysOpen)); kb.classList.toggle("on", this.keysOpen); if (this.keysOpen) input.focus(); } },
+      h("span", { class: "g", "aria-hidden": "true" }, chOf("Q1")));
+    const go = word => { const v = evaQuery(input.value); if (v) { this.findDraft = ""; this.openFind(v, word); } };
+    const update = () => {
+      const v = evaQuery(input.value);
+      echo.textContent = v && Text.glyphs ? evaToGlyphs(v) : "";
+      echo.hidden = !echo.textContent || this.script === "glyphs" && !/[*?]/.test(v) && v === input.value.trim();
+      if (inFind) return;   // the view itself lists the words that match
+      const ws = v ? this.findWords(v) : [];
+      hits.hidden = !v;
+      hits.replaceChildren(...(!v ? [] : !ws.length ? [h("span", { class: "tx-dim" }, "No word in the book matches.")] :
+        [...ws.slice(0, 8).map(([w, n]) => h("button", { type: "button", class: `tx-chip${this.script === "glyphs" ? " glyph" : ""}`, title: `The ${plural(n, "place", "places")} of ${w}`, onclick: () => go(w) }, this.showWord(w), h("span", { class: "n" }, n))),
+          ...(ws.length > 8 ? [h("span", { class: "tx-dim" }, `and ${ws.length - 8} more: press Enter`)] : [])]));
+    };
+    input.addEventListener("input", () => { if (!inFind) this.findDraft = input.value; update(); });
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); go(null); }
+      else if (e.key === "Escape") { if (input.value) { input.value = ""; update(); } else input.blur(); e.stopPropagation(); }
+      else e.stopPropagation();   // typing in the box is not a key for the Reader
+    });
+    if (q) update();
+    return h("div", { class: "tx-find", role: "search" }, h("div", { class: "tx-find-row" }, input, echo, kb), keys, hits);
+  },
+  /* the view: the query, the words that match (the one shown is marked), then that word's places as the word view
+     has them; its places on the pages on show are outlined */
+  openFind(q, word = null) {
+    $("#tx-tip")?.remove();
+    this.closePeek(); this.closeSky();
+    this.anchor = this.focus = null; this.set = []; this.similar = null; this.filter = null;
+    this.view = { kind: "find", q, word };
+    this.show(); this.marks(); setHash();
+    $(".tx-body", this.el)?.focus({ preventScroll: true });
+  },
+  findView(body) {
+    const v = this.view, q = v.q;
+    this.head([this.backButton(), h("span", { class: "tx-where" }, "Find ", h("b", {}, q)), h("span", { class: "sp" })]);
+    const kids = [this.findBar(q)];
+    const matches = this.findWords(q);
+    if (!matches.length) {
+      v.word = null; v.onShow = [];
+      kids.push(h("p", { class: "tx-msg" }, `No word in the book matches ${q}.`));
+    } else {
+      const word = v.word && matches.some(([w]) => w === v.word) ? v.word : matches[0][0];
+      v.word = word;
+      if (matches.length > 1) kids.push(h("div", { class: "tx-sim tx-found", role: "group", "aria-label": "The words that match" },
+        matches.slice(0, 40).map(([w, n]) => h("button", { type: "button", class: `tx-chip${this.script === "glyphs" ? " glyph" : ""}${w === word ? " on" : ""}`, title: `The ${plural(n, "place", "places")} of ${w}`,
+          onclick: () => { v.word = w; this.similar = null; this.filter = null; this.keepScroll = true; this.show(); this.marks(); setHash(); } }, this.showWord(w), h("span", { class: "n" }, n))),
+        matches.length > 40 ? h("span", { class: "tx-dim" }, `and ${matches.length - 40} more`) : ""));
+      const places = this.placesOf([word]);
+      v.onShow = places.filter(x => this.loaded.has(x.page)).map(x => key(x.page, x.li, x.wi));
+      const pages = new Set(places.map(x => x.page)), shown = this.similar || word;
+      kids.push(h("p", { class: "tx-say" }, h("b", { class: this.script === "glyphs" ? "glyph" : "" }, this.showWord(shown)),
+        places.length ? ` is found ${plural(places.length, "time", "times")}, on ${plural(pages.size, "page", "pages")}${this.filter ? ` (${this.filter.say})` : ""}.` : ` is not found${this.filter ? ` (${this.filter.say})` : ""}.`));
+      kids.push(this.placesEl([word], places, null));
+      if (places.length) kids.push(this.sitsEl(places));
+      kids.push(this.similarEl(word));
+    }
+    kids.push(this.sourceLine(false));
+    body.classList.toggle("glyph", this.script === "glyphs");
+    body.replaceChildren(...kids);
   },
 
   /* ---- the word, or phrase, chosen ---- */
   /* Layer one is the word itself: cut upright from the photograph, its glyphs with its letters under them, and one
      sentence. Then its line, then its other places as crops; then, behind named doors, where it sits and its near
-     spellings. */
+     spellings. The source is one line at the foot, and in full behind the panel's ?. */
   /* glyphs picked in the word on show: one, or a run in one word (shift-click), and a way to find them elsewhere */
   pickGlyph(its, wn, ci, extend) {
     const g = this.gpick;
@@ -926,8 +1086,7 @@ const T = {
     const where = first.loc.id === last.loc.id ? `${pageName_(first.page)} · line ${lineNo(first.loc.id)}` : `${pageName_(first.page)} · lines ${lineNo(first.loc.id)}–${lineNo(last.loc.id)}`;
     this.head([this.backButton(), h("span", { class: "tx-where" }, where), h("span", { class: "sp" }),
       h("button", { class: "tx-ic", title: "Copy the words, with where they are", "aria-label": "Copy", onclick: () => this.copy(its) }, "⧉"),
-      h("button", { class: "tx-ic", title: "Copy a link to these words", "aria-label": "Copy a link", onclick: () => navigator.clipboard?.writeText(location.href).then(() => toast("Link copied"), () => toast(location.href)) }, "🔗"),
-      h("button", { class: "tx-ic", title: "Note what you make of these words (kept in Your work)", "aria-label": "Add a note", onclick: () => this.note(its) }, "✎")]);
+      h("button", { class: "tx-ic", title: "Copy a link to these words", "aria-label": "Copy a link", onclick: () => navigator.clipboard?.writeText(location.href).then(() => toast("Link copied"), () => toast(location.href)) }, "🔗")]);
     const kids = [];
     if (this.back) kids.push(this.returnChip());
     // 1. the word: its picture, its glyphs and letters, one sentence
@@ -958,10 +1117,7 @@ const T = {
       h("p", { class: "tx-gfind", hidden: true })));
     const words = its.map(it => this.wordText(it.w));
     const places = this.placesOf(words);
-    for (const x of Saved.placesAt(location.hash)) kids.push(h("p", { class: "tx-note" }, h("b", {}, "Your note: "), x.note, " ",
-      h("button", { class: "tx-x", title: "Delete this note", "aria-label": "Delete this note", onclick: async () => { if (await askYes("Delete this note?", x.note, "Delete", true)) { Saved.removePlace(x.id); this.show(); } } }, "×")));
-    kids.push(h("p", { class: "tx-say" }, this.sentence(words, places, first.page),
-      h("span", { class: "tx-stamp" }, ` RF1b · ${SCRIPT_NAME[L]}${approxIn(its.flatMap(it => it.w.codes), L) ? ` · ${SCRIPT_NAME[L]} writes a glyph here by its nearest basic form` : ""}`)));
+    kids.push(h("p", { class: "tx-say" }, this.sentence(words, places, first.page)));
     if (n === 1) {                                              // Claude's own reading from the photograph, where there is one
       const slot = h("p", { class: "tx-photo", hidden: true });
       kids.push(slot);
@@ -996,8 +1152,7 @@ const T = {
     // 3. where it sits; near spellings
     if (places.length) kids.push(this.sitsEl(places));
     if (n === 1) kids.push(this.similarEl(words[0]));
-    if (n === 1) kids.push(this.transcribersEl(first));
-    kids.push(h("p", { class: "tx-src" }, `RF1b${shapes.length ? " · position: " + (first.page === "fRos" ? "Alessandro Placa" : "The Voynichese Project") : ""}${shapes.length ? " · photograph: Yale University" : ""}`));
+    kids.push(this.sourceLine(shapes.length > 0, first.page));
     body.classList.toggle("glyph", this.script === "glyphs");
     body.replaceChildren(...kids);
   },
@@ -1054,7 +1209,7 @@ const T = {
     const sec = h("details", { class: "tx-places", open: !this.placesShut, ontoggle: e => { this.placesShut = !e.target.open; } });
     const sort = h("select", { "aria-label": "Order of the places", onclick: e => e.stopPropagation(), onchange: e => { this.sortBy = e.target.value; this.keepScroll = true; this.show(); } },
       [["book", "in book order"], ["before", "by the word before"], ["after", "by the word after"]].map(([v, t]) => { const o = h("option", { value: v }, t); o.selected = this.sortBy === v; return o; }));
-    sec.append(h("summary", { class: "tx-ph2" }, h("h4", { class: "tx-h" }, this.similar ? `Places of ${this.similar}` : `Other places (${places.length.toLocaleString("en")})`),
+    sec.append(h("summary", { class: "tx-ph2" }, h("h4", { class: "tx-h" }, this.similar ? `Places of ${this.similar}` : `${this.view?.kind === "find" ? "Places" : "Other places"} (${places.length.toLocaleString("en")})`),
       this.similar ? h("button", { class: "tx-x", title: "Back to the word chosen", onclick: e => { e.preventDefault(); this.similar = null; this.show(); } }, "×") : "",
       this.filter ? h("button", { class: "tx-chip on", title: "Show them all", onclick: e => { e.preventDefault(); this.filter = null; this.show(); } }, this.filter.say, " ×") : "",
       h("span", { class: "sp" }), places.length > 3 ? sort : "",
@@ -1082,14 +1237,6 @@ const T = {
     add(0);
     sec.append(grid);
     return sec;
-  },
-  async note(its) {
-    const L = letters(this.script), words = its.map(it => writeAs(it.w.codes, L)).join(" ");
-    const t = await askText(`A note on ${words}`, { placeholder: "e.g. the final glyph is not the same as on 67r2", ok: "Keep",
-      body: "Kept in this browser and in your progress file (Your work), with a link back to these words." });
-    if (!t) return;
-    const x = Saved.addPlace(location.hash, `${pageName_(its[0].page)} · ${words}`, t);
-    if (x) { toast("Note kept in Your work"); this.keepScroll = true; this.show(); }
   },
   /* the places as a file: one row each, with its line */
   exportPlaces(places, words) {
@@ -1174,36 +1321,6 @@ const T = {
     });
     return d;
   },
-  /* Behind a door: what the independent transcriptions (the consensus Search is built on) read here. RF1b's word is
-     matched to the consensus word with the same basic Eva, nearest the same position in the line. */
-  transcribersEl(it) {
-    const d = h("details", { class: "tx-door" }, h("summary", {}, "How the transcribers read it"));
-    d.addEventListener("toggle", async () => {
-      if (!d.open || d.children.length > 1) return;
-      const out = h("div", { class: "tx-tr" }, h("p", { class: "tx-dim" }, "Loading…"));
-      d.append(out);
-      try {
-        await Data.base();
-        const pg = await load(`pages/${encodeURIComponent(it.page)}.json`);
-        const loc = pg.loci.find(l => l.id === it.loc.id);
-        if (!loc) { out.replaceChildren(h("p", { class: "tx-dim" }, "This line is not in the transcriptions compared.")); return; }
-        const want = writeAs(it.w.codes, "eva");
-        const ws = []; let off = 0;
-        for (const w of loc.c.split(".")) { ws.push({ off, end: off + w.length, text: w.replace(/,/g, "") }); off += w.length + 1; }
-        const same = ws.map((w, i) => [w, i]).filter(([w]) => w.text === want);
-        const [w] = same.length ? same.reduce((a, b) => Math.abs(b[1] - it.wi) < Math.abs(a[1] - it.wi) ? b : a) : [null];
-        if (!w) { out.replaceChildren(h("p", { class: "tx-dim" }, `The transcriptions compared do not split this line into the same words (their line: ${loc.c.replace(/\./g, " ")}).`)); return; }
-        const n = loc.w.length, units = loc.u.filter(u => u[1] ? u[0] >= w.off && u[0] < w.end : u[0] > w.off && u[0] < w.end);
-        const split = units.filter(u => u[2] !== "u");
-        const kids = [h("p", { class: "tx-say" }, split.length ? `${n} transcribers; they differ on ${split.length === 1 ? "one glyph" : split.length + " glyphs"}:` : `All ${n} transcribers read it this way.`)];
-        for (const u of split) kids.push(h("div", { class: "tx-tr-u" }, h("span", { class: "tx-dim" }, u[1] ? `glyph${u[1] > 1 ? "s" : ""} ${w.text.slice(u[0] - w.off, u[0] - w.off + u[1]) || "–"}: ` : "between two glyphs: "),
-          ...u[3].filter(r => r[1] > 0).flatMap((r, i) => [i ? "; " : "", h("b", { class: "mono" }, r[0] || "nothing"), ` ${Number.isInteger(r[1]) ? r[1] : r[1].toFixed(1)} (${r[2].split(" ").map(c => SHORT[c] || c).join(", ")})`])));
-        kids.push(h("p", { class: "tx-dim" }, `${loc.w.map(c => SHORT[c] || c).join(", ")}. The Text tab's Reading menu searches the consensus or any one of them.`));
-        out.replaceChildren(...kids);
-      } catch (e) { out.replaceChildren(h("p", { class: "tx-dim" }, "The transcriptions could not be loaded (" + e.message + ").")); }
-    });
-    return d;
-  },
   copy(its) {
     const L = letters(this.script);
     const words = its.map(it => writeAs(it.w.codes, L)).join(" ");
@@ -1219,13 +1336,15 @@ const T = {
     if (kind === "word") {
       const ks = this.chosenKeys(), words = ks.map(k => this.wordText(this.item(k).w));
       for (const x of Find.find(this.similar ? [this.similar] : words, this.script)) count.set(x.page, (count.get(x.page) || 0) + 1);
+    } else if (kind === "find" && this.view.word) {
+      for (const x of Find.find([this.similar || this.view.word], this.script)) count.set(x.page, (count.get(x.page) || 0) + 1);
     } else if (kind === "set" && this.view.rows) {
       for (const r of this.view.rows) count.set(r.page, r.weight);
     } else if (kind === "ring" && this.view.matches) {
       for (const m of this.view.matches) count.set(m.page, (count.get(m.page) || 0) + m.n);
     }
     const max = Math.max(1, ...count.values());
-    Reader.markHits(new Map([...count].map(([p, n]) => [p, n / max])), p => kind === "word" ? count.get(p) || 0 : 0);
+    Reader.markHits(new Map([...count].map(([p, n]) => [p, n / max])), p => kind === "word" || kind === "find" ? count.get(p) || 0 : 0);
   },
 
   /* ---- the peek: another place, beside the page, never in place of it ---- */
@@ -1796,6 +1915,7 @@ const T = {
     if (this.view?.kind === "set" && this.view.from !== "page") p.set("s", this.set.map(x => x.s).join(" "));
     if (this.view?.kind === "set" && this.view.from === "page") p.set("like", this.view.page + (this.view.scope ? "." + this.view.scope : ""));
     if (this.view?.kind === "ring") p.set("ring", Text.pages.get(this.view.page)[this.view.li].id);
+    if (this.view?.kind === "find") { p.set("find", this.view.q); if (this.view.word) p.set("fw", this.view.word); }
     if (this.ask) {
       p.set("l", this.ask.l);
       if (this.ask.m) p.set("m", this.ask.m.join("-"));
@@ -1813,8 +1933,9 @@ const T = {
     this.wantSet = p.get("s") ? p.get("s").split(/[ +]/).filter(Boolean) : null;
     this.wantLike = p.get("like") || null;
     this.wantRing = p.get("ring") || null;
+    this.wantFind = p.get("find") ? { q: evaQuery(p.get("find")), word: p.get("fw") || null } : null;
     if (this.back && location.hash === this.back.hash) this.back = null;   // the browser's Back went there
-    if (!w && !this.wantSet && !this.wantLike && !this.wantRing && (this.anchor || this.view)) { this.anchor = this.focus = null; this.view = null; this.set = []; }
+    if (!w && !this.wantSet && !this.wantLike && !this.wantRing && !this.wantFind && (this.anchor || this.view)) { this.anchor = this.focus = null; this.view = null; this.set = []; }
     this.onShow = "";
     if (this.el) this.sync();
   },
@@ -1829,6 +1950,7 @@ const T = {
     if (this.wantSet) { const s = this.wantSet; this.wantSet = null; this.openSet(s.map(x => ({ s: x }))); }
     if (this.wantLike) { const [pg, sc] = this.wantLike.split("."); this.wantLike = null; if (Text.has(pg)) this.openPageSet(pg, KINDS[sc] ? sc : null); }
     if (this.wantRing) { const f = findLocus(this.wantRing); if (f) { this.wantRing = null; this.openRing(f.page, f.li); } }
+    if (this.wantFind) { const f = this.wantFind; this.wantFind = null; if (f.q && (this.view?.kind !== "find" || this.view.q !== f.q || this.view.word !== f.word)) this.openFind(f.q, f.word); }
     const a = this.ask;
     if (!a) { bar.hidden = true; return; }
     const f = findLocus(a.l);

@@ -1089,10 +1089,44 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 /* the strip's lit pages glow faintly, like stars (after Nadieh Bremer's "Royal Constellations") */
 .strip .t.hit { box-shadow: 0 0 calc(7px * var(--w, 1)) rgba(239, 222, 180, calc(.55 * var(--w, 1))); }
 /* the alphabet: four quiet segments */
-.tx-seg { display: inline-flex; border: 1px solid var(--table-line); border-radius: var(--radius); overflow: hidden; flex: none; }
-.tx-seg button { border: none; border-radius: 0; background: transparent; color: var(--table-muted); min-height: 30px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
-.tx-seg button:hover { color: var(--table-ink); }
-.tx-seg button[aria-pressed=true] { background: var(--table-ink); color: var(--table); }
+.tx-script { flex: none; height: 32px; padding: 2px 26px 2px 10px; border: 1px solid var(--table-line); border-radius: var(--radius); background: transparent; color: var(--table-ink);
+  font-size: 13px; cursor: pointer; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a69d8f' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 9px center; }
+.tx-script:hover { border-color: var(--table-muted); }
+.tx-script option { color: var(--ink); background: #fff; }
+/* Find: a word anywhere in the book */
+.tx-find { margin: 10px 0 4px; }
+.tx-find-row { display: flex; align-items: center; gap: 6px; }
+.tx-find-in { flex: 1; min-width: 0; height: 32px; padding: 2px 10px; border: 1px solid var(--table-line); border-radius: var(--radius); background: rgba(255, 255, 255, .03); color: var(--table-ink);
+  font: 14px ui-monospace, Menlo, monospace; outline: none; }
+.tx-find-in::placeholder { color: var(--table-muted); font: 12.5px var(--sans, system-ui, sans-serif); }
+.tx-find-in:focus { border-color: rgba(216, 180, 106, .6); }
+.tx-find-in::-webkit-search-cancel-button { filter: invert(1) opacity(.6); }
+.tx-find-echo { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 22px/1 "Voynich VV", serif; color: #f3ead9; }
+.tx-find-echo[hidden] { display: none; }
+.tx-kb .g { font: 20px/1 "Voynich VV", serif; }
+.tx-kb.on { background: var(--table-ink); color: var(--table); border-color: var(--table-ink); }
+.tx-keys { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; padding: 8px; border: 1px solid var(--table-line); border-radius: var(--radius); background: rgba(255, 255, 255, .025); }
+.tx-keys[hidden] { display: none; }
+.tx-key { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; min-width: 34px; min-height: 0; padding: 3px 4px 2px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--table-ink); cursor: pointer; }
+.tx-key:hover { border-color: var(--table-line); background: rgba(243, 234, 217, .08); }
+.tx-key .g { font: 22px/1 "Voynich VV", serif; color: #f3ead9; }
+.tx-key .e { font: 10px ui-monospace, Menlo, monospace; color: var(--table-muted); }
+.tx-key-x { justify-content: center; font-size: 16px; }
+.tx-find-hits { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.tx-find-hits[hidden] { display: none; }
+.tx-find-hits .tx-dim, .tx-found .tx-dim { margin: 0; align-self: center; }
+.tx-chip.glyph { font: 18px/1 "Voynich VV", serif; }
+.tx-found { margin: 10px 0 0; }
+.tx-say b.glyph { font: 22px/1 "Voynich VV", serif; font-weight: 400; }
+/* the panel's ?: how to use the text, and its sources */
+dialog.tx-dlg { width: min(520px, 94vw); max-height: 86vh; overflow: auto; padding: 18px 20px 16px; }
+dialog.tx-dlg h3 { margin: 0 0 8px; font-size: 16px; }
+dialog.tx-dlg h4 { margin: 16px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+dialog.tx-dlg p { margin: 0 0 8px; line-height: 1.5; font-size: 14px; }
+dialog.tx-dlg .tx-keys-list p { margin: 0 0 4px; }
+dialog.tx-dlg kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; font: 12px ui-monospace, Menlo, monospace; text-align: center; }
 .tx-return { display: flex; gap: 4px; align-items: baseline; width: 100%; margin: 10px 0 0; padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(243, 195, 92, .35);
   background: rgba(243, 195, 92, .08); color: var(--table-ink); font-size: 13px; cursor: pointer; text-align: left; }
 .tx-return:hover { border-color: #f3c35c; }
@@ -1110,7 +1144,6 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .tx-crop.failed { background: repeating-linear-gradient(135deg, rgba(217, 205, 180, .1) 0 6px, transparent 6px 12px); }
 .tx-fig-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .tx-fig-acts:empty { display: none; }
-.tx-body.caps .w, .tx-body.caps .pk-line, .tx-body.caps .cx { font-size: 13px; letter-spacing: .02em; }
 .tx-places > summary { list-style: none; cursor: pointer; }
 .tx-places > summary::-webkit-details-marker { display: none; }
 .tx-places > summary .tx-h::before { content: "▸ "; }
@@ -1177,10 +1210,6 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .tx-simc { display: inline-flex; align-items: center; gap: 6px; }
 .sim-crop:empty { display: none; }
 .sim-crop canvas { display: block; height: 22px !important; width: auto; border-radius: 3px; }
-.tx-note { margin: 8px 0 0; padding: 6px 10px; border-left: 2px solid var(--gold); color: var(--ivory); font: 400 13.5px/1.4 var(--serif); }
-.tx-note b { font-weight: 600; }
-.tx-tr-u { margin: 4px 0; font-size: 13px; }
-.tx-tr .mono { font-family: ui-monospace, Menlo, monospace; }
 .tx-place { display: flex; flex-direction: column; gap: 4px; width: 100%; height: 100%; padding: 6px; border-radius: 8px; border: 1px solid transparent; background: rgba(255, 255, 255, .03);
   color: var(--table-ink); cursor: pointer; text-align: left; }
 .tx-place:hover { border-color: var(--table-line); background: rgba(255, 255, 255, .06); }
@@ -1257,6 +1286,7 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .tx-runs .tx-pr-t b { font-weight: 600; }
 .tx-h2 { margin-top: 18px; }
 .tx-src { color: var(--table-muted); font-size: 11.5px; margin-top: 16px; }
+.tx-src .tx-link, .tx-foot .tx-link { color: inherit; font-size: inherit; }
 /* a search result being stepped through */
 .tx-step { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--table-line); background: #2a2520; font-size: 13px; }
 .tx-step[hidden] { display: none; }

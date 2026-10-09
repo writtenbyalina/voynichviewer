@@ -21,7 +21,7 @@ Site: [voynichviewer.com](https://voynichviewer.com).
   little, as on many phones, nor when the browser asks to save data. **▦ Grid** (key O) shows every page at once,
   quire by quire, with buttons for each section and for your bookmarks.
 - **Text** in the Reader (key T): the text of the pages beside them, RF1b, René Zandbergen's reference
-  transliteration, shown as glyphs or written in Eva, FSG or Currier by his own tables. Point at a word on the
+  transliteration, shown as glyphs or written in Eva by his own tables. Point at a word on the
   photograph to see what it reads; click it and the page stays put while the panel shows it cut upright from Yale's
   photograph, with its other places as crops that open beside the page (N steps, Open page goes, Back returns). The
   strip under the pages marks where the words are and where you have been. ⌘-click collects words to find the pages

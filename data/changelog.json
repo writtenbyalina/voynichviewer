@@ -2,6 +2,17 @@
  "about": "What changed on the site, newest first. Shown under the version number (top left). Add an entry for every change people can see and every fix, in the same commit, with the date it went live. kind: new | improved | fixed. The second number of the version goes up with each release; the first with a redesign.",
  "releases": [
   {
+   "version": "1.6",
+   "date": "2026-10-10",
+   "changes": [
+    {"kind": "new", "text": "Text in the Reader (T): the text of the pages beside them, René Zandbergen's reference transliteration RF1b. Point at a word on the page to see what it reads; click it to see it cut from the photograph, with every other place in the book it appears."},
+    {"kind": "new", "text": "Find, at the top of the text: type a word in Eva (qokeedy, or qok* for words that begin so), or with the glyph keys, to see its places anywhere in the book."},
+    {"kind": "improved", "text": "The text is shown as glyphs or in Eva, chosen from a dropdown. FSG and Currier are no longer offered."},
+    {"kind": "improved", "text": "The text's ? says in a few lines how to use it and where the text, the word positions and the photographs come from; Sources at the foot opens the same. The keyboard list under the ? at the top right keeps only the keys that matter."},
+    {"kind": "improved", "text": "“How the transcribers read it” and notes on words are gone from the word panel."}
+   ]
+  },
+  {
    "version": "1.4",
    "date": "2026-10-04",
    "changes": [

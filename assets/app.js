@@ -2120,14 +2120,12 @@ const Info = {
           this.link("#read/beinecke/2r/text", "Try it on 2r"))),
       this.sec("consensus", "The text you see",
         h("p", {}, "Copying unknown glyphs is hard, and careful people disagree: is this an ", h("i", {}, "a"), " or an ", h("i", {}, "o"), "? Is that a space, or just a wider gap? The text in the Reader is ", h("b", {}, "RF1b"), ", René Zandbergen's ", h("b", {}, "reference transliteration"), " (2025). He made it by lining up, glyph by glyph, the two most detailed transcriptions there are, his own with Gabriel Landini and Glen Claston's, choosing between them where they differ and correcting clear mistakes. Its aim is to count the glyphs of every line as exactly as possible, so that every glyph in the manuscript can have its own number and other transcriptions can be compared against it."),
-        h("p", {}, "RF1b is kept in Zandbergen's ", h("b", {}, "STA"), ", an alphabet big enough to hold every other one, so his own tables can write it in the older alphabets. Choose how to see it at the top of the text:"),
+        h("p", {}, "RF1b is kept in Zandbergen's ", h("b", {}, "STA"), ", an alphabet big enough to hold every other one, so his own tables can write it in Eva. Choose how to see it in the dropdown at the top of the text:"),
         h("dl", { class: "info-dl" },
-          ...[["Glyphs", "the manuscript's own shapes, drawn with Glen Claston's font (words are matched as Eva)"], ["Eva", "the alphabet most people use today (Landini and Zandbergen, 1998)"],
-            ["FSG", "the alphabet of William Friedman's First Study Group (1944–46)"],
-            ["Currier", "Prescott Currier's alphabet (1970s), from the papers that found the two “languages” A and B"]]
+          ...[["Glyphs", "the manuscript's own shapes, drawn with Glen Claston's font (words are matched as Eva)"], ["Eva", "the alphabet most people use today (Landini and Zandbergen, 1998)"]]
             .flatMap(([t, d]) => [h("dt", {}, t), h("dd", {}, d)])),
         h("ul", {},
-          h("li", {}, "The alphabets are a choice of which glyph differences count. FSG and Currier have fewer letters: where one has none for a glyph, its nearest basic form is written, the word says so, and words are matched as that alphabet writes them, so it finds more."),
+          h("li", {}, h("b", {}, "Find"), ", at the top of the text, finds a word anywhere in the book: type Eva (qokeedy, or qok* for words that begin so), or type with the glyph keys, and its places open beside the page you are on."),
           h("li", {}, "A faint ", h("b", {}, "·"), " between two words is an ", h("b", {}, "uncertain space"), ": Zandbergen could not be sure it is a space."),
           h("li", {}, h("b", {}, "The strip under the pages"), " is the book's compass. Every page has its place on it; the page you are on is gold, a dot marks each page you have been to, and while you look at a word, every page it is on is lit. Point at a page there to see it without going."),
           h("li", {}, h("b", {}, "Its other places"), " open beside the page you are on, never in place of it: the line around the word, cut from its photograph, and where it is on its page. ", h("kbd", {}, "N"), " goes on to the next. ", h("b", {}, "Open page"), " turns the book there; the Back chip, or the browser's Back, returns you."),
