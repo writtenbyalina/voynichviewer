@@ -450,3 +450,28 @@ test("quire names show their counts where there is room beside them, and never r
   await expect.poll(async () => overlaps(await names()), "a small window: shorter names, none on top of another").toEqual([]);
   expect(cutForNothing(await names())).toEqual([]);
 });
+
+test("a stack shows every sheet it holds: a sheet pointed at, selected or moved comes out a little, never over the edge of the one under it", async ({ page }) => {
+  await openTable(page);
+  // in a stack each sheet's front edge shows as a strip in front of the sheet above; the strips must stay wide enough to count
+  const strips = () => page.evaluate(() => { const L = View3D.mod.debug.V.layout;
+    return L.piles.filter(p => !p.fan && p.ids.length > 1).map(p => { const zs = p.ids.map(id => L.centers.get(id).z); return { key: p.key, fwd: p.fwd, gaps: zs.slice(1).map((z, j) => zs[j] - z) }; }); });
+  const check = async what => { for (const p of await strips()) for (const g of p.gaps) expect(g, `${what}: in Q${p.key} a sheet's edge shows ${g.toFixed(1)} of a ${p.fwd} strip`).toBeGreaterThanOrEqual(p.fwd * .5); };
+  const fwdOf = key => page.evaluate(k => View3D.mod.debug.V.layout.piles.find(p => p.key === k).fwd, key);
+  await check("at rest");
+  await at(page, "4|5"); await check("pointing at 4|5");
+  await click(page, "4|5"); await check("4|5 selected, under the pointer");
+  await expect(hud(page), "the panel keeps showing the sheet under the pointer after a click").toBeVisible();
+  await expect(hud(page).locator(".hud-id")).toHaveText("4 + 5");
+  // with the pointer elsewhere the stack holding the selection stays open, and still shows every sheet
+  const empty = await emptySpot(page); await page.mouse.move(empty.x, empty.y); await still(page);
+  expect(await fwdOf("1"), "quire 1, holding the selection, is open").toBeGreaterThan(await fwdOf("3"));
+  await check("4|5 selected, pointer away");
+  // moved one sheet outward: now in the middle of the stack, drawn out a little, with the sheets under it still showing
+  await bar(page).getByRole("button", { name: "Outward" }).click(); await still(page);
+  await expect.poll(() => quire(page, 1)).toBe("1:1|8,2|7,4|5,3|6");
+  await check("4|5 moved outward");
+  // messages stay above the cookie strip, not over it
+  const t = await page.locator("#cx-toast").boundingBox(), s = await page.locator("#pv-strip").boundingBox();
+  if (t && s) expect(t.y + t.height, "the message sits above the cookie strip").toBeLessThanOrEqual(s.y + 1);
+});

@@ -1235,7 +1235,7 @@ function setThick(x) {
    (a new quire there). The book's frame (posture, place) holds still while the sheets are on the table. */
 const ARR = { leaving: false, drag: null, gap: null, gapKey: "", cam: null, dk: 0, goal: 0, sig: "", tray: null, hl: null, ins: null,
               qsel: [], plan: null, box: null, space: false, hudT: 0 };
-const ARR_UP = 7, ARR_FWD = 10, ARR_FAN = .42, ARR_LIFT = 46;
+const ARR_UP = 8, ARR_FWD = 13, ARR_FAN = .42, ARR_LIFT = 46;   // a stack at rest: each sheet's edge shows a strip in front of the one above
 const ARR_UP_OPEN = 12, ARR_FWD_OPEN = 22;   // a stack under the pointer opens out, so each of its sheets is easy to point at
 const BG = new THREE.Color(0x221e1a), BG_DARK = new THREE.Color(0x100e0c), TBL = new THREE.Color(0x3a3129), TBL_DARK = new THREE.Color(0x1f1a16);
 const TABLE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -1248,7 +1248,7 @@ function whereText(en) {
   return en.idx === en.count - 1 ? "the centre sheet" : en.idx === 0 ? "the outermost sheet" : `the ${nth(en.idx)} sheet from the outside`;
 }
 const sheetWidth = id => { const o = V.objs.get(id); return o ? (o.leaves[0].w || o.leaves[1].w) + (o.leaves[1].w || o.leaves[0].w) : H * 1.4; };
-const GX = H * .38, CAP = H * .72;   // the gap between piles, and the room in front of a row for its names (enough in a small window)
+const GX = H * .38, CAP = H * .6;   // the gap between piles, and the room in front of a row for its names (enough in a small window)
 
 function arrangeLayout(base) {
   const model = V.model, place = base.place, inv = place.matrix.clone().invert(), hid = hiddenQuires();
@@ -1264,7 +1264,8 @@ function arrangeLayout(base) {
     if (gap?.kind === "into" && gap.key === p.key) p.slots.splice(gap.index, 0, ...[...lifted].map(() => null));   // room for them
     p.fan = p.type !== "nested";
     p.sw = Math.max(...p.ens.map(en => sheetWidth(en.id)), p.ens.length ? 0 : W0);   // its widest sheet, lying open
-    const open = !p.fan && (p.key === V.hoverPile || (gap?.kind === "into" && gap.key === p.key));
+    // a stack opens out while it is pointed at, dragged over, or holds a selected sheet (so the selection stays easy to read)
+    const open = !p.fan && (p.key === V.hoverPile || (gap?.kind === "into" && gap.key === p.key) || p.ids.some(id => V.sel.has(id)));
     p.fwd = open ? ARR_FWD_OPEN : ARR_FWD; p.up = open ? ARR_UP_OPEN : ARR_UP;
     const n = Math.max(1, p.slots.length);
     p.d = H + (p.fan ? 0 : p.fwd * (n - 1));
@@ -1275,7 +1276,9 @@ function arrangeLayout(base) {
      own row; a quire moved keeps every row as long as it was. Its shape doesn't depend on the window. */
   const kind = p => p.fan ? "f" : "n";
   const room = p => p.fan ? p.sw * (1 + ARR_FAN * Math.max(p.ens.length, p.key === "aside" ? 2 : 0)) : p.sw;   // a fan: room for one card more (set aside: three)
-  const reach = p => p.fan ? H * 1.16 : H + (ARR_FWD_OPEN + ARR_UP_OPEN / 1.6) * p.ens.length;   // a fan: room for a card drawn out; a stack: open (its rise looks like depth from above), one sheet deeper
+  // a fan: room for a card drawn out; a stack: as it lies (its rise looks like depth from above) and one sheet deeper. An open
+  // stack reaches a little further back, into the room kept for the names of the row behind, which it never touches
+  const reach = p => p.fan ? H * 1.16 : H + (ARR_FWD + ARR_UP / 1.6) * p.ens.length + ARR_FWD_OPEN;
   const keys = piles.map(p => `${p.key}:${kind(p)}`).join("|");
   const depthOf = row => Math.max(...row.map(reach)) + CAP;
   const place2 = rows => {   // x for every pile, each row centred; rows keep the depth they had (new ones after)
@@ -1347,10 +1350,11 @@ function arrangeLayout(base) {
       const cx = p.fan ? p.fx + j * p.step : p.x0 + p.w / 2;
       const y = 1 + (p.fan ? j * 1.6 : j * p.up), z = p.fan ? p.z1 : p.z1 - j * p.fwd;
       if (id == null) return;
-      // selected sheets are drawn a little out of a stack, toward you (the main one more); the one pointed at, less. A card
+      // selected sheets are drawn a little out of a stack, toward you (the main one more); the one pointed at, less: never
+      // so far that it covers the strip of the sheet under it, so the stack still shows every sheet it holds. A card
       // in a fan stays where it lies (drawn out either way it only looked out of line, the next card still over most of
       // it): its gold outline, drawn over its neighbours, shows the whole of it
-      const pull = p.fan ? 0 : V.sel.has(id) ? H * (id === V.selMain ? .16 : .1) : id === V.hover?.id ? H * .07 : 0;
+      const pull = p.fan ? 0 : p.fwd * (V.sel.has(id) ? (id === V.selMain ? .45 : .3) : id === V.hover?.id ? .25 : 0);
       put(byId.get(id), cx, y + (pull ? .6 : 0), z + pull);
       centers.set(id, new THREE.Vector3(cx, y, z + pull - H / 2));
       // a point on the part of it that shows: the strip in front of the sheet above, or (a fan) its own uncovered side
@@ -1893,7 +1897,7 @@ function wire() {
     if (DRAG.mode === "marquee" && DRAG.moved) { marquee(e, true); return; }
     if (DRAG.moved) return;
     const hit = pick(e);
-    if (V.arrange) { Arrange.click(hit?.en.id || null, e); return; }   // on the table: select (no inspector)
+    if (V.arrange) { Arrange.click(hit?.en.id || null, e); if (hit) tip(hit.en, e, hit.mesh); return; }   // on the table: select (no inspector); the panel keeps showing the sheet under the pointer
     if (!hit) return;
     clearTimeout(DRAG.click);
     const i = V.model.all.indexOf(hit.en);

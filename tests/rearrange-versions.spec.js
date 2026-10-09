@@ -94,14 +94,17 @@ test("a card selected in a fan stays where it lies, its whole outline drawn over
   expect(await page.evaluate(() => View3D.mod.debug.V.layout.centers.get("77|82").z === View3D.mod.debug.V.layout.centers.get("78|81").z)).toBe(true);
   const ol = await page.evaluate(() => { const l = View3D.mod.debug.selOutlines.find(x => x.visible); return l && { depthTest: l.material.depthTest, w: l.scale.x }; });
   expect(ol, "an outline as wide as the card, not hidden under the next card").toEqual({ depthTest: false, w: expect.any(Number) });
-  // and in a stack, the selected sheet still comes a little out toward you
+  // and in a stack, the selected sheet still comes a little out toward you: further than the stack's own step, but
+  // never over the edge of the sheet under it (the stack, which stays open round a selection, shows every sheet)
   await page.locator("#cx-order").selectOption("beinecke");
   await page.keyboard.press("Escape");   // nothing selected
   await page.mouse.move(5, 400); await still(page);
-  const s0 = await page.evaluate(() => View3D.mod.debug.V.layout.centers.get("77|82").z);
   const r = await at(page, "77|82"); await page.mouse.click(r.x, r.y);
   await page.mouse.move(5, 400); await still(page);
-  expect(await page.evaluate(() => View3D.mod.debug.V.layout.centers.get("77|82").z)).toBeGreaterThan(s0);
+  const out = await page.evaluate(() => { const L = View3D.mod.debug.V.layout, p = L.piles.find(x => x.key === "13");
+    return { fwd: p.fwd, step: L.centers.get("77|82").z - L.centers.get("78|81").z, under: L.centers.get("76|83").z - L.centers.get("77|82").z }; });
+  expect(out.step, "drawn out further than the stack's own step").toBeGreaterThan(out.fwd + 1);
+  expect(out.under, "not over the edge of the sheet under it").toBeGreaterThanOrEqual(out.fwd * .5);
 });
 
 test.describe("the book coming apart", () => {

@@ -58,6 +58,7 @@ kbd { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); 
   max-width: min(640px, 90vw);
 }
 #cx-toast.show { opacity: 1; }
+body:has(#pv-strip) #cx-toast { margin-bottom: var(--pv-h, 0px); }   /* above the cookie strip, not over it */
 dialog { border: 1px solid var(--line); border-radius: 10px; max-width: 620px; }
 dialog h4 { margin: 12px 0 4px; }
 dialog p { margin: 4px 0; }
