@@ -157,14 +157,15 @@ const Arrange = {
     MyOrders.put(next, { ms, moved });
     // a first move makes a new order: say so, and let it be taken back at once (until the next move: then Undo is
     // one step back, ⌘Z, and taking back the copy would throw that move away too)
+    this.justStarted = !!started;
     if (started) {
       const msg = `You're now changing your own copy, “${next.title}”. “${started}” stays as it was.`;
       toast(msg, { label: "Undo", fn: () => this.unstart(next.id, from) });
-      this.firstMsg = { id: next.id, msg };
-    } else if (this.firstMsg?.id === next.id) {
+      this.lastMsg = { id: next.id, msg };
+    } else if (this.lastMsg) {   // a message about the move before: still say it, without an Undo that would now undo this one
       const t = $("#cx-toast");
-      if (t?.classList.contains("show") && t.firstChild?.textContent === this.firstMsg.msg) toast(this.firstMsg.msg);
-      this.firstMsg = null;
+      if (t?.classList.contains("show") && t.firstChild?.textContent === this.lastMsg.msg) toast(this.lastMsg.msg);
+      this.lastMsg = null;
     }
     this.render();
     return true;
@@ -272,12 +273,21 @@ const Arrange = {
       o.gatherings.splice(to > gi ? to - 1 : to, 0, g);
     }, { moved: [...this.order().gatherings[gi].bifolia] });
   },
+  /* A quire's name as typed, as it is kept: a number as a number ("013" is quire 13), anything else as text, at most 24
+     characters. And why it can't be used here, if it can't: another quire has it, or it is the set-aside pile's. */
+  quireName: t => (/^\d+$/.test(t) ? +t : t.slice(0, 24)),
+  nameClash(o, gi, name) {
+    const n = String(name);
+    if (n.toLowerCase() === "aside") return "That name is kept for the set-aside pile";
+    return o.gatherings.some((g, j) => j !== gi && String(g.quire) === n) ? `There is already a quire called ${n}` : null;
+  },
   async renameGathering(gi) {
     const g = this.order().gatherings[gi];
     const t = await askText("Name this quire", { value: String(g.quire), ok: "Rename", placeholder: "e.g. 4, 13b, Herbal A" });
     if (!t) return;
-    const was = String(g.quire);
-    this.edit(o => { o.gatherings[gi].quire = /^\d+$/.test(t) ? +t : t; }, { ms: 300, renamed: [was, t] });
+    const was = String(g.quire), name = this.quireName(t), clash = this.nameClash(this.order(), gi, name);
+    if (clash) { toast(clash); return; }
+    this.edit(o => { o.gatherings[gi].quire = name; }, { ms: 300, renamed: [was, String(name)] });
     if (this.at === was) this.at = String(this.order().gatherings[gi]?.quire ?? was);
     this.render();
   },
@@ -387,6 +397,9 @@ const Arrange = {
     this.shown = o;   // a different order, or a new version of yours, draws the dock again (mark)
     this.ch = this.changes(o);
     if (this.table) {   // on the table: a bar of its own above the book, and the picked sheet's buttons over it
+      const shown = new Set(this.onTable()), hid = View3D.mod?.hiddenQuires() || new Set();
+      const ids = [...this.selected].filter(id => shown.has(id)), quires = [...this.selQ].filter(k => this.gIndex(o, k) >= 0 && !hid.has(k));
+      if (ids.length !== this.selected.size || quires.length !== this.selQ.size) this.setSel(ids, { quires, main: ids.includes(this.sel) ? this.sel : ids.at(-1) ?? null });
       el.hidden = false; el.replaceChildren(this.topEl(o));
       this.renderActs(o);
       ArrangeList.render();   // and the list beside it, if it is open
@@ -688,9 +701,16 @@ const Arrange = {
   },
   /* a box drawn across the table (view3d.js marquee), live as it grows */
   marquee(ids, add, end) {
-    this.mBase ||= add ? [...this.selected] : [];
+    if (!this.mBase) { this.mWas = [[...this.selected], [...this.selQ], this.sel]; this.mBase = add ? [...this.selected] : []; }
     this.setSel([...new Set([...this.mBase, ...ids])], { main: ids.at(-1) ?? null });
     if (end) this.mBase = null;
+  },
+  /* Esc while a box is drawn: the selection as it was */
+  marqueeCancel() {
+    if (!this.mBase) return;
+    const [ids, quires, main] = this.mWas;
+    this.mBase = this.mWas = null;
+    this.setSel(ids, { quires, main });
   },
   clickQuire(e, key) {
     if (this.noClick) return;
@@ -698,9 +718,10 @@ const Arrange = {
     if (key !== "aside" && this.lastQ?.key === key && now - this.lastQ.t < 450 && !(e.shiftKey || e.metaKey || e.ctrlKey)) {   // a double click: rename
       this.lastQ = null; return this.renameInline(key);
     }
-    this.lastQ = { key, t: now };
-    if (key === "aside") return this.setSel(this.aside(o).slice());   // the set-aside pile: its sheets
-    const add = e.shiftKey || e.metaKey || e.ctrlKey, s = new Set(add ? this.selQ : []);
+    const add = e.shiftKey || e.metaKey || e.ctrlKey;
+    this.lastQ = add ? null : { key, t: now };   // a double click is two plain clicks
+    if (key === "aside") return this.setSel(this.onTable().filter(id => this.locate(o, id).gi < 0));   // the set-aside pile: its sheets
+    const s = new Set(add ? this.selQ : []);
     if (add && s.has(key)) s.delete(key); else s.add(key);
     this.setSel([], { quires: [...s], main: null });
   },
@@ -718,6 +739,12 @@ const Arrange = {
     if (base == null) { let n = 1; while (used.has(`New ${n}`)) n++; return `New ${n}`; }
     for (const c of "abcdefghijklmnopqrstuvwxyz") if (!used.has(`${base}${c}`)) return `${base}${c}`;
     let n = 2; while (used.has(`${base}-${n}`)) n++; return `${base}-${n}`;
+  },
+  /* A message about the move just made, with an Undo that stands only while that move is the last one. */
+  offer(msg) {
+    const id = S.order, n = this.histOf(id).undo.length;
+    toast(msg, { label: "Undo", fn: () => { if (S.order === id && this.histOf(id).undo.length === n) this.undo(); } });
+    this.lastMsg = { id, msg };
   },
   say(msg) {   // for screen readers: what a change did
     let el = $("#ar-live");
@@ -747,8 +774,13 @@ const Arrange = {
     else this.setSel([...was[0]], { main: was[2], quires: [...was[1]] });
     return done;
   },
-  /* Sheets let go over a pile, before the k-th of the sheets 3D shows there (lost ones may be hidden). */
-  dropAt(ids, gi, shown, k) { return this.moveMany(ids, gi, shown[k] ?? null); },
+  /* Sheets let go over a pile (a quire by its name, or "aside"), before the k-th of the sheets 3D shows there (lost ones may
+     be hidden). */
+  dropAt(ids, key, shown, k) {
+    const gi = key === "aside" ? -1 : this.gIndex(this.order(), key);
+    if (gi < 0 && key !== "aside") return false;
+    return this.moveMany(ids, gi, shown[k] ?? null);
+  },
   /* A new quire of these sheets, after quire `after` (null: first). Its sheets read as the ones they came from did. */
   newQuireAt(ids, after) {
     const o0 = this.order(); ids = this.inOrder(ids, o0);
@@ -802,7 +834,7 @@ const Arrange = {
     const o0 = this.order();
     keys = this.quiresInOrder(keys || (this.selQ.size ? [...this.selQ] : [...new Set([...this.selected].map(id => this.locate(o0, id).gi).filter(gi => gi >= 0).map(gi => String(o0.gatherings[gi].quire)))]), o0)
       .filter(k => o0.gatherings[this.gIndex(o0, k)].bifolia.length > 1);
-    if (!keys.length) { toast("A quire of one sheet can't be split further"); return false; }
+    if (!keys.length) { toast(this.selQ.size || this.selected.size ? "A quire of one sheet can't be split further" : "Select a quire, or a sheet in it, to split it into single sheets"); return false; }
     const made = [];
     const done = this.edit(o => {
       for (const k of keys) {
@@ -849,6 +881,8 @@ const Arrange = {
   paste() {
     const o = this.order(), ids = (this.clip || []).filter(id => SHEETS.has(id));
     if (!ids.length) return;
+    if ([...this.selected].length && [...this.selected].every(id => ids.includes(id))) { toast("Select where the cut sheets go first: a sheet to put them after, or a quire"); return; }
+    if (this.selQ.size > 1) { toast("Select one quire to paste into"); return; }
     let done;
     if (this.selQ.size === 1) done = this.moveMany(ids, this.gIndex(o, [...this.selQ][0]), null);
     else if (this.sel && !ids.includes(this.sel) && this.selected.size) {
@@ -856,6 +890,11 @@ const Arrange = {
       done = this.moveMany(ids, gi, list.slice(i + 1).find(x => !ids.includes(x)) ?? null);
     } else done = this.newQuireAt(ids, String(o.gatherings.at(-1).quire));
     if (done !== false) this.clip = null;
+  },
+  /* the table's menu: the cut sheets as a new quire at the end, whatever is selected */
+  pasteNew() {
+    const o = this.order(), ids = (this.clip || []).filter(id => SHEETS.has(id));
+    if (ids.length && this.newQuireAt(ids, String(o.gatherings.at(-1).quire)) !== false) this.clip = null;
   },
   /* Put sheets back where the order you started from has them, folded the same way. */
   putBackMany(ids) {
@@ -895,10 +934,15 @@ const Arrange = {
   /* Keys on the table, as in drawing programs. Returns whether the key was used. */
   key(e) {
     if (!this.on || !this.table || this.menuEl) return false;
+    // while something is in hand (sheets, a quire's name, a box), keys wait: an undo now would change the order under
+    // it. Esc lets go of it, back where it was
+    if (this.cancelGesture || View3D.mod?.dragging) {
+      if (e.key === "Escape") this.cancelGesture ? this.cancelGesture() : View3D.mod.cancelDrag();
+      return true;
+    }
     const mod = e.metaKey || e.ctrlKey, c = e.code, o = this.order(), any = this.selected.size || this.selQ.size;
-    const onCanvas = !document.activeElement || document.activeElement === document.body || document.activeElement.closest?.("#v3-stage");
+    const onCanvas = !document.activeElement || document.activeElement === document.body;   // not a button or a name in focus
     if (e.key === "Escape") {
-      if (View3D.mod?.cancelDrag()) return true;
       if (any) this.setSel([]); else this.close();
       return true;
     }
@@ -912,12 +956,19 @@ const Arrange = {
       const ids = this.selQ.size ? [...this.selQ].flatMap(k => o.gatherings[this.gIndex(o, k)]?.bifolia || []) : [...this.selected];
       if (ids.every(id => this.locate(o, id).gi < 0)) return true;   // already out of the book
       const n = ids.length;
-      if (this.setAside(ids)) toast(`${n === 1 ? this.label(ids[0]) : `${n} sheets`} set aside`, { label: "Undo", fn: () => this.undo() });
+      if (this.setAside(ids) && !this.justStarted) this.offer(`${n === 1 ? this.label(ids[0]) : `${n} sheets`} set aside`);
       return true;
     }
-    if (e.shiftKey && (c === "Digit1" || c === "Digit2")) { View3D.mod?.frameTable(c === "Digit2" ? [...this.selected] : null); return true; }
+    if (e.shiftKey && (c === "Digit1" || c === "Digit2")) {
+      View3D.mod?.frameTable(c === "Digit2" ? [...this.selected, ...this.quiresInOrder([...this.selQ]).flatMap(k => o.gatherings[this.gIndex(o, k)].bifolia)] : null);
+      return true;
+    }
     if (e.key === "Enter") {
-      if (e.shiftKey && this.selected.size) { const keys = new Set([...this.selected].map(id => this.locate(o, id).gi).filter(gi => gi >= 0).map(gi => String(o.gatherings[gi].quire))); this.setSel([], { quires: [...keys] }); }
+      if (e.shiftKey && this.selected.size) {
+        const keys = new Set([...this.selected].map(id => this.locate(o, id).gi).filter(gi => gi >= 0).map(gi => String(o.gatherings[gi].quire)));
+        if (keys.size) this.setSel([], { quires: [...keys] });
+        else this.setSel(this.onTable().filter(id => this.locate(o, id).gi < 0), { main: this.sel });   // set aside: every set-aside sheet
+      }
       else if (!e.shiftKey && this.selQ.size) { const ids = this.quiresInOrder([...this.selQ]).flatMap(k => o.gatherings[this.gIndex(o, k)].bifolia); this.setSel(ids, { main: ids[0] }); }
       else return false;
       return true;
@@ -928,9 +979,10 @@ const Arrange = {
       if (id) this.setSel([id], { main: id });
       return true;
     }
-    if ((e.key === "ArrowUp" || e.key === "ArrowDown") && this.selected.size === 1) {   // up or down its pile
-      const { gi, i } = this.locate(o, this.sel), list = gi < 0 ? this.aside(o) : o.gatherings[gi].bifolia;
-      const id = list[i + (e.key === "ArrowUp" ? 1 : -1)];
+    if ((e.key === "ArrowUp" || e.key === "ArrowDown") && this.selected.size === 1) {   // up or down its pile, as the table shows it
+      const { gi } = this.locate(o, this.sel), shown = new Set(this.onTable());
+      const list = (gi < 0 ? this.aside(o) : o.gatherings[gi].bifolia).filter(x => shown.has(x)), i = list.indexOf(this.sel);
+      const id = i < 0 ? null : list[i + (e.key === "ArrowUp" ? 1 : -1)];
       if (id) this.setSel([id], { main: id });
       return true;
     }
@@ -941,6 +993,14 @@ const Arrange = {
   /* The bar over the foot of the table: what is selected, and what it can do. Nothing selected: no bar. */
   renderActs(o) {
     const bar = $("#v3-arr-acts"); if (!bar) return;
+    // the bar is drawn anew: a keyboard user's focus stays on the button they used (or the first one, if it went)
+    const f = document.activeElement, was = bar.contains(f) ? f.getAttribute("aria-label") || f.textContent : null;
+    this.drawActs(o, bar);
+    if (was == null || bar.hidden) return;
+    const label = b => b.getAttribute("aria-label") || b.textContent;
+    ([...bar.querySelectorAll("button:not([disabled])")].find(b => label(b) === was) || bar.querySelector("button:not([disabled])"))?.focus();
+  },
+  drawActs(o, bar) {
     const ids = o ? this.inOrder([...this.selected].filter(id => SHEETS.has(id)), o) : [];
     if (!this.table || !this.on || !o || (!ids.length && !this.selQ.size)) { bar.hidden = true; bar.replaceChildren(); return; }
     bar.hidden = false;
@@ -990,13 +1050,15 @@ const Arrange = {
     const o = this.order(), gis = new Set(ids.map(id => this.locate(o, id).gi)), same = gis.size === 1, gi = [...gis][0], g = o.gatherings[gi];
     const nested = g?.type === "nested", one = ids.length === 1 ? ids[0] : null, n = ids.length;
     const sh = one && SHEETS.get(one), opts = one && g ? this.optsOf(one) : null, cols = sh ? sh.inside[0].length : 0;
+    const list = same ? (gi < 0 ? this.aside(o) : g.bifolia) : [], first = !same || list.indexOf(ids[0]) === 0, last = !same || list.indexOf(ids.at(-1)) === list.length - 1;
+    const up = last, down = first;   // no further in (a fan: later), no further out (earlier)
     const row = sh && sh.inside[sh.proper_row ?? (sh.inside.length - 1)], spine = opts ? opts.spine ?? sh.spine : null;
     return [
       ...(same && g ? [
-        { text: nested ? "Toward the centre" : "Later", kbd: "⌘]", fn: () => this.reorder(1) },
-        { text: nested ? "Outward" : "Earlier", kbd: "⌘[", fn: () => this.reorder(-1) },
-        { text: nested ? "To the centre" : "Last", kbd: "⌥⌘]", fn: () => this.reorder(1, true) },
-        { text: nested ? "To the outside" : "First", kbd: "⌥⌘[", fn: () => this.reorder(-1, true) }, "-"] : []),
+        { text: nested ? "Toward the centre" : "Later", kbd: "⌘]", disabled: up, fn: () => this.reorder(1) },
+        { text: nested ? "Outward" : "Earlier", kbd: "⌘[", disabled: down, fn: () => this.reorder(-1) },
+        { text: nested ? "To the centre" : "Last", kbd: "⌥⌘]", disabled: up, fn: () => this.reorder(1, true) },
+        { text: nested ? "To the outside" : "First", kbd: "⌥⌘[", disabled: down, fn: () => this.reorder(-1, true) }, "-"] : []),
       { text: "Move to…", fn: () => this.menu(this.lastAnchor, this.moveToItems(ids)) },
       { text: n > 1 ? "New quire of these" : "New quire of it", kbd: "⌘G", fn: () => this.group() },
       same && gi < 0 ? null : { text: "Set aside", kbd: "⌫", fn: () => this.setAside(ids) },
@@ -1034,7 +1096,7 @@ const Arrange = {
     const hidden = View3D.mod?.hiddenQuires().size || 0, lostOff = !!View3D.mod?.hideLost;
     return [
       { text: "Select all", kbd: "⌘A", fn: () => this.setSel(this.onTable()) },
-      this.clip?.length ? { text: `Paste ${this.clip.length === 1 ? this.label(this.clip[0]) : `${this.clip.length} sheets`} as a new quire`, kbd: "⌘V", fn: () => this.paste() } : null,
+      this.clip?.length ? { text: `Paste ${this.clip.length === 1 ? this.label(this.clip[0]) : `${this.clip.length} sheets`} as a new quire`, fn: () => this.pasteNew() } : null,
       "-",
       hidden ? { text: `Show every quire (${hidden} hidden)`, fn: () => View3D.mod.showAllQuires() } : null,
       { check: lostOff, text: "Hide lost sheets", kbd: "L", fn: () => View3D.mod?.setHideLost(!lostOff) },
@@ -1081,20 +1143,23 @@ const Arrange = {
     const el = $(`.v3-pile[data-key="${CSS.escape(String(key))}"]`), b = el?.querySelector("b");
     if (!b) { const gi = this.gIndex(this.order(), key); if (gi >= 0) this.renameGathering(gi); return; }   // not on the table (hidden): ask
     const was = b.textContent;
-    const input = h("input", { class: "pl-name", value: String(this.order().gatherings[this.gIndex(this.order(), key)]?.quire ?? key), "aria-label": "Name of the quire", size: 8 });
+    const input = h("input", { class: "pl-name", value: String(this.order().gatherings[this.gIndex(this.order(), key)]?.quire ?? key), "aria-label": "Name of the quire", size: 8, maxlength: 24 });
     let gone = false;
-    const finish = keep => {
+    // Enter keeps the name (a name that can't be used: says why, and stays to be changed); Esc, or clicking away from
+    // a name that can't be used, gives up
+    const finish = (keep, away = false) => {
       if (gone) return; gone = true;
-      const t = input.value.trim(), o = this.order(), gi = this.gIndex(o, key);
-      if (keep && t && t !== String(key) && gi >= 0) {
-        if (o.gatherings.some((g, j) => j !== gi && String(g.quire) === t)) { toast(`There is already a quire called ${t}`); gone = false; input.select(); return; }
-        input.replaceWith(h("b", {}, t));
-        this.edit(oo => { oo.gatherings[this.gIndex(oo, key)].quire = /^\d+$/.test(t) ? +t : t; }, { ms: 300, renamed: [String(key), t] });
-        this.setSel([], { quires: [t] });
+      const t = input.value.trim(), o = this.order(), gi = this.gIndex(o, key), name = this.quireName(t);
+      if (keep && t && String(name) !== String(key) && gi >= 0) {
+        const clash = this.nameClash(o, gi, name);
+        if (clash) { toast(clash); if (!away) { gone = false; input.select(); return; } input.replaceWith(h("b", {}, was)); return; }
+        input.replaceWith(h("b", {}, String(name)));
+        this.edit(oo => { oo.gatherings[this.gIndex(oo, key)].quire = name; }, { ms: 300, renamed: [String(key), String(name)] });
+        this.setSel([], { quires: [String(name)] });
       } else input.replaceWith(h("b", {}, was));
     };
     input.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") finish(true); if (e.key === "Escape") finish(false); });
-    input.addEventListener("blur", () => finish(true));
+    input.addEventListener("blur", () => finish(true, true));
     input.addEventListener("pointerdown", e => e.stopPropagation());
     input.addEventListener("click", e => e.stopPropagation());
     b.replaceWith(input);
@@ -1184,7 +1249,7 @@ const Arrange = {
     // taken it out of the page, so it is the one that has to say no
     const still = ev => { if (this.dragging) ev.preventDefault(); };
     el.addEventListener("touchmove", still, { passive: false });
-    const stop = () => { gone = true; clearTimeout(hold); el.classList.remove("lifted"); el.removeEventListener("touchmove", still);
+    const stop = () => { gone = true; clearTimeout(hold); el.classList.remove("lifted"); el.removeEventListener("touchmove", still); this.cancelGesture = null;
       removeEventListener("pointermove", mv); removeEventListener("pointerup", up); removeEventListener("pointercancel", cancel); };
     const mv = ev => {
       if (gone) return;
@@ -1193,6 +1258,8 @@ const Arrange = {
         if (!ready) { if (touch && d > 8) stop(); return; }   // a finger that moves at once is scrolling
         if (!touch && d < 5) return;
         on = true; this.dragging = true; el.classList.remove("lifted"); start(ev);
+        // Esc: put it back, and the click that letting go of the button makes is not a click
+        this.cancelGesture = () => { cancel(); addEventListener("pointerup", () => this.quietClick(), { once: true, capture: true }); };
       }
       move(ev);
     };
@@ -1455,12 +1522,13 @@ const ArrangeList = {
       if (edge) scrollT = setInterval(() => { panel.scrollTop += edge * 16; }, 30);
     };
     const end = ev => {
-      clearInterval(scrollT);
+      clearInterval(scrollT); Arrange.cancelGesture = null;
       removeEventListener("pointermove", move); removeEventListener("pointerup", end); removeEventListener("pointercancel", cancel);
       ghost.remove(); bar.remove(); card.classList.remove("dragging");
       if (to != null && ev) Arrange.moveGatheringTo(gi, to);
     };
     const cancel = () => { to = null; end(null); };
+    Arrange.cancelGesture = cancel;
     addEventListener("pointermove", move);
     addEventListener("pointerup", end);
     addEventListener("pointercancel", cancel);
@@ -1507,7 +1575,7 @@ const ArrangeList = {
       if (edge) scrollT = setInterval(() => { panel.scrollTop += edge * 14; }, 30);
     };
     const end = () => {
-      clearInterval(scrollT);
+      clearInterval(scrollT); Arrange.cancelGesture = null;
       removeEventListener("pointermove", move); removeEventListener("pointerup", end); removeEventListener("pointercancel", cancel);
       ghost.remove(); bar.remove(); row.classList.remove("dragging");
       if (target) {
@@ -1517,6 +1585,7 @@ const ArrangeList = {
       }
     };
     const cancel = () => { target = null; end(); };
+    Arrange.cancelGesture = cancel;
     addEventListener("pointermove", move);
     addEventListener("pointerup", end);
     addEventListener("pointercancel", cancel);

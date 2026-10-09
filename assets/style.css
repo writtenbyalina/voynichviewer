@@ -571,10 +571,7 @@ dialog.work-dlg { width: min(620px, 94vw); max-height: 86vh; overflow: auto; pad
 /* (only while 3D is the view on screen: the Reader keeps its messages where they always are) */
 body.arranging:not(.on-table):has(#v-three:not([hidden])) #cx-toast { bottom: calc(var(--dock-h, 0px) + 16px); }   /* above the panel, on a phone */
 /* on the table, messages sit at the foot of the column beside it, where they cover neither piles nor the bar */
-body.arranging.on-table:has(#v-three:not([hidden])) #cx-toast { left: 14px; bottom: 14px; transform: none; max-width: 300px; }
-@media (max-width: 900px) {   /* no column beside the table in a small window: above the selection's bar, when it shows */
-  body.arranging.on-table:has(#v-three:not([hidden])):has(#v3-arr-acts:not([hidden])) #cx-toast { bottom: 80px; }
-}
+body.arranging.on-table:has(#v-three:not([hidden])) #cx-toast { left: 14px; bottom: 14px; transform: none; max-width: max(var(--hud-col, 300px), 220px); }
 .v3-arrange button { background: transparent; color: var(--table-ink); border-color: var(--table-line); }
 .v3-arrange button:hover:not([disabled]) { border-color: var(--table-muted); }
 .v3-arrange button.on { background: #f3c35c; color: #2d2925; border-color: #f3c35c; }
@@ -595,12 +592,16 @@ body.arranging.on-table:has(#v-three:not([hidden])) #cx-toast { left: 14px; bott
 #v-three.table .ar-top { margin: 0; flex-wrap: wrap; }
 .v3-arrange .ar-done { background: #f3c35c; color: #2d2925; border-color: #f3c35c; font-weight: 600; padding: 2px 14px; }
 .v3-piles { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: hidden; transition: opacity .35s; }
-.v3-piles.moving { opacity: 0; transition: none; }
+.v3-piles.moving, .v3-pile.moving { opacity: 0; transition: none; }
+.v3-pile { transition: opacity .35s; }
 .v3-pile { position: absolute; left: 0; top: 0; pointer-events: auto; display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 99px;
   background: rgba(29, 26, 23, .88); border: 1px solid var(--table-line); color: var(--table-ink); font-size: 12px; white-space: nowrap; cursor: grab;
   touch-action: pan-x pan-y; user-select: none; }
 .v3-pile:hover { border-color: var(--table-muted); }
-.v3-pile b { color: #f3c35c; font-size: 12.5px; }
+.v3-pile b { color: #f3c35c; font-size: 12.5px; max-width: 10em; overflow: hidden; text-overflow: ellipsis; }   /* a long name: its start, and all of it in the tooltip */
+.v3-stage.tsmall .v3-pile { font-size: 11px; padding: 2px 7px; gap: 4px; }
+.v3-stage.tsmall .v3-pile b { font-size: 11.5px; }
+.v3-stage.tsmall .v3-pile .ar-ic { width: 12px; height: 12px; }
 .v3-pile .pl-ics { display: inline-flex; gap: 2px; color: var(--table-ink); }
 .v3-pile .pl-n { color: var(--table-muted); }
 .v3-pile .ar-dot { margin-left: 0; }
@@ -613,12 +614,12 @@ body.arranging.on-table:has(#v-three:not([hidden])) #cx-toast { left: 14px; bott
   color: var(--table-ink); font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
 .v3-arr-acts[hidden] { display: none; }
 #v-three.table .v3-arr-acts { left: 14px; right: 14px; margin-inline: auto; width: max-content; max-width: calc(100% - 28px); transform: none; }   /* under the table, at its natural width */
-#v-three.table .v3-stage.hudcol .v3-arr-acts { left: 314px; max-width: calc(100% - 328px); }   /* beside the panel's column */
+#v-three.table .v3-stage.hudcol .v3-arr-acts { left: calc(var(--hud-col, 300px) + 14px); max-width: calc(100% - var(--hud-col, 300px) - 28px); }   /* beside the panel's column */
 .al-hudslot { position: sticky; top: -12px; height: 0; z-index: 5; margin: -12px -12px 12px; }   /* the panel, over the top of the list */
 .al-hudslot .v3-hud { left: 0; right: 0; top: 0; width: auto; max-width: none; max-height: 70vh; border-radius: 0 0 10px 10px; box-shadow: 0 8px 20px rgba(0, 0, 0, .35); background: #1d1a17; }
 @media (min-width: 901px) { body.arranging.on-table.list-open:has(#v-three:not([hidden])) #cx-toast { left: auto; right: 14px; max-width: 292px; } }   /* messages at the foot of the list */
 .v3-arr-acts .aa-what { color: var(--table-muted); }
-.v3-arr-acts .aa-what b { font: 600 13px ui-monospace, Menlo, monospace; color: #f3c35c; }
+.v3-arr-acts .aa-what b { font: 600 13px ui-monospace, Menlo, monospace; color: #f3c35c; display: inline-block; max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .v3-arr-acts .ar-acts { margin: 0; }
 .v3-arr-acts button { background: transparent; color: var(--table-ink); border-color: var(--table-line); }
 .v3-arr-acts button:hover:not([disabled]) { border-color: var(--table-muted); }
@@ -674,7 +675,7 @@ svg.glyph { display: block; flex: none; overflow: visible; }
 .v3-pile.mid .pl-ics, .v3-pile.tight .pl-ics, .v3-pile.tight .pl-n { display: none; }   /* not room enough for its whole name (view3d.js placePiles) */
 .v3-pile .pl-name { width: 7em; font: 600 12.5px -apple-system, system-ui, sans-serif; padding: 0 4px; border-radius: 4px; border: 1px solid #f3c35c; background: #1f1a16; color: var(--table-ink); }
 .v3-arr-acts .aa-what { display: inline-flex; align-items: center; gap: 7px; }
-.v3-arr-acts .aa-what b { font: 600 13px ui-monospace, Menlo, monospace; color: #f3c35c; }
+.v3-arr-acts .aa-what b { font: 600 13px ui-monospace, Menlo, monospace; color: #f3c35c; display: inline-block; max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .v3-arr-acts .aa-seg { display: inline-flex; }
 .v3-arr-acts .aa-seg button { border-radius: 0; margin-left: -1px; min-width: 32px; }
 .v3-arr-acts .aa-seg button:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
