@@ -74,7 +74,7 @@ const SECTION = { H: "Herbal", A: "Astronomical", Z: "Zodiac", B: "Balneological
 let D;                       // codex.json
 const SHEETS = new Map();    // "77|82" -> sheet
 let ORDERS = new Map();      // id -> resolved order
-const APP_VERSION = "1.6";
+const APP_VERSION = "1.5.1";
 const PAGE_SHEET = new Map();   // "f78v" -> "78|81", every page including lost ones
 const RETIRED = { "davis-blog-2025": "davis" };   // orders taken out of the menu -> the order an old link now opens
 
