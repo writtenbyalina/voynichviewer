@@ -2711,7 +2711,7 @@ function stepSel(d) {
 function key(e) {
   const k = e.key;
   if (!V.model) return;
-  if (V.arrange && !["ArrowLeft", "ArrowRight", "Home", "End", "l", "L", "+", "=", "-", "_", "Escape"].includes(k)) return;   // the book's own keys rest
+  if (V.arrange && !["ArrowLeft", "ArrowRight", "Home", "End", "a", "A", "l", "L", "+", "=", "-", "_", "Escape"].includes(k)) return;   // the book's own keys rest (A puts it back together)
   if (e.altKey) {
     const big = e.shiftKey;
     if (k === "ArrowLeft") big ? panBy(60, 0) : orbitBy(-30, 0);

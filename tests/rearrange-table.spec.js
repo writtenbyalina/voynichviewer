@@ -420,3 +420,45 @@ test("hiding lost sheets on the table: an emptied set-aside pile shows its dashe
   }, shot.toString("base64"));
   expect(lit, "the dashed outline is on the screen").toBeGreaterThan(10);
 });
+
+test("A puts the book back together, as Done and Esc do, and opens the table again", async ({ page }) => {
+  await openTable(page);
+  await page.keyboard.press("a");
+  await expect(page.locator("#v-three")).not.toHaveClass(/table/);
+  expect(await page.evaluate(() => [Arrange.on, View3D.mod.arranging])).toEqual([false, false]);
+  await page.keyboard.press("a");
+  await expect(page.locator("#v-three")).toHaveClass(/table/);
+});
+
+test("a change that changes nothing leaves a built-in order alone: no copy is made", async ({ page }) => {
+  await openTable(page);
+  const untouched = async why => expect(await page.evaluate(() => [S.order, MyOrders.list.length]), why).toEqual(["beinecke", 0]);
+  // a sheet picked up and let go where it was
+  const q = await at(page, "77|82");
+  await drag(page, q, () => slot(page, "13", 2));
+  await untouched("let go where it was");
+  expect(await quire(page, 13)).toBe("13:75|84,76|83,77|82,78|81,79|80");
+  // the centre sheet one further in, the outermost one further out
+  await click(page, "79|80"); await page.keyboard.press("Meta+BracketRight");
+  await click(page, "75|84"); await page.keyboard.press("Meta+BracketLeft");
+  await untouched("⌘] on the centre sheet, ⌘[ on the outermost");
+  // the way a quire is put together, chosen again
+  await caption(page, "2").click();
+  await bar(page).getByRole("button", { name: "Tucked" }).click();
+  await untouched("Tucked on a tucked quire");
+  await expect(page.locator("#cx-toast")).not.toContainText("your own copy");
+  // and a real change still makes the copy
+  await page.keyboard.press("Meta+BracketRight");
+  await expect.poll(() => page.evaluate(() => S.order)).toMatch(/^my-/);
+});
+
+test("the list of shortcuts fits in the window, every line of it", async ({ page }) => {
+  await openTable(page);
+  await page.locator("#v3-arrange").getByRole("button", { name: "Keyboard shortcuts" }).click();
+  const m = page.locator(".ar-menu");
+  await expect(m).toBeVisible();
+  expect(await m.evaluate(e => e.scrollHeight - e.clientHeight), "nothing to scroll to").toBeLessThanOrEqual(1);
+  const r = await m.boundingBox();
+  expect(r.y + r.height).toBeLessThanOrEqual(page.viewportSize().height);
+  await expect(m.locator(".ar-row").last()).toBeInViewport({ ratio: 1 });
+});

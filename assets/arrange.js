@@ -137,13 +137,14 @@ const Arrange = {
 
   /* Apply fn to a copy of the current order. A built-in order is first copied into an order of your own. `moved` names
      the sheets the change is about: only they lift in 3D, the others slide aside (null: let 3D decide). */
-  edit(fn, { ms = 1000, moved = null } = {}) {
+  edit(fn, { ms = 1000, moved = null, copy = false } = {}) {
     let o = this.order(), started = null, from = o.id;
     if (!MyOrders.isMine(o.id)) { started = o.title; o = MyOrders.copyOf(o); }
     const before = this.snap(o);
     const next = JSON.parse(JSON.stringify(o));
     if (fn(next) === false) return false;
-    if (this.snap(next) === before && !started) return false;
+    // a change that changes nothing (a sheet let go where it was) is no change, and doesn't start a copy either
+    if (this.snap(next) === before && !copy) return false;
     const hst = this.histOf(next.id);
     hst.undo.push({ s: before, moved }); hst.redo = [];
     if (hst.undo.length > 100) hst.undo.shift();
@@ -389,7 +390,7 @@ const Arrange = {
   topEl(o) {
     const mine = MyOrders.isMine(o.id), hst = this.histOf(o.id), hidden = View3D.mod?.hiddenQuires().size || 0;
     const items = [
-      mine ? { text: "Rename this order…", fn: () => this.rename() } : { text: "Make my own copy now", fn: () => this.edit(() => {}, { ms: 0 }) },
+      mine ? { text: "Rename this order…", fn: () => this.rename() } : { text: "Make my own copy now", fn: () => this.edit(() => {}, { ms: 0, copy: true }) },
       { text: "Export a progress file", fn: () => Work.exportFile(), disabled: !MyOrders.list.length && !Crops.mine.size && !Bookmarks.list.length },
       { text: "Import a progress file…", fn: () => Work.pickFile() },
       { text: "All your work…", fn: () => Work.open() },

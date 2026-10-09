@@ -816,7 +816,7 @@ svg.glyph { display: block; flex: none; overflow: visible; }
 .ar-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: auto; }
 .ar-acts button { padding: 3px 9px; font-size: 12.5px; }
 .ar-hint { color: var(--table-muted); font-size: 12.5px; margin: 0; }
-.ar-menu { position: fixed; z-index: 2100; min-width: 220px; max-width: 340px; max-height: min(70vh, 520px); overflow: auto; padding: 4px; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+.ar-menu { position: fixed; z-index: 2100; min-width: 220px; max-width: 340px; max-height: calc(100vh - 24px); overflow: auto; padding: 4px; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
   border-radius: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); font-size: 13px; }
 .ar-menu button { display: flex; gap: 6px; width: 100%; text-align: left; border: 0; background: none; padding: 6px 10px; border-radius: 5px; }
 .ar-menu button:hover:not([disabled]), .ar-menu button:focus-visible { background: #f1ede4; outline: none; }

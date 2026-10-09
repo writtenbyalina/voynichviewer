@@ -1808,7 +1808,9 @@ const Info = {
   },
   /* A sheet's folds in words: "72r1–72r2 in, 72r2–72r3 out and the crease in 72r3 in". */
   foldWords(id) {
-    const sh = SHEETS.get(id), name = img => short(pageName(sh.inside.flat().find(sg => sg.img === img) || { page: img }));
+    const sh = SHEETS.get(id);
+    if (!sh) return "";   // a sheet the data no longer has: nothing to say, rather than no Info page
+    const name = img => short(pageName(sh.inside.flat().find(sg => sg.img === img) || { page: img }));
     const w = Object.entries(D.folds?.sheets?.[id]?.folds || {}).map(([k, way]) =>
       (k.includes("|") ? k.split("|").map(name).join("–") : `the crease in ${name(k)}`) + " " + way);
     return w.length > 1 ? w.slice(0, -1).join(", ") + " and " + w.at(-1) : w[0] || "";
@@ -1843,7 +1845,7 @@ const Info = {
   /* A drawn leaf, folded every way in (as the viewer guessed) or as Davis describes it, under the page it faces today. */
   foldLeaf(id, leaf, guess) {
     const panels = D.folds?.sheets?.[id]?.drawn?.[leaf];
-    if (!panels) return "";
+    if (!panels || !SHEETS.has(id)) return "";
     const pages = linearize(ORDERS.get("beinecke"), { ghosts: true });
     const i = pages.findIndex(p => p.sheet === id && p.face === "inside" && p.leafNo === +leaf), f = pages[i % 2 ? i + 1 : i - 1];
     return this.foldSvg(`leaf ${leaf}, ${guess ? "every fold in (the viewer's guess)" : "as Davis describes it"}`, panels,
