@@ -1644,7 +1644,11 @@ const TextTab = {
   mount() {   // at once when loaded, so that the address it reads is the one show() writes back
     if (this.mod) this.mod.mount(); else this.load().then(m => m.mount()).catch(() => {});
   },
-  state() { return this.mod ? this.mod.state() : location.hash.replace(/^#\/?text\/[^/]*\/?/, "") || "search"; },
+  state() {   // before search.js has loaded: what the address asks for, or a plain "search" (so #text alone is #text/order/search)
+    if (this.mod) return this.mod.state();
+    const m = location.hash.match(/^#\/?text(?:\/[^/]*)?(?:\/(.*))?$/);
+    return (m && m[1]) || "search";
+  },
   /* "/" anywhere: the search box */
   focus() {
     if (S.view !== "text") show("text");

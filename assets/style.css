@@ -828,19 +828,32 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .sx-chip-s, .sx-more-opts > summary { display: inline-flex; align-items: center; gap: 4px; height: 32px; border: 1px solid var(--line); border-radius: 99px;   /* Spec: chips 32 px */
   padding: 0 4px 0 12px; font-size: 13px; background: #fff; color: var(--muted); }
 .sx-chip-s select { border: none; background: transparent; color: var(--ink); font-size: 13px; padding: 4px 6px 4px 2px; max-width: 250px; }
-.sx-more-opts { position: relative; }
-.sx-more-opts > summary { list-style: none; padding: 0 12px; color: var(--ink); cursor: pointer; }
-.sx-more-opts > summary::-webkit-details-marker { display: none; }
-.sx-more-opts > summary::after { content: " ▾"; color: var(--muted); white-space: pre; }
+/* the chips that open a popover (More options, Compare): one open at a time, closed by a click elsewhere; a popover
+   that would run off the right of the window hangs from the chip's right edge instead (.flip, set by search.js) */
+.sx-pop, .sx-more-opts { position: relative; }
+.sx-pop > summary, .sx-more-opts > summary { list-style: none; padding: 0 12px; color: var(--ink); cursor: pointer; }
+.sx-pop > summary::-webkit-details-marker, .sx-more-opts > summary::-webkit-details-marker { display: none; }
+.sx-pop > summary::after, .sx-more-opts > summary::after { content: " ▾"; color: var(--muted); white-space: pre; }
 .sx-more-opts.on > summary { background: #efece5; border-color: #cfc9bd; }
-.sx-more-m { position: absolute; left: 0; top: 38px; z-index: 30; width: 320px; display: flex; flex-direction: column; gap: 10px; padding: 12px;
+.sx-pop-m, .sx-more-m { position: absolute; left: 0; top: 38px; z-index: 30; width: 320px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 10px; padding: 12px;
   background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(0,0,0,.14); }
+.sx-pop.flip > .sx-pop-m { left: auto; right: 0; }
 .sx-opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
 .sx-opt select { min-height: 32px; color: var(--ink); max-width: 210px; }
-.sx-cmp-b { background: transparent; border: 1px solid var(--line); color: var(--ink); font-size: 13px; min-height: 32px; text-align: left; }
-.sx-cmp { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 13px; color: #2f6fb5; flex-wrap: wrap; }
-.sx-cmp[hidden] { display: none; }
-.sx-cmp input { flex: 1; min-width: 160px; border: 1.5px solid #2f6fb5; border-radius: 6px; padding: 5px 10px; font: 14px ui-monospace, Menlo, monospace; min-height: 36px; }
+/* the second search: a chip that says what it is compared with, blue like everything of the second search's */
+.sx-cmp-d > summary b { font-family: ui-monospace, Menlo, monospace; font-weight: 600; }
+.sx-cmp-d.on > summary { background: #e9f0f9; border-color: #a9c3e4; color: #1f4f8a; }
+.sx-cmp-d.on > summary::after { color: #1f4f8a; }
+.sx-cmp { width: min(360px, calc(100vw - 24px)); gap: 8px; }
+.sx-cmp label { font-size: 13px; color: var(--muted); line-height: 1.4; }
+.sx-cmp input { width: 100%; border: 1.5px solid #2f6fb5; border-radius: 8px; padding: 5px 10px; font: 16px ui-monospace, Menlo, monospace; min-height: 40px; }
+.sx-cmp input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sx-cmp-b { display: flex; gap: 8px; }
+.sx-cmp-b button { min-height: 34px; font-size: 13px; }
+.sx-cmp-b button[hidden] { display: none; }
+/* the two searches' colours, said with a square before each */
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; background: #3b4048; vertical-align: 0; }
+.sw.b { background: #2f6fb5; }
 .sx-pal { margin-top: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: #fbfaf7; }
 .sx-pal[hidden] { display: none; }
 .sx-pal-g { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -850,12 +863,12 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .sx-pal-c { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .sx-pal-c button { font: 13px ui-monospace, Menlo, monospace; min-height: 32px; }
 /* the count, in one sentence */
-.sx-echo { margin: 12px 2px 4px; font-size: 16px; line-height: 1.5; }
+.sx-echo { margin: 10px 2px 4px; font-size: 16px; line-height: 1.5; }
 .sx-count b { font-weight: 650; }
 .sx-count b.mono { font-family: ui-monospace, Menlo, monospace; }
 .sx-err { color: #a3280f; }
 .sx-ex { display: block; color: var(--muted); font-size: 13px; }
-.sx-cmpsay { display: block; color: #2f6fb5; font-size: 13px; }
+.sx-cmpsay { display: block; color: #1f4f8a; }   /* the second search's count: a sentence of its own, in its blue */
 .sx-why { display: inline-block; position: relative; vertical-align: 2px; }
 .sx-why > summary { list-style: none; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center;
   color: var(--muted); font: 600 11px Georgia, serif; cursor: pointer; }
@@ -878,7 +891,10 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .sx-bar i { position: absolute; left: 0; right: 0; bottom: 0; display: block; background: #3b4048; border-radius: 1px 1px 0 0; }
 .sx-bar.ghost i.all { background: #3b4048; opacity: .2; }
 .sx-bar.none i.all { background: #d9d5cc; }
-.sx-bar i.cmp { left: 50%; background: #2f6fb5; opacity: .85; }
+/* with a second search, two bars side by side on every page: the first's in ink at the left, the second's in blue */
+.sx-bars.two .sx-bar i.all { right: 50%; }
+.sx-bar i.cmp { left: 50%; background: #2f6fb5; }
+.sx-bar i.cmp.z { background: #d9d5cc; }
 .sx-secs { display: flex; gap: 1px; margin-top: 3px; }
 .sx-secs span { height: 8px; }
 .sx-secn { position: relative; height: 18px; margin-top: 3px; font-size: 11.5px; color: var(--muted); }
@@ -887,6 +903,7 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
   box-shadow: 0 6px 18px rgba(0,0,0,.25); pointer-events: none; }
 .sx-card .s { color: #c9ced4; font: 12px ui-monospace, Menlo, monospace; margin-top: 3px; white-space: nowrap; }
 .sx-card em { font-style: normal; font-weight: 700; color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+.sx-card .c { color: #9ec3f0; }
 /* facets and results */
 .sx-body { flex: 1; min-height: 0; display: flex; }
 .sx-facets { width: 240px; flex: none; overflow: auto; padding: 14px 16px 20px; background: var(--panel); border-right: 1px solid var(--line); }
@@ -904,6 +921,8 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .sx-frow:hover { background: #efece5; border-color: transparent; }
 .sx-frow.sel { background: #e7e3da; border-color: #cfc9bd; color: var(--ink); font-weight: 600; }
 .sx-frow .n { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sx-frow .n .b, .sx-pg > header .b { color: #2f6fb5; }   /* the second search's count */
+.sx-fkey { margin: 0 0 10px; font: 12.5px ui-monospace, Menlo, monospace; color: var(--muted); overflow-wrap: anywhere; }
 .sx-res { flex: 1; min-width: 0; overflow: auto; padding: 10px 24px 40px; }
 /* the lines in the manuscript's glyphs (the Eva / Glyphs switch, shared with the Reader) */
 .sx-script { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
@@ -927,6 +946,9 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 .sx-id { color: var(--muted); font-size: 12px; text-align: right; }
 .sx-t { overflow-wrap: anywhere; }
 .sx-hit em { font-style: normal; font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }   /* Spec: a match, plainly marked */
+.sx-hit em.b { color: #1f4f8a; text-decoration-color: #2f6fb5; }   /* the second search's match, in its blue */
+.sx-res.glyph .sx-t em.b { color: #2f6fb5; }
+.sx-hit.sx-cmp-only .sx-id { color: #2f6fb5; }
 .sx-l { display: flex; justify-content: flex-end; overflow: hidden; white-space: nowrap; }   /* clipped on the left */
 .sx-l > span { flex: none; }
 .sx-r { overflow: hidden; white-space: nowrap; }
@@ -946,7 +968,7 @@ dialog.new-dlg h3 { margin: 0 0 6px; font-size: 16px; }
 @media (max-width: 760px) {
   .sx-top { padding: 10px 12px 6px; }
   .sx-row > button { padding: 0 14px; }
-  .sx-chip-s select { max-width: 150px; }
+  .sx-chip-s select { max-width: 190px; }   /* "RF1b, the Reader's text" whole */
   .sx-strip { padding: 8px 12px 2px; }
   .sx-bars { gap: 0; }
   .sx-facets { display: none; position: fixed; inset: 0; z-index: 40; width: auto; border: none; padding: 12px 16px 30px; }

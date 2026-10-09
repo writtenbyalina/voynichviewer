@@ -10,6 +10,13 @@
     {"kind": "improved", "text": "The text is shown as glyphs or in Eva, chosen from a dropdown. FSG and Currier are no longer offered."},
     {"kind": "improved", "text": "The text's ? says in a few lines how to use it and where the text, the word positions and the photographs come from; Sources at the foot opens the same. The keyboard list under the ? at the top right keeps only the keys that matter."},
     {"kind": "improved", "text": "“How the transcribers read it” and notes on words are gone from the word panel."},
+    {"kind": "improved", "text": "Text tab, Compare: a second search now shows beside the first everywhere, in blue: its own count sentence, its own bars on every page of the strip, its share of every filter (Section, Scribe, Language, Kind of text, Quire), and its matches marked in the lines, with each page's two counts. The i says how many lines hold both. Compare is a chip in the row of settings, not a button inside More options."},
+    {"kind": "fixed", "text": "Text tab: More options and Compare ran off the right of narrower windows and pushed the whole view sideways; the popovers stayed open until clicked again. They stay inside the window, and a click elsewhere or Esc closes them."},
+    {"kind": "fixed", "text": "Text tab: clicking a page in the strip said “No results on …” when that page's results were further down than the list had got (past the first 150). The list now opens out to that page."},
+    {"kind": "fixed", "text": "Text tab, Reading: any transcriber: a word written twice in one line was counted and marked once. Both count now."},
+    {"kind": "fixed", "text": "Text tab: when nothing matched, an empty strip and empty filters were still drawn."},
+    {"kind": "fixed", "text": "Text tab: opening #text alone wrote a broken address (#text/…/#text)."},
+    {"kind": "fixed", "text": "Text tab: section names in the strip overlapped on a phone, being measured before the strip was laid out."},
     {"kind": "improved", "text": "The Text button in the Reader's bar has an icon, like Bookmark and Grid beside it."}
    ]
   },

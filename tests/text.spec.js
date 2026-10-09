@@ -365,8 +365,8 @@ test.describe("the text in the Reader", () => {
   test("a word whose place is estimated from the words beside it is drawn dashed and says so", async ({ page }) => {
     await openSite(page, "#read/beinecke/57v/text");
     await textReady(page);
-    const est = box(page, "f57v|2|25");   // a ring word the ink fit could not find (tools/text/inkfit.py)
-    await expect(est).toHaveClass(/est/);
+    const est = page.locator("#rd-zoomer .wb.est").first();   // a ring word the ink fit could not find (tools/text/inkfit.py)
+    await expect(est).toBeAttached();
     await est.hover({ force: true });
     await expect(page.locator("#tx-tip")).toContainText("place estimated");
     expect(await page.locator("#rd-zoomer .seg-words .out.hov:not(.u)").evaluate(e => getComputedStyle(e).strokeDasharray)).not.toBe("none");
@@ -496,6 +496,84 @@ test.describe("the Text tab", () => {
   test("a query it cannot read is answered in plain words", async ({ page }) => {
     await openSite(page, "#text/beinecke/search?q=Qok");
     await expect(page.locator("#sx-echo .sx-err")).toContainText("Capitals stand for whole words");
+  });
+
+  test("Compare: a second search beside the first, in blue, in the count, the strip, every filter and the lines (docs/text/TEXT_TAB_AUDIT.md)", async ({ page }) => {
+    await openSite(page, "#text/beinecke/search?q=qokeedy&cmp=qokedy");
+    await results(page);
+    const echo = page.locator("#sx-echo");
+    await expect(echo).toContainText("qokeedy appears 306 times on 56 of 227 pages");
+    await expect(echo.locator(".sx-cmpsay")).toContainText("qokedy appears 270 times on 63 of 227 pages");
+    await expect(page.locator("#sx-cmp-s")).toHaveText("Compared with qokedy");
+    await expect(page.locator(".sx-bars")).toHaveClass(/two/);
+    expect(await page.locator(".sx-bar i.cmp:not(.z)").count()).toBe(62);   // 63 pages, two of them panels of one side
+    // each filter row gives both counts
+    await expect(page.locator(".sx-frow", { hasText: "Recipes" }).locator(".n")).toHaveText("(133 · 60)");
+    await expect(page.locator(".sx-frow", { hasText: "Pharmaceutical" }).locator(".n")).toHaveText("(0 · 1)");
+    // a page's heading gives both, and a line holds both searches' marks, the second's in blue
+    await expect(page.locator(".sx-pg[data-page=f26r] header")).toContainText("3 · 6");
+    const l5 = page.locator(".sx-pg[data-page=f26r] .sx-line", { hasText: "saiin shedy chdy chdy" });
+    await expect(l5.locator("em:not(.b)")).toHaveText("qokeedy");
+    await expect(l5.locator("em.b")).toHaveText("qokedy");
+    // a line the first search has nothing on opens in the Reader without a result number
+    const only = page.locator(".sx-line.sx-cmp-only").first();
+    expect(await only.getAttribute("href")).not.toContain("hit=");
+    // the i: lines with both
+    await page.locator(".sx-why summary").click();
+    await expect(page.locator(".sx-why-m")).toContainText("41 lines hold both");
+    // narrowing applies to both; Remove takes the second away
+    await page.locator(".sx-frow", { hasText: "Recipes" }).click();
+    await expect(echo.locator(".sx-cmpsay")).toContainText("qokedy appears 60 times");
+    await page.locator("#sx-cmp-s").click();
+    await expect(page.locator("#sx-cmp-q")).toBeFocused();
+    await expect(page.locator("#sx-cmp-q")).toHaveValue("qokedy");
+    await page.locator(".sx-cmp-rm").click();
+    await expect(echo.locator(".sx-cmpsay")).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => location.hash)).not.toContain("cmp=");
+  });
+
+  test("the popovers (More options, Compare) close on a click elsewhere or Esc, and stay inside a narrow window", async ({ page }) => {
+    await page.setViewportSize({ width: 750, height: 553 });
+    await openSite(page, "#text/beinecke/search?q=qokeedy");
+    await results(page);
+    await page.locator(".sx-more-opts > summary").click();
+    await expect(page.locator(".sx-more-opts")).toHaveAttribute("open", "");
+    await expect.poll(async () => { const b = await page.locator(".sx-more-m").boundingBox(); return b.x + b.width; }, { message: "the popover's right edge" }).toBeLessThanOrEqual(750);
+    await page.locator("#sx-cmp-s").click();   // one open at a time
+    await expect(page.locator(".sx-more-opts")).not.toHaveAttribute("open", "");
+    await expect(page.locator("#sx-cmp-d")).toHaveAttribute("open", "");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#sx-cmp-d")).not.toHaveAttribute("open", "");
+    await page.locator("#sx-cmp-s").click();
+    await page.locator(".sx-res-h .sx-opt > span").click();   // anywhere outside it
+    await expect(page.locator("#sx-cmp-d")).not.toHaveAttribute("open", "");
+    expect(await page.evaluate(() => document.querySelector("#v-text").scrollLeft), "nothing scrolled sideways").toBe(0);
+  });
+
+  test("a page clicked in the strip is shown even when its results are past the first 150; nothing found draws no strip and no filters", async ({ page }) => {
+    await openSite(page, "#text/beinecke/search?q=qokeedy");
+    await results(page);
+    expect(await page.locator(".sx-pg").count()).toBeLessThan(40);
+    await page.locator('.sx-bar[aria-label^="116r"]').dispatchEvent("click");
+    await expect(page.locator(".sx-pg[data-page=f116r]")).toBeVisible();
+    await expect(page.locator(".sx-pg[data-page=f116r]")).toHaveClass(/flash/);
+    await page.evaluate(() => { location.hash = "#text/beinecke/search?q=qokqz"; });
+    await expect(page.locator("#sx-echo")).toContainText("qokqz appears nowhere");
+    await expect(page.locator("#sx-strip")).toBeEmpty();
+    await expect(page.locator("#sx-facets")).toBeEmpty();
+  });
+
+  test("any transcriber: a word twice in one line counts twice, and both are marked", async ({ page }) => {
+    await openSite(page, "#text/beinecke/search?q=qokeedy&in=all");
+    await results(page);
+    await expect(page.locator("#sx-echo")).toContainText("qokeedy appears 320 times");
+    await expect(page.locator(".sx-pg[data-page=f26r] .sx-line", { hasText: "daiin shedy" }).locator("em")).toHaveCount(2);
+  });
+
+  test("#text alone opens the search with a whole address", async ({ page }) => {
+    await openSite(page, "#text");
+    await results(page);
+    await expect.poll(() => page.evaluate(() => location.hash)).toBe("#text/beinecke/search");
   });
 
   test("/ anywhere goes to the search box", async ({ page }) => {
