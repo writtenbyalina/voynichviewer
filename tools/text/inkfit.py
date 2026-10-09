@@ -46,7 +46,7 @@ def ink_map(im: np.ndarray) -> np.ndarray:
     """How much each pixel is the scribe's ink, 0..1: darker than the parchment around it (a median of its
     neighbourhood), measured against how dark this page's ink is (pages differ: the zodiac's is pale), and not
     the colour of paint (redder, greener or bluer than the page's ink)."""
-    g = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    g = im.min(axis=2)                                         # the darkest channel: red ink is as dark as brown there
     bg = cv2.medianBlur(g, 31).astype(np.float32)
     d = bg - g.astype(np.float32)
     lab = cv2.cvtColor(im, cv2.COLOR_BGR2LAB).astype(np.int16)
@@ -54,7 +54,11 @@ def ink_map(im: np.ndarray) -> np.ndarray:
     strong = d > max(20.0, float(np.percentile(d, 99)) * 0.6)
     a_ink = float(np.median(a[strong])) if strong.any() else 4.0
     b_ink = float(np.median(b[strong])) if strong.any() else 12.0
-    paint = (a > a_ink + 7) | (a < a_ink - 6) | (b < b_ink - 10)
+    colour = (a > a_ink + 7) | (a < a_ink - 6) | (b < b_ink - 10)
+    # paint is laid in areas; a thin stroke in a colour is writing in coloured ink (f67r2's red words): keep it
+    k = max(3, im.shape[0] // 280) | 1
+    wide = cv2.morphologyEx(colour.astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    paint = cv2.dilate(wide, np.ones((3, 3), np.uint8)).astype(bool)
     full = max(25.0, float(np.percentile(d[~paint], 99.3)))     # this page's ink at its darkest
     dark = np.clip((d - 0.3 * full) / (0.45 * full), 0, 1)
     dark[paint] = 0
@@ -220,7 +224,7 @@ def share(units, n, expect, widths, xh, ext=None):
         c += 1.5 * float(np.clip(gapw[j + 1:k + 1] - 0.55 * xh, 0, None).sum()) / xh   # no word gap inside it
         if ext and ext[i]:                                          # not far past its old box
             lo, hi = ext[i]
-            c += 1.2 * (max(0.0, lo - a - 0.6 * xh) + max(0.0, b - hi - 0.6 * xh)) / xh
+            c += 0.6 * (max(0.0, lo - a - 1.0 * xh) + max(0.0, b - hi - 1.0 * xh)) / xh
         return c
 
     span = 20
@@ -491,13 +495,35 @@ class Line:
         got = share(units, len(words), e_s, widths, xh, [None if w[-1] else e for w, e in zip(self.est, self.ext)])
         if not got:
             return {}
-        # how far up and down a word of this line may reach: its gallows rise towards the line above, its tails
-        # hang towards the line below, but never into their bodies
+        # This line's strip of the page, between seams: a path along the gap to the line above (and one to the line
+        # below) that runs through the least ink, round a gallows rising from this line and under a tail hanging from
+        # the line above, cutting a stroke only where two lines' strokes touch (seam carving, as in text-line
+        # segmentation). Gallows rise about 2.5 x-heights, tails hang about 1.
         above = [r for r, st in self.cands if r < vc - 1.5 * xh and st >= 0.3]
         below = [r for r, st in self.cands if r > vc + 1.5 * xh and st >= 0.3]
-        top = max(vc - 3.4 * xh, (max(above) + 0.7 * xh) if above else -1)      # gallows rise ~2.5 x-heights
-        bot = min(vc + 1.9 * xh, (min(below) - 0.9 * xh) if below else S.shape[0])  # tails hang ~1
-        top, bot = max(0, int(math.floor(top))), min(S.shape[0], int(math.ceil(bot)))
+        ra, rb = (max(above) if above else None), (min(below) if below else None)
+        top = max(0, int(math.floor(vc - 3.4 * xh)))
+        bot = min(S.shape[0], int(math.ceil(vc + 2.0 * xh)))
+        up = seam(S, int(ra + 0.5 * xh), int(vc - 0.6 * xh)) if ra is not None else np.full(S.shape[1], top)
+        dn = seam(S, int(vc + 0.6 * xh), int(rb - 0.5 * xh)) if rb is not None else np.full(S.shape[1], bot)
+        up, dn = np.maximum(up, top), np.minimum(dn, bot)
+        # a stroke that touches this line's body and no other line's is wholly this line's (a gallows' whole loop); one
+        # that touches no body, or another line's too, is cut at the seams
+        B = (S > 0.3).astype(np.uint8)
+        ncomp, lab, _st, _c = cv2.connectedComponentsWithStats(B, connectivity=8)
+        rows_ = np.arange(S.shape[0])[:, None]
+        own_band = (rows_ >= lo_band[None, :]) & (rows_ < hi_band[None, :])
+        cnt = lambda m: np.bincount(lab[m & (lab > 0)], minlength=ncomp)
+        own_n = cnt(own_band)
+        other = np.zeros_like(own_band)
+        for r_ in (ra, rb):
+            if r_ is not None:
+                other |= np.abs(rows_ - r_) < 0.55 * xh
+        oth_n = cnt(other)
+        whole = (own_n > 0) & (oth_n == 0)
+        whole[0] = False
+        between = (rows_ >= up[None, :]) & (rows_ < dn[None, :])
+        mine = B.astype(bool) & between & ((own_n[lab] >= oth_n[lab]) | whole[lab])
         self.debug = dict(vc=vc, xh=xh, top=top, bot=bot)
         out, good = {}, 0
         pad = PAD * xh
@@ -508,26 +534,24 @@ class Line:
             a, b = units[j][0], units[kk2][1]
             if not (0.4 * w_exp <= b - a <= 2.4 * w_exp + xh) or abs((a + b) / 2 - es) > 6 * xh + w_exp:
                 continue
-            # each column's strokes, followed up and down from the word's body while they last (a one-row break
-            # allowed): a gallows' stem and loop, a tail; not the next line's, which do not join it
-            ink_ = S[:, a:b] > 0.3
-            ys0, ys1, xs_ = [], [], []
-            for x in range(b - a):
-                lo_, hi_ = int(lo_band[a + x]), int(hi_band[a + x])
-                body = np.nonzero(ink_[lo_:hi_, x])[0]
-                if not len(body):
-                    continue
-                y = lo_ + int(body[0])
-                while y - 1 >= top and (ink_[y - 1, x] or (y - 2 >= top and ink_[y - 2, x])):
-                    y -= 1
-                y2 = lo_ + int(body[-1])
-                while y2 + 1 < bot and (ink_[y2 + 1, x] or (y2 + 2 < bot and ink_[y2 + 2, x])):
-                    y2 += 1
-                ys0.append(y); ys1.append(y2); xs_.append(x)
-            if not xs_:
+            keep = mine[top:bot, a:b]
+            if keep.sum() < 3:
                 continue
-            v0, v1 = min(ys0) - pad, max(ys1) + 1 + pad
-            u0, u1 = a + min(xs_) - pad, a + max(xs_) + 1 + pad
+            ys, xs = np.nonzero(keep)
+            v0, v1 = top + ys.min() - pad, top + ys.max() + 1 + pad
+            u0, u1 = a + xs.min() - pad, a + xs.max() + 1 + pad
+            # the box takes in no real part of another word: rows holding a glyph's worth of ink that is not this
+            # word's are trimmed off its top and bottom (never into the word's body)
+            c0_, c1_ = max(0, int(u0)), min(S.shape[1], int(math.ceil(u1)))
+            foreign = (S[:, c0_:c1_] > 0.3) & ~mine[:, c0_:c1_]
+            body_lo, body_hi = int(lo_band[a:b].min()), int(hi_band[a:b].max())
+            lim = 0.2 * xh * xh
+            r0_, r1_ = int(math.floor(v0)), int(math.ceil(v1))
+            while r0_ < body_lo and foreign[max(0, r0_):max(0, r0_) + max(1, int(xh)), :].sum() > lim:
+                r0_ += 1
+            while r1_ > body_hi and foreign[max(0, r1_ - max(1, int(xh))):r1_, :].sum() > lim:
+                r1_ -= 1
+            v0, v1 = max(v0, r0_), min(v1, r1_)
             out[wi] = self.shape(u0, u1, v0, v1)
             good += 1
         if good < MIN_FIT * len(words):
@@ -557,6 +581,34 @@ class Line:
         if abs(ang) < 1.0:
             return ("r", [(c[0] - L / 2) / k, (c[1] - Hh / 2) / k, L / k, Hh / k], 0.0)
         return ("o", [c[0] / k, c[1] / k, L / k, Hh / k, ang], ang)
+
+
+def seam(S: np.ndarray, r0: int, r1: int) -> np.ndarray:
+    """the path across a strip, between rows r0 and r1, through the least ink (a row per column, moving at most one
+    row from column to column)"""
+    r0, r1 = max(0, r0), min(S.shape[0] - 1, r1)
+    if r1 <= r0:
+        return np.full(S.shape[1], (r0 + r1) // 2)
+    C = S[r0:r1 + 1] * 10.0 + 0.02                             # ink is dear; parchment nearly free
+    mid, half = (r0 + r1) / 2, max(1.0, (r1 - r0) / 2)
+    C += (0.15 * ((np.arange(r0, r1 + 1) - mid) / half) ** 2)[:, None]   # and the middle of the gap a little cheaper
+    n, m = C.shape
+    acc = C[:, 0].copy()
+    back = np.zeros((m, n), np.int8)
+    for c in range(1, m):
+        up_ = np.r_[np.inf, acc[:-1]] + 0.05
+        dn_ = np.r_[acc[1:], np.inf] + 0.05
+        stack = np.vstack([acc, up_, dn_])
+        k = np.argmin(stack, axis=0)
+        acc = stack[k, np.arange(n)] + C[:, c]
+        back[c] = k
+    r = int(np.argmin(acc))
+    path = np.empty(m, int)
+    for c in range(m - 1, -1, -1):
+        path[c] = r
+        k = back[c, r]
+        r = r - 1 if k == 1 else r + 1 if k == 2 else r
+    return path + r0
 
 
 def fit_circle(pts: np.ndarray):
@@ -653,6 +705,54 @@ def nearest_row(ln: "Line"):
     good = [(st - 0.5 * ((r - ln.half) / ln.t_px) ** 2, r) for r, st in ln.cands
             if st >= 0.3 and abs(r - ln.half) <= 0.8 * ln.t_px]
     return max(good)[1] if good else None
+
+
+def fit_label(kind, nums, glyphs, ink, H):
+    """A label (a word alone) the line fit could not place: the word-shaped cluster of glyph strokes that overlaps its
+    old shape most, outlined as a box turned to the way its ink runs. Returns (kind, nums, reading angle) or None."""
+    k = H / 1000.0
+    P = shape_poly(kind, nums) * k
+    t = max(6.0, thickness(kind, nums) * k)
+    xh = 0.45 * t
+    x0, y0 = np.floor(P.min(0) - 2.5 * t).astype(int); x1, y1 = np.ceil(P.max(0) + 2.5 * t).astype(int)
+    x0, y0 = max(0, x0), max(0, y0); x1, y1 = min(ink.shape[1], x1), min(ink.shape[0], y1)
+    if x1 - x0 < 4 or y1 - y0 < 4:
+        return None
+    sub = ink[y0:y1, x0:x1]
+    B = (sub > 0.3).astype(np.uint8)
+    n, lab, st, _c = cv2.connectedComponentsWithStats(B, connectivity=8)
+    ok = np.zeros(n, bool)                                     # glyph strokes, not a drawing's lines
+    ok[1:] = (st[1:, cv2.CC_STAT_HEIGHT] < 3.5 * xh) & (st[1:, cv2.CC_STAT_WIDTH] < 3.0 * xh) & (st[1:, cv2.CC_STAT_AREA] >= 4)
+    G = ok[lab].astype(np.uint8)
+    kk = max(3, int(0.9 * xh) | 1)
+    J = cv2.dilate(G, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kk, kk)))
+    nw, labw, stw, _ = cv2.connectedComponentsWithStats(J, connectivity=8)
+    old = np.zeros_like(G)
+    cv2.fillPoly(old, [np.int32(P - [x0, y0])], 1)
+    best = None
+    for i in range(1, nw):
+        m = (labw == i) & (G > 0)
+        ov = int((m & (old > 0)).sum())
+        if ov < 0.3 * m.sum() or m.sum() < 1.2 * xh * xh:
+            continue
+        score = ov - 0.2 * int((m & (old == 0)).sum())
+        if best is None or score > best[0]:
+            best = (score, m)
+    if best is None:
+        return None
+    ys, xs = np.nonzero(best[1])
+    pts = np.c_[xs + x0, ys + y0].astype(np.float32)
+    (cx, cy), (rw, rh), ang = cv2.minAreaRect(pts)
+    if rw < rh:
+        rw, rh, ang = rh, rw, ang + 90
+    ang = ((ang + 90) % 180) - 90                              # read left to right (or downwards)
+    if rw < 0.4 * glyphs * xh or rw > 3.0 * glyphs * xh + 2 * xh:   # not the size of this word
+        return None
+    pad = PAD * xh
+    L, Hh = (rw + 2 * pad) / k, (rh + 2 * pad) / k
+    if abs(ang) < 4:
+        return ("r", [(cx / k) - L / 2, (cy / k) - Hh / 2, L, Hh], 0.0)
+    return ("o", [cx / k, cy / k, L, Hh, ang], ang)
 
 
 def label_angle(v_poly: np.ndarray, ink: np.ndarray, H: float, ratio: float = 4.0):
@@ -803,14 +903,19 @@ def refine(page: str, data: dict, loci_sta: list[str], panels: dict[int, np.ndar
             got = ln.fit(rows[key])
         if not got and alt is not None and alt.ok and nearest_row(alt) is not None:
             got = alt.fit(nearest_row(alt))
+        if not got and len(ws) == 1 and ln is not None and not ln.ring:   # a lone label: its own cluster of ink
+            wi, kind, nums, r = ws[0]
+            fl = fit_label(kind, nums, ln.words[0][3], inks[key[1]], panels[key[1]].shape[0])
+            if fl:
+                got = {wi: fl}
         if got:
             stats["refit"] += 1
             stats["words_refit"] += len(got)
         li, pi = key[0], key[1]
         for wi, kind, nums, r in ws:
             if wi in got:
-                k2, n2, ang = got[wi]
-                rnd = [round(float(x), 1) for x in n2]
+                k2, n2, ang = got[wi][:3]
+                rnd = [round(float(x)) for x in n2[:4]] + [round(float(x), 1) for x in n2[4:]]
                 new[(li, wi)] = [li, wi, pi, k2, *rnd, round(((ang + 180) % 360) - 180, 1), 0]
             else:                                              # not found on the ink: rf.py's shape, as approximate
                 new[(li, wi)] = r[:-1] + [1]

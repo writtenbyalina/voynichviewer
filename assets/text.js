@@ -129,6 +129,18 @@ const Shapes = {
     return b ? b._map : null;
   },
 };
+/* A reading made from the photograph by Claude (Anthropic's model), where no transcriber's covers a word well:
+   data/text/rf/read/<page>.json, {by, about, words: [[locus, word, eva, confidence, note]]} (tools/text/read_photo.py) */
+const PhotoReading = {
+  pages: null,
+  async of(page) {
+    if (!this.pages) this.pages = new Set(await load("rf/read/pages.json").catch(() => []));
+    if (!this.pages.has(page)) return null;
+    const b = await load(`rf/read/${encodeURIComponent(page)}.json`).catch(() => null);
+    if (b && !b._map) b._map = new Map(b.words.map(([li, wi, eva, conf, note]) => [li + ":" + wi, { eva, conf, note }]));
+    return b;
+  },
+};
 const rad = d => d * Math.PI / 180;
 /* the outline of a shape, as an SVG path in its panel's units (thousandths of the panel's height) */
 function shapePath(s) {
@@ -950,6 +962,21 @@ const T = {
       h("button", { class: "tx-x", title: "Delete this note", "aria-label": "Delete this note", onclick: async () => { if (await askYes("Delete this note?", x.note, "Delete", true)) { Saved.removePlace(x.id); this.show(); } } }, "×")));
     kids.push(h("p", { class: "tx-say" }, this.sentence(words, places, first.page),
       h("span", { class: "tx-stamp" }, ` RF1b · ${SCRIPT_NAME[L]}${approxIn(its.flatMap(it => it.w.codes), L) ? ` · ${SCRIPT_NAME[L]} writes a glyph here by its nearest basic form` : ""}`)));
+    if (n === 1) {                                              // Claude's own reading from the photograph, where there is one
+      const slot = h("p", { class: "tx-photo", hidden: true });
+      kids.push(slot);
+      PhotoReading.of(first.page).then(b => {
+        const r = b && b._map.get(`${first.li}:${first.wi}`);
+        if (!r) return;
+        const rf = writeAs(first.w.codes, "eva");
+        slot.hidden = false;
+        slot.replaceChildren(h("span", { class: "tx-dim" }, "Read from the photograph by Claude: "),
+          r.eva ? h("b", { class: "mono" }, r.eva) : h("i", {}, "no writing found here"),
+          r.eva ? h("span", { class: "tx-dim" }, r.eva === rf ? " · the same as RF1b" : ` · RF1b has ${rf}`) : "",
+          h("span", { class: "tx-dim" }, ` · ${r.conf} confidence`),
+          h("button", { class: "tx-i", title: b.about, "aria-label": "About this reading", onclick: () => toast(b.about) }, "i"));
+      });
+    }
     // its line: click a word of it to choose it instead, shift-click to take in the words up to it
     kids.push(h("div", { class: "tx-inline", "aria-label": "In its line" },
       h("button", { class: "tx-grow", title: "Take in the word before ({)", "aria-label": "Take in the word before", disabled: !this.canExtend(-1), onclick: () => this.extend(-1) }, "+"),

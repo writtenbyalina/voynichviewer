@@ -277,7 +277,7 @@ test.describe("the text in the Reader", () => {
   test("a word whose place is estimated from the words beside it is drawn dashed and says so", async ({ page }) => {
     await openSite(page, "#read/beinecke/57v/text");
     await textReady(page);
-    const est = box(page, "f57v|2|15");   // a ring word the ink fit could not find (tools/text/inkfit.py)
+    const est = box(page, "f57v|2|25");   // a ring word the ink fit could not find (tools/text/inkfit.py)
     await expect(est).toHaveClass(/est/);
     await est.hover({ force: true });
     await expect(page.locator("#tx-tip")).toContainText("place estimated");

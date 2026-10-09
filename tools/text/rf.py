@@ -567,6 +567,9 @@ def main():
     if os.environ.get("INKFIT", "1") != "0":
         import inkfit
         stats["on ink"] = inkfit.refine_all()["words_refit"]
+    # Claude's readings from the photograph, where there are any (read_photo.py)
+    import read_photo
+    read_photo.build()
     print(f"{len(pages)} pages, {sum(len(r) for _, r in pages)} loci; words {stats['words']}, placed {stats['placed']} "
           f"({100 * stats['placed'] / max(1, stats['words']):.1f}%): upright {stats['r']}, turned {stats['o']}, "
           f"round a ring {stats['a']}; estimated {stats['estimated']}; fitted to the ink {stats['on ink']}")
