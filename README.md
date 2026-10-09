@@ -97,12 +97,14 @@ tests/                  the automatic checks (Playwright); what they cover and h
 
 Every change people can see, and every bug fix, gets an entry in `data/changelog.json`, in the same commit as the
 change. Releases are newest first, each with its `version`, the `date` it went live (YYYY-MM-DD) and its `changes`,
-each with a `kind` (`new`, `improved` or `fixed`) and a sentence written for readers, not developers. The site reads
+each with a `kind` (`new`, `improved` or `fixed`) and a short line written for readers, not developers. Keep the list
+short: one line per change, a few words each, only what a visitor would notice; a release of fixes is usually one
+line. The site reads
 this file: the badge at the top left shows the latest version, clicking it opens the list, and someone who has been
 here before sees a dot on the badge until they have opened the newest notes.
 
-Versions: the second number goes up with each release (1.1, 1.2, …), the first with a redesign. Change the fallback
-version in `index.html` (`#cx-ver`) at the same time, for the moment before the list loads.
+Versions: the third number goes up with fixes (1.5.1), the second with new features (1.6), the first with a redesign.
+Change `APP_VERSION` in `assets/app.js` and the fallback in `index.html` (`#cx-ver`) at the same time.
 
 Credit people who report bugs by name only if they have said that is all right; otherwise "Reported by a reader".
 
