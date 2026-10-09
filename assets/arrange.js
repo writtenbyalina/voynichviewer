@@ -1050,7 +1050,7 @@ const Arrange = {
       oncontextmenu: aside ? null : e => { e.preventDefault(); const k = e.currentTarget.dataset.key; if (!this.selQ.has(k)) this.setSel([], { quires: [k] }); this.menu({ x: e.clientX, y: e.clientY }, this.quireItems(this.quiresInOrder([...this.selQ]))); } },
       h("b", {}, aside ? "Set aside" : qTag(g.quire)),
       h("span", { class: "pl-ics" }, (aside ? ["aside"] : secs.length ? secs : ["lost"]).map(x => icon(x, 14))),
-      h("span", { class: "pl-n" }, aside ? (n ? String(n) : "drop here") : `${n}${lost ? ` · ${lost} lost` : ""}`),
+      h("span", { class: "pl-n" }, aside && !n ? "drop here" : `${n}${lost ? ` · ${lost} lost` : ""}`),
       this.ch?.booklets.has(p.key) ? h("span", { class: "ar-dot", title: "Changed in your order" }) : "");
   },
   /* Rename a quire in place: its name becomes a field (Enter keeps it, Esc gives up). */

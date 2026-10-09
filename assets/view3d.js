@@ -1512,7 +1512,7 @@ function placePiles() {
     ARR.tray.rotation.x = -Math.PI / 2; scene.add(ARR.tray);
   }
   ARR.tray.visible = !aside.ids.length;
-  ARR.tray.position.set(aside.x0 + aside.sw / 2, .5, aside.z1 - H / 2);
+  ARR.tray.position.set(aside.x0 + aside.w / 2, .5, aside.z1 - H / 2);   // in the middle of its room, under its name
   ARR.tray.scale.set(aside.sw, H, 1); ARR.tray.computeLineDistances();
   // selected quires: an outline under each
   const sel = piles.filter(p => V.selQ.has(p.key));
@@ -1539,6 +1539,10 @@ function placePiles() {
   ARR.ins.visible = t?.kind === "new";
   if (t?.kind === "new") { ARR.ins.position.set(t.x, .5, t.z); ARR.ins.scale.set(5, t.depth, 1); }
   if (ARR.drag) hud(null, t || null);
+  // these marks are set after the frame was drawn: if one changed, draw another, or it shows only when something moves
+  const r = m => m ? `${+m.visible}${m.position.x.toFixed(1)},${m.position.z.toFixed(1)},${m.scale.x.toFixed(1)}` : "";
+  const drawn = [ARR.tray, ARR.hl, ARR.ins, ...ARR.qsel, ...(ARR.ssel || [])].map(r).join("|");
+  if (drawn !== ARR.drawn) { ARR.drawn = drawn; wake(); }
 }
 
 /* A pile drawn small at the table's slant, for the panel and the selection's bar: a stack of layers (the outermost at
@@ -2815,6 +2819,7 @@ export default {
     seek(k) { if (!TW.on) return; TW.t0 = performance.now() - k * TW.dur; tweenStep(performance.now()); renderer.render(scene, camera); drawLabels(); },
     get renderer() { return renderer; },
     get camera() { return camera; },
+    get tray() { return ARR.tray; },   // the set-aside pile's dashed place on the table
     pickAt(x, y) { return pick({ clientX: x, clientY: y })?.en.id ?? null; },
     /* jump to the end of whatever is moving (the folds, the camera) and draw it: for checks that look at a still view.
        k < 1 stops the folds that far through, with the camera already where it is going. */

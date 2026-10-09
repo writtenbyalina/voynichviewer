@@ -397,3 +397,26 @@ test.describe("the list beside the table (Rearrange as it used to be)", () => {
     await expect.poll(() => page.evaluate(() => View3D.mod.debug.V.layout.piles.find(p => p.key === "1").fan), "a fan on the table").toBe(true);
   });
 });
+
+test("hiding lost sheets on the table: an emptied set-aside pile shows its dashed place at once, under its name", async ({ page }) => {
+  await openTable(page, "davis");   // its only set-aside sheet, 109|110, is lost
+  await page.locator("#v3-arrange").getByRole("button", { name: "Hide lost sheets" }).click();
+  await expect(caption(page, "aside")).toContainText("1 lost");
+  await expect.poll(() => page.evaluate(() => View3D.mod.debug.tray.visible)).toBe(true);
+  // drawn, not just set: the canvas has the dashed outline where the place is (lighter than the table)
+  const at = await page.evaluate(() => {
+    const d = View3D.mod.debug, t = d.tray, st = document.querySelector("#v3-stage").getBoundingClientRect();
+    t.updateMatrixWorld(true);
+    const p = (x, y) => { const v = t.position.clone().set(x, y, 0).applyMatrix4(t.matrixWorld).project(d.camera); return { x: st.left + (v.x + 1) / 2 * st.width, y: st.top + (1 - v.y) / 2 * st.height }; };
+    return { l: p(-.5, -.5), r: p(.5, -.5) };
+  });
+  const cap = await caption(page, "aside").boundingBox();
+  expect(Math.abs(cap.x + cap.width / 2 - (at.l.x + at.r.x) / 2), "its name centred under it").toBeLessThan(3);
+  const shot = await page.screenshot({ clip: { x: Math.min(at.l.x, at.r.x) - 2, y: at.l.y - 3, width: Math.abs(at.r.x - at.l.x) + 4, height: 6 } });
+  const lit = await page.evaluate(async b64 => {
+    const img = new Image(); img.src = "data:image/png;base64," + b64; await img.decode();
+    const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+    const px = x.getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < px.length; i += 4) if (px[i] > 90) n++; return n;
+  }, shot.toString("base64"));
+  expect(lit, "the dashed outline is on the screen").toBeGreaterThan(10);
+});
