@@ -834,7 +834,6 @@ svg.glyph { display: block; flex: none; overflow: visible; }
   .ar-body { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .ar-stack, .ar-row { height: 190px; }
 }
-}
 
 /* ---------- Info: credits, contents, Davis's research ---------- */
 .info-wrap { max-width: 1120px; }

@@ -50,6 +50,23 @@ test.describe("index.html", () => {
   });
 });
 
+test.describe("the stylesheet", () => {
+  // A browser does not stop at a stray "}" in CSS: it quietly drops the rule after it. One left behind after a phone
+  // block once took the Info page's width rule with it, and nothing else said so.
+  test("assets/style.css has its braces in pairs, so no rule is quietly dropped", () => {
+    const css = fs.readFileSync(path.join(ROOT, "assets", "style.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, c => c.replace(/[^\n]/g, " "));
+    const unpaired = [];
+    let depth = 0, line = 1, open = [];
+    for (const ch of css) {
+      if (ch === "\n") line++;
+      else if (ch === "{") { depth++; open.push(line); }
+      else if (ch === "}") { if (depth === 0) unpaired.push(`a "}" with no "{" on line ${line}`); else { depth--; open.pop(); } }
+    }
+    for (const l of open) unpaired.push(`a "{" never closed, from line ${l}`);
+    expect(unpaired).toEqual([]);
+  });
+});
+
 test.describe("scripts", () => {
   const classic = ["app.js", "work.js", "arrange.js", "privacy.js"];
 
