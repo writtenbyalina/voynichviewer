@@ -46,6 +46,10 @@ test.describe("page turns", () => {
     for (const [from, to] of stretches) {
       await page.evaluate(k => Reader.go(k, 0, null, true), from);
       await page.evaluate(() => __idle());
+      // The first leaf's front is a page of the opening just jumped to, whose pictures load lazily. The Reader waits for
+      // the next opening's pictures before a leaf lifts, not for these (whoever turns a page has seen it), so on a busy
+      // machine the leaf could lift with a blank front
+      await readerPicturesLoaded(page);
       for (let k = from; k < to; k++) {
         const r = await page.evaluate(async () => {
           __rec(); Reader.step(1); await __idle();
