@@ -83,19 +83,25 @@ test("a file imported over your order keeps the order as it was; deleting the or
   expect(await page.evaluate(id => [Versions.list(id).length, JSON.parse(localStorage.getItem("vv:versions") || "{}")[id]], id)).toEqual([0, undefined]);
 });
 
-test("a card drawn out of a fan goes up, away from you: clear of its quire's name", async ({ page }) => {
+test("a card selected in a fan stays where it lies, its whole outline drawn over the cards on it", async ({ page }) => {
   await openTable(page, "davis");
+  const before = await page.evaluate(() => View3D.mod.debug.V.layout.centers.get("77|82").clone());
   const q = await at(page, "77|82");
   await page.mouse.click(q.x, q.y);
   await page.mouse.move(5, 400); await still(page);
-  const z = await page.evaluate(() => { const c = View3D.mod.debug.V.layout.centers; return [c.get("77|82").z, c.get("78|81").z]; });
-  expect(z[0], "the selected card lies further back than the one beside it").toBeLessThan(z[1]);
-  const front = await page.evaluate(() => {   // the selected card's front edge, on the screen
-    const d = View3D.mod.debug, c = d.V.layout.centers.get("77|82"), st = document.querySelector("#v3-stage").getBoundingClientRect();
-    const p = c.clone(); p.z += 50; p.project(d.camera); return st.top + (1 - p.y) / 2 * st.height;
-  });
-  const cap = await caption(page, "13").boundingBox();
-  expect(front, "its front edge above the name").toBeLessThan(cap.y);
+  const after = await page.evaluate(() => View3D.mod.debug.V.layout.centers.get("77|82"));
+  expect([after.x, after.z], "not drawn out of line, either way").toEqual([before.x, before.z]);
+  expect(await page.evaluate(() => View3D.mod.debug.V.layout.centers.get("77|82").z === View3D.mod.debug.V.layout.centers.get("78|81").z)).toBe(true);
+  const ol = await page.evaluate(() => { const l = View3D.mod.debug.selOutlines.find(x => x.visible); return l && { depthTest: l.material.depthTest, w: l.scale.x }; });
+  expect(ol, "an outline as wide as the card, not hidden under the next card").toEqual({ depthTest: false, w: expect.any(Number) });
+  // and in a stack, the selected sheet still comes a little out toward you
+  await page.locator("#cx-order").selectOption("beinecke");
+  await page.keyboard.press("Escape");   // nothing selected
+  await page.mouse.move(5, 400); await still(page);
+  const s0 = await page.evaluate(() => View3D.mod.debug.V.layout.centers.get("77|82").z);
+  const r = await at(page, "77|82"); await page.mouse.click(r.x, r.y);
+  await page.mouse.move(5, 400); await still(page);
+  expect(await page.evaluate(() => View3D.mod.debug.V.layout.centers.get("77|82").z)).toBeGreaterThan(s0);
 });
 
 test.describe("the book coming apart", () => {

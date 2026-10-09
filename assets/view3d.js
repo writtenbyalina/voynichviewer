@@ -1347,9 +1347,10 @@ function arrangeLayout(base) {
       const cx = p.fan ? p.fx + j * p.step : p.x0 + p.w / 2;
       const y = 1 + (p.fan ? j * 1.6 : j * p.up), z = p.fan ? p.z1 : p.z1 - j * p.fwd;
       if (id == null) return;
-      // selected sheets are drawn a little out of their pile (the main one more); the one pointed at, less. Out of a stack
-      // toward you; a card out of a fan away from you, up into the room kept behind it, clear of the name in front
-      const pull = (V.sel.has(id) ? H * (id === V.selMain ? .16 : .1) : id === V.hover?.id ? H * .07 : 0) * (p.fan ? -1 : 1);
+      // selected sheets are drawn a little out of a stack, toward you (the main one more); the one pointed at, less. A card
+      // in a fan stays where it lies (drawn out either way it only looked out of line, the next card still over most of
+      // it): its gold outline, drawn over its neighbours, shows the whole of it
+      const pull = p.fan ? 0 : V.sel.has(id) ? H * (id === V.selMain ? .16 : .1) : id === V.hover?.id ? H * .07 : 0;
       put(byId.get(id), cx, y + (pull ? .6 : 0), z + pull);
       centers.set(id, new THREE.Vector3(cx, y, z + pull - H / 2));
       // a point on the part of it that shows: the strip in front of the sheet above, or (a fan) its own uncovered side
@@ -1601,11 +1602,13 @@ function placePiles() {
   // selected sheets: a gold outline round each (the parts under other sheets stay hidden, as the sheets do)
   ARR.ssel ||= [];
   const ids = V.arrange ? [...V.sel].filter(id => V.layout.centers.has(id) && !ARR.drag?.ids.includes(id)) : [];
+  const inFan = new Set(piles.filter(p => p.fan).flatMap(p => p.ids));
   while (ARR.ssel.length < ids.length) { const l = new THREE.Line(RECT, new THREE.LineBasicMaterial({ color: GOLD })); l.rotation.x = -Math.PI / 2; scene.add(l); ARR.ssel.push(l); }
   ARR.ssel.forEach((l, i) => {
     const id = ids[i]; l.visible = !!id && !settling; if (!id) return;
-    const c = V.layout.centers.get(id);
+    const c = V.layout.centers.get(id), fan = inFan.has(id);
     l.position.set(c.x, c.y + 1.4, c.z); l.scale.set(sheetWidth(id) + 3, H + 3, 1);
+    l.material.depthTest = !fan; l.renderOrder = fan ? 5 : 0;   // a card in a fan: its whole outline, over the cards on it
   });
   // dragging: a gold wash under the pile they would go into, or a gold bar in the gap a new quire would fill
   ARR.hl ||= flatGold(.2, 1);
@@ -2938,6 +2941,7 @@ export default {
     get renderer() { return renderer; },
     get camera() { return camera; },
     get tray() { return ARR.tray; },   // the set-aside pile's dashed place on the table
+    get selOutlines() { return ARR.ssel || []; },   // the gold outlines round selected sheets
     pickAt(x, y) { return pick({ clientX: x, clientY: y })?.en.id ?? null; },
     /* true while anything is still moving or about to: a tween, the camera on its way, a resize not yet fitted */
     get busy() {
