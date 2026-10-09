@@ -222,9 +222,11 @@ def share(units, n, expect, widths, xh, ext=None):
         c = wpos * ((a + b) / 2 - expect[i]) ** 2 / (2.2 * xh) ** 2  # where the old shape put it
         c += 3.0 * math.log(w / widths[i]) ** 2                     # as wide as its glyphs
         c += 1.5 * float(np.clip(gapw[j + 1:k + 1] - 0.55 * xh, 0, None).sum()) / xh   # no word gap inside it
-        if ext and ext[i]:                                          # not far past its old box
+        if ext and ext[i]:                                          # not past its old box by more than a glyph or so
             lo, hi = ext[i]
-            c += 0.6 * (max(0.0, lo - a - 1.0 * xh) + max(0.0, b - hi - 1.0 * xh)) / xh
+            if a < lo - 1.5 * xh or b > hi + 1.5 * xh:
+                return BIG
+            c += 0.6 * (max(0.0, lo - a - 0.5 * xh) + max(0.0, b - hi - 0.5 * xh)) / xh
         return c
 
     span = 20
@@ -242,6 +244,8 @@ def share(units, n, expect, widths, xh, ext=None):
                 if abs((starts[j] + stops[k - 1]) / 2 - expect[i]) > 8 * xh + widths[i]:
                     continue
                 wc = word_cost(i, j, k - 1)
+                if wc >= BIG:
+                    continue
                 for q in range(max(0, j - 25), j + 1):         # the previous word ended with unit q-1
                     prev = best[i, q]
                     if prev >= BIG:
@@ -547,7 +551,7 @@ class Line:
             c0_, c1_ = max(0, int(u0)), min(S.shape[1], int(math.ceil(u1)))
             foreign = (S[:, c0_:c1_] > 0.3) & ~mine[:, c0_:c1_]
             body_lo, body_hi = int(lo_band[a:b].min()), int(hi_band[a:b].max())
-            lim = 0.2 * xh * xh
+            lim = 0.9 * xh * xh                                  # (a tail of the line above grazing it is not a glyph)
             r0_, r1_ = int(math.floor(v0)), int(math.ceil(v1))
             while r0_ < body_lo and foreign[max(0, r0_):max(0, r0_) + max(1, int(xh)), :].sum() > lim:
                 r0_ += 1
@@ -731,9 +735,10 @@ def fit_label(kind, nums, glyphs, ink, H, t_page=None):
     nw, labw, stw, _ = cv2.connectedComponentsWithStats(J, connectivity=8)
     old = np.zeros_like(G)
     cv2.fillPoly(old, [np.int32(P - [x0, y0])], 1)
+    near = cv2.dilate(old, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(1.2 * xh) | 1, int(1.2 * xh) | 1)))
     best = None
     for i in range(1, nw):
-        m = (labw == i) & (G > 0)
+        m = (labw == i) & (G > 0) & (near > 0)                # (never far outside the label's given place)
         ov = int((m & (old > 0)).sum())
         if ov < 0.3 * m.sum() or m.sum() < 1.2 * xh * xh:
             continue
