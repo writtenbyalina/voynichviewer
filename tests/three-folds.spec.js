@@ -373,25 +373,26 @@ test.describe("while folding", () => {
     const z = await page.evaluate(async () => {
       const wait = ms => new Promise(r => setTimeout(r, ms));
       for (let i = 0; i < 200 && (R.busy || R.queue.length); i++) await wait(30);   // the Reader is free
-      const done = Reader.setUnfold({ L: false, R: true }, { speed: 6 });
+      const done = Reader.setUnfold({ L: false, R: true });
       // how far each flap's free edge has come toward you (+) or gone away (-) from the edge it hangs on
       const lift = () => Object.fromEntries([...document.querySelectorAll(".rd-page.right .seg.ext")].map(el => {
         const t = getComputedStyle(el).transform, m = new DOMMatrix(t === "none" ? undefined : t);
         return [el.title, m.transformPoint(new DOMPoint(el.offsetWidth, 0, 0)).z - m.transformPoint(new DOMPoint(0, 0, 0)).z];
       }));
-      let seen = null;
-      // every frame the Reader draws, until it is done: a frame where 72r2 is plainly turning (on a slow machine the frames
-      // are few and far between, and a timer can run out before one comes)
-      while (R.busy && !seen) {
-        const now = lift(), w = document.querySelector('.rd-page.right .seg.ext[title="f72r2"]').offsetWidth;
-        if (Math.abs(now["f72r2"]) > .3 * w) seen = now;
-        else await new Promise(r => requestAnimationFrame(() => r()));
-      }
+      // The fold is put at exact points of its course and read at once, rather than caught in passing: a browser drawing
+      // the new panels' pictures in software (GitHub's machines) may not manage a single frame before the animation is over.
+      const w = document.querySelector('.rd-page.right .seg.ext[title="f72r2"]').offsetWidth;
+      const seen = [.2, .35, .5, .65, .8].map(k => { R.folding.frame(k); return { k, ...lift() }; });
       await done;
-      return seen;
+      return { w, seen };
     });
-    expect(z, "the unfolding was seen under way").not.toBeNull();
-    expect(z["f72r2"], "72r2's free edge comes toward you").toBeGreaterThan(0);
-    expect(z["f72r3"], "72r3's free edge goes back from 72r2's").toBeLessThan(0);
+    const plain = z.seen.filter(s => Math.abs(s["f72r2"]) > .3 * z.w);
+    expect(plain.length, `72r2 plainly turning at some point: ${JSON.stringify(z.seen)}`).toBeGreaterThan(0);
+    for (const s of plain) {
+      expect(s["f72r2"], `at ${s.k}: 72r2's free edge comes toward you`).toBeGreaterThan(0);
+      expect(s["f72r3"], `at ${s.k}: 72r3's free edge goes back from 72r2's`).toBeLessThan(0);
+    }
+    // and it lands open, with both panels flat
+    expect(await page.evaluate(() => [...document.querySelectorAll(".rd-page.right .seg.ext")].every(el => !el.style.transform))).toBe(true);
   });
 });

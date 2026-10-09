@@ -733,7 +733,7 @@ const Reader = {
       }
     };
     const DUR = (560 + 300 * (n - 1)) * speed, t0 = performance.now();
-    R.busy = true; R.folding = {};
+    R.busy = true; R.folding = { frame };   // `frame` is kept so a test can put the fold at an exact point without waiting on the browser's frames
     frame(0);
     return new Promise(done => {
       const finish = () => {
