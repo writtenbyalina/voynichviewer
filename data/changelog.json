@@ -2,6 +2,15 @@
  "about": "What changed on the site, newest first. Shown under the version number (top left). Add an entry for every change people can see and every fix, in the same commit, with the date it went live. kind: new | improved | fixed. The second number of the version goes up with each release; the first with a redesign.",
  "releases": [
   {
+   "version": "1.5",
+   "date": "2026-10-05",
+   "changes": [
+    {"kind": "improved", "text": "Rearrange lays the book out on the table, a pile for each quire, to move sheets around."},
+    {"kind": "fixed", "text": "Updates to the foldouts and notes as per review by Lisa Fagin Davis."},
+    {"kind": "improved", "text": "The 3D book is smoother, with the paper curling round every fold."}
+   ]
+  },
+  {
    "version": "1.4",
    "date": "2026-10-04",
    "changes": [

@@ -1,0 +1,478 @@
+{
+ "app": "voynich-viewer",
+ "version": 1,
+ "exported": "2026-10-04T09:55:05.788Z",
+ "crops": {
+  "f1r": {
+   "quad": [
+    [
+     30,
+     134
+    ],
+    [
+     2826,
+     134
+    ],
+    [
+     2826,
+     3634
+    ],
+    [
+     30,
+     3634
+    ]
+   ],
+   "rotate": 0
+  },
+  "f78v": {
+   "quad": [
+    [
+     134,
+     110
+    ],
+    [
+     2692,
+     110
+    ],
+    [
+     2692,
+     3586
+    ],
+    [
+     134,
+     3586
+    ]
+   ],
+   "rotate": 90
+  }
+ },
+ "orders": [
+  {
+   "id": "my-mutna5t9trd5",
+   "title": "Alina’s own order",
+   "from": "Current binding (folio order)",
+   "gatherings": [
+    {
+     "quire": 1,
+     "type": "nested",
+     "bifolia": [
+      "2|7",
+      "3|6",
+      "4|5",
+      "1|8"
+     ]
+    },
+    {
+     "quire": 2,
+     "type": "singulions",
+     "bifolia": [
+      "9|16",
+      "10|15",
+      "11|14",
+      "12|13"
+     ],
+     "sheets": {
+      "9|16": {
+       "inside_out": true
+      },
+      "10|15": {
+       "rot180": true
+      }
+     }
+    },
+    {
+     "quire": 3,
+     "type": "nested",
+     "bifolia": [
+      "17|24",
+      "18|23",
+      "19|22",
+      "20|21"
+     ]
+    },
+    {
+     "quire": 4,
+     "type": "nested",
+     "bifolia": [
+      "25|32",
+      "26|31",
+      "27|30",
+      "28|29"
+     ]
+    },
+    {
+     "quire": 5,
+     "type": "nested",
+     "bifolia": [
+      "34|39",
+      "35|38",
+      "36|37"
+     ]
+    },
+    {
+     "quire": "New 1",
+     "type": "nested",
+     "bifolia": [
+      "33|40"
+     ]
+    },
+    {
+     "quire": 6,
+     "type": "nested",
+     "bifolia": [
+      "41|48",
+      "42|47",
+      "43|46",
+      "44|45"
+     ]
+    },
+    {
+     "quire": 7,
+     "type": "nested",
+     "bifolia": [
+      "49|56",
+      "50|55",
+      "51|54",
+      "52|53"
+     ]
+    },
+    {
+     "quire": 8,
+     "type": "nested",
+     "bifolia": [
+      "57|66",
+      "58|65",
+      "59|64",
+      "60|63",
+      "61|62"
+     ]
+    },
+    {
+     "quire": 9,
+     "type": "nested",
+     "bifolia": [
+      "67|68"
+     ],
+     "sheets": {
+      "67|68": {
+       "spine": 2
+      }
+     }
+    },
+    {
+     "quire": 10,
+     "type": "nested",
+     "bifolia": [
+      "69|70"
+     ]
+    },
+    {
+     "quire": 11,
+     "type": "nested",
+     "bifolia": [
+      "71|72"
+     ]
+    },
+    {
+     "quire": 12,
+     "type": "nested",
+     "bifolia": [
+      "73|74"
+     ]
+    },
+    {
+     "quire": 13,
+     "type": "nested",
+     "bifolia": [
+      "75|84",
+      "76|83",
+      "77|82",
+      "78|81",
+      "79|80"
+     ]
+    },
+    {
+     "quire": 14,
+     "type": "nested",
+     "bifolia": [
+      "85|86"
+     ]
+    },
+    {
+     "quire": 15,
+     "type": "nested",
+     "bifolia": [
+      "87|90",
+      "88|89"
+     ]
+    },
+    {
+     "quire": 16,
+     "type": "nested",
+     "bifolia": [
+      "91|92"
+     ]
+    },
+    {
+     "quire": 17,
+     "type": "nested",
+     "bifolia": [
+      "93|96",
+      "94|95"
+     ]
+    },
+    {
+     "quire": 18,
+     "type": "nested",
+     "bifolia": [
+      "97|98"
+     ]
+    },
+    {
+     "quire": 19,
+     "type": "nested",
+     "bifolia": [
+      "99|102",
+      "100|101"
+     ]
+    },
+    {
+     "quire": 20,
+     "type": "nested",
+     "bifolia": [
+      "103|116",
+      "104|115",
+      "106|113",
+      "107|112",
+      "108|111",
+      "109|110"
+     ]
+    }
+   ],
+   "unplaced": [
+    "105|114"
+   ],
+   "updated": "2026-10-04T09:55:04.559Z"
+  },
+  {
+   "id": "my-mutna5tcyfkw",
+   "title": "My order",
+   "from": "Davis: complete proposed order",
+   "gatherings": [
+    {
+     "quire": 2,
+     "type": "singulions",
+     "bifolia": [
+      "9|16",
+      "10|15",
+      "11|14",
+      "12|13"
+     ]
+    },
+    {
+     "quire": 1,
+     "type": "singulions",
+     "bifolia": [
+      "1|8",
+      "2|7",
+      "3|6",
+      "4|5"
+     ]
+    },
+    {
+     "quire": 3,
+     "type": "singulions",
+     "bifolia": [
+      "17|24",
+      "18|23",
+      "19|22",
+      "20|21"
+     ]
+    },
+    {
+     "quire": 4,
+     "type": "singulions",
+     "bifolia": [
+      "25|32",
+      "26|31",
+      "27|30",
+      "28|29"
+     ]
+    },
+    {
+     "quire": 5,
+     "type": "singulions",
+     "bifolia": [
+      "33|40",
+      "34|39",
+      "35|38",
+      "36|37"
+     ]
+    },
+    {
+     "quire": 6,
+     "type": "singulions",
+     "bifolia": [
+      "41|48",
+      "42|47",
+      "43|46",
+      "44|45"
+     ]
+    },
+    {
+     "quire": 7,
+     "type": "singulions",
+     "bifolia": [
+      "49|56",
+      "50|55",
+      "51|54",
+      "52|53"
+     ]
+    },
+    {
+     "quire": 8,
+     "type": "singulions",
+     "bifolia": [
+      "57|66",
+      "58|65",
+      "59|64",
+      "60|63",
+      "61|62"
+     ]
+    },
+    {
+     "quire": 9,
+     "type": "singulions",
+     "bifolia": [
+      "67|68"
+     ],
+     "sheets": {
+      "67|68": {
+       "spine": 1
+      }
+     }
+    },
+    {
+     "quire": 10,
+     "type": "singulions",
+     "bifolia": [
+      "69|70"
+     ]
+    },
+    {
+     "quire": 11,
+     "type": "singulions",
+     "bifolia": [
+      "71|72"
+     ]
+    },
+    {
+     "quire": 12,
+     "type": "singulions",
+     "bifolia": [
+      "73|74"
+     ]
+    },
+    {
+     "quire": 13,
+     "type": "singulions",
+     "bifolia": [
+      "77|82",
+      "78|81",
+      "75|84",
+      "76|83",
+      "79|80"
+     ]
+    },
+    {
+     "quire": 14,
+     "type": "singulions",
+     "bifolia": [
+      "85|86"
+     ]
+    },
+    {
+     "quire": 15,
+     "type": "singulions",
+     "bifolia": [
+      "87|90",
+      "88|89"
+     ]
+    },
+    {
+     "quire": 16,
+     "type": "singulions",
+     "bifolia": [
+      "91|92"
+     ]
+    },
+    {
+     "quire": 17,
+     "type": "singulions",
+     "bifolia": [
+      "93|96",
+      "94|95"
+     ]
+    },
+    {
+     "quire": 18,
+     "type": "singulions",
+     "bifolia": [
+      "97|98"
+     ]
+    },
+    {
+     "quire": 19,
+     "type": "singulions",
+     "bifolia": [
+      "99|102",
+      "100|101"
+     ]
+    },
+    {
+     "quire": 20,
+     "type": "singulions",
+     "bifolia": [
+      "105|114",
+      "104|115",
+      "106|113",
+      "107|112",
+      "108|111",
+      "103|116"
+     ]
+    }
+   ],
+   "unplaced": [
+    "109|110"
+   ],
+   "updated": "2026-10-04T09:55:04.560Z"
+  }
+ ],
+ "bookmarks": [
+  {
+   "id": "bm-mutna1pm0fq5",
+   "page": "f78v",
+   "name": "Waterspouts ★ “quoted” & <b>tags</b>",
+   "at": "2026-10-04T09:54:59.242Z"
+  },
+  {
+   "id": "bm-mutna1pqa41s",
+   "page": "f1r",
+   "name": "1r",
+   "at": "2026-10-04T09:54:59.246Z"
+  },
+  {
+   "id": "bm-mutna1prinu5",
+   "page": "f67r1",
+   "name": "Big foldout",
+   "at": "2026-10-04T09:54:59.247Z"
+  },
+  {
+   "id": "bm-mutna1ptnkl8",
+   "page": "f12r",
+   "name": "A lost leaf",
+   "at": "2026-10-04T09:54:59.249Z"
+  }
+ ],
+ "viewer": "1.0"
+}

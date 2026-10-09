@@ -1,0 +1,23 @@
+{
+ "generation": "v1.1",
+ "rev": "ec35dee809104b508b4a795d098aca6b4c9cf83e",
+ "capturedWith": "tests/legacy/capture.js",
+ "orders": 2,
+ "bookmarks": 4,
+ "crops": 2,
+ "orderIds": [
+  "my-mutna5t9trd5",
+  "my-mutna5tcyfkw"
+ ],
+ "currentOrder": "my-mutna5t9trd5",
+ "bookmarkPages": [
+  "f78v",
+  "f1r",
+  "f67r1",
+  "f12r"
+ ],
+ "cropKeys": [
+  "f1r",
+  "f78v"
+ ]
+}

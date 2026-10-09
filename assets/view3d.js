@@ -33,10 +33,14 @@ const V = {
   spread: store.get("3d:spread", 0.32), thick: store.get("3d:thick", 4), posture: store.get("3d:posture", "stand"),
   mode: "block", opening: 1, cur: 0, hover: null, preset: 1,
   inspect: false,      // the current sheet is pulled out and the inspector is open
-  hand: { on: false, turned: false, folded: true, flat: false, yaw: 0, pitch: 0, cam: null },   // lifted clear to look at
+  hand: { on: false, turned: false, open: [0, 0], flat: false, yaw: 0, pitch: 0, cam: null },   // lifted clear to look at; open: folds open per leaf
   unfoldOpening: false, slow: store.get("3d:slow", false), prevOrder: null, flash: null,
   overlay: store.get("3d:overlay", "none"),
   contact: { on: false, i: 0, newOnly: false, list: [] },
+  arrange: false,      // Rearrange: the quires lie open on the table as piles (arrangeLayout)
+  sel: new Set(), selQ: new Set(), selMain: null,   // there, the selected sheets (the main one) or quires (arrange.js)
+  hoverPile: null,     // and the stack under the pointer, opened out
+  hideLost: store.get("3d:hideLost", false),   // lost sheets left out of the 3D book
   objs: new Map(),     // current order: sheet id -> sheet object
   cache: new Map(),    // id + handling -> sheet object, reused across orders
 };
@@ -112,6 +116,30 @@ const BOX = (() => {
   return g;
 })();
 const RECT = new THREE.BufferGeometry().setFromPoints([[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5], [-.5, -.5]].map(([x, y]) => new THREE.Vector3(x, y, 0)));
+const PAPER = .8;   // a leaf is drawn this much of a layer thick, so the layers of a stack do not touch
+const NS = 16, NB = 10;   // steps along the curve of a fold at the spine, and of a fold between panels
+/* A bent band of paper as four strips of quads along a curve of n steps: its two faces (0, 1), then its two edges
+   (2, 3), each strip a ladder of vertex pairs. Group 0 is the faces, group 1 the edges. */
+function bandGeo(n) {
+  const g = new THREE.BufferGeometry(), idx = [];
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array((n + 1) * 8 * 3), 3));
+  for (let s = 0; s < 4; s++) for (let i = 0; i < n; i++) { const a = (s * (n + 1) + i) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  g.setIndex(idx);
+  g.addGroup(0, 12 * n, 0); g.addGroup(12 * n, 12 * n, 1);
+  return g;
+}
+/* Fill a band from its cross-sections: at(i) gives step i's two faces' points at either end, [[p0, p1], [q0, q1]]. */
+function fillBand(g, n, at) {
+  const pos = g.attributes.position, put = (s, i, e, p) => pos.setXYZ((s * (n + 1) + i) * 2 + e, p[0], p[1], p[2]);
+  for (let i = 0; i <= n; i++) {
+    const [[p0, p1], [q0, q1]] = at(i);
+    put(0, i, 0, p0); put(0, i, 1, p1); put(1, i, 0, q0); put(1, i, 1, q1);
+    put(2, i, 0, p0); put(2, i, 1, q0); put(3, i, 0, p1); put(3, i, 1, q1);
+  }
+  pos.needsUpdate = true;
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+}
 
 function makeMaterials() {
   M.ghost = new THREE.MeshBasicMaterial({ color: 0xe9e3d8, transparent: true, opacity: .06, depthWrite: false });
@@ -133,8 +161,10 @@ function modelOf(order) {
       const moved = order.id !== "beinecke" && (!w || w.q !== g.quire || w.i !== i);
       return { id, sheet: SHEETS.get(id), opts, quire: g.quire, type: g.type, idx: i, count: g.bifolia.length, note: g.note, qi,
                moved, resewn: order.id !== "beinecke" && !moved && !!w && w.o !== JSON.stringify(opts) };
-    });
-    quires.push({ qi, quire: g.quire, type: g.type, leaves: [] });
+    }).filter(e => !(V.hideLost && e.sheet.missing.every(Boolean)));   // Hide lost sheets: the book without them
+    if (!es.length) return;
+    const qd = { qi, quire: g.quire, type: g.type, leaves: [] };   // qi stays the gathering's place in the order
+    quires.push(qd);
     const groups = g.type === "singulions" ? es.map(e => [e]) : [es];
     for (const grp of groups) {
       const gi = gathers.length;
@@ -142,13 +172,14 @@ function modelOf(order) {
       const ga = { gi, qi, quire: g.quire, leaves: [] };
       ls.forEach(([e, k], j) => {
         const L = { key: `${e.id}:${k}`, e, k, gi, qi, j, depth: g.type === "singulions" ? 0 : e.idx, n: leaves.length };
-        ga.leaves.push(L); quires[qi].leaves.push(L); leaves.push(L);
+        ga.leaves.push(L); qd.leaves.push(L); leaves.push(L);
       });
       gathers.push(ga);
     }
     sheets.push(...es);
   });
-  const unplaced = unplacedOf(order).map(id => ({ id, sheet: SHEETS.get(id), opts: {}, quire: SHEETS.get(id).quire, unplaced: true, type: "aside", idx: 0, count: 1 }));
+  const unplaced = unplacedOf(order).filter(id => !(V.hideLost && SHEETS.get(id).missing.every(Boolean)))
+    .map(id => ({ id, sheet: SHEETS.get(id), opts: {}, quire: SHEETS.get(id).quire, unplaced: true, type: "aside", idx: 0, count: 1 }));
   return { sheets, gathers, leaves, quires, unplaced, all: [...sheets, ...unplaced] };
 }
 
@@ -156,7 +187,8 @@ function modelOf(order) {
 /* Port of the old CSS sheet3D(). Each leaf is a group whose origin is the foot of the spine fold; its proper panel
    starts there and further panels hang from hinges, each folding back over the last. A hinge is
    translateZ(g/2) rotate translateZ(-g/2): the fold line sits g/2 inside, so the folded panel lands g in front, on
-   the inside of the sheet. The Rose sheet's top row hangs from the top edge of the bottom row and folds down. */
+   the inside of the sheet; a fold that goes out has g < 0 and turns the other way. The Rose sheet's top row hangs from
+   the top edge of the bottom row and folds down. */
 function makeSheet(entry) {
   const sh = entry.sheet, v = handled(sh, entry.opts);
   const n = v.n, s = v.spine, rows = v.inside.length, prow = v.proper;
@@ -168,13 +200,15 @@ function makeSheet(entry) {
     }
     return a * H;
   };
-  const o = { id: entry.id, v, n, s, rows, group: new THREE.Group(), leaves: [], panels: [], creases: [], lost: sh.missing.every(Boolean) };
+  const o = { id: entry.id, v, n, s, rows, group: new THREE.Group(), leaves: [], panels: [], creases: [], folds: [], lost: sh.missing.every(Boolean) };
   o.group.name = entry.id;
   const leafLost = k => sh.missing[k];
   /* Pieces of one leaf's panels in hinge order. Folded, each piece lies back over the last. A panel too wide to lie
-     flat inside the leaf (68r3, 72r3, 89r2 …) would reach past the spine or the fore-edge, so it gets an extra crease
-     there and its remainder rolls back inside: inferred, like the fold direction itself. */
+     flat inside the leaf (68r3, 72r3, 89r2, 102r2) has an extra crease, and its remainder folds back. For the sheet as
+     bound the crease is where Yale's photographs show it (data/folds.json, as a fraction of the panel's width from the
+     fold it hangs from); otherwise it goes where the panel would reach past the spine or the fore-edge. */
   const MARGIN = 1.2;
+  const marked = recordOf(sh.id, entry.opts)?.creases || {};
   const piecesOf = cols => {
     const out = [];
     if (!cols.length) return out;
@@ -182,12 +216,12 @@ function makeSheet(entry) {
     out.push({ c: cols[0], a: 0, b: w0, w: w0 });
     let end = w0, d = -1;   // folded: where the last piece ends, and which way the next one runs
     for (const c of cols.slice(1)) {
-      const w = colW(c);
+      const w = colW(c), at = marked[v.inside[prow][c].img];
       let a = 0;
       while (w - a > .01) {
         const room = d < 0 ? end - MARGIN : w0 - MARGIN - end;
         // a few units over is loose cropping, not a crease
-        const take = w - a - room < 5 ? w - a : Math.min(w - a, Math.max(room, Math.min(w - a, 4)));
+        const take = at ? (a ? w - a : w * at) : w - a - room < 5 ? w - a : Math.min(w - a, Math.max(room, Math.min(w - a, 4)));
         if (a > 0) o.creases.push({ page: v.inside[prow][c].page, at: a / w });
         out.push({ c, a, b: a + take, w, cont: a > 0 });
         end += d * take; d = -d; a += take;
@@ -202,6 +236,18 @@ function makeSheet(entry) {
     for (let i = 20; i < 24; i++) uv.setX(i, 1 - p1 + uv.getX(i) * (p1 - p0));           // back (-z): mirrored
     return g;
   };
+  /* Which way a fold goes (data/folds.json): 1 in, the inside faces of the sheet coming together, or -1 out. The record
+     names the sheet's own inside panels, so a sheet sewn inside out folds each one the other way. Unlisted folds go in. */
+  const ways = D.folds?.sheets?.[sh.id]?.folds || {};
+  const wayOf = colsAt => {
+    const ids = row => colsAt.map(c => row === v.inside ? row[prow][c]?.img : row[prow][n - 1 - c]?.img);
+    for (const [row, k] of [[v.inside, 1], [v.outside, -1]]) {
+      const a = ids(row).join("|"), b = ids(row).reverse().join("|");
+      const w = ways[a] || ways[b];
+      if (w) return { way: (w === "out" ? -1 : 1) * k, given: true };
+    }
+    return { way: 1, given: false };
+  };
   const buildLeaf = k => {
     const dir = k === 0 ? -1 : 1;
     const cols = k === 0 ? range(0, s).reverse() : range(s, n);
@@ -209,10 +255,28 @@ function makeSheet(entry) {
     const L = { k, group: new THREE.Group(), hinges: [], layers: rows * pieces.length, w: cols.length ? colW(cols[0]) : 0,
                 edge: leafLost(k) ? M.ghostEdge : new THREE.MeshLambertMaterial({ color: EDGE[(sh.leaves[k] || 0) % 3] }) };
     L.base = L.edge.color ? L.edge.color.getHex() : null;
-    const hinge = (parent, x, y, gapU, axis, sign) => {
+    // the paper round its folds is coloured like its edges, and seen from either side
+    L.bendMat = leafLost(k) ? M.ghostEdge : new THREE.MeshLambertMaterial({ color: L.base, side: THREE.DoubleSide });
+    /* Folded, the pieces stack as foldStack says (app.js). Every piece is a block of `rows` layers (the Rose's top row
+       lies on its front); z is where its own panel lies. */
+    const fw = pieces.map((p, j) => j ? wayOf(p.cont ? [p.c] : [pieces[j - 1].c, p.c]) : null);
+    const fs = foldStack(fw.map(f => f ? f.way : 0));
+    const zOf = j => fs.layer[j] * rows + (fs.up[j] ? 0 : rows - 1);
+    pieces.forEach((p, j) => { if (j) o.folds.push({ k, crease: !!p.cont, way: fw[j].way, given: fw[j].given,
+      pages: (p.cont ? [p.c] : [pieces[j - 1].c, p.c]).map(c => v.inside[prow][c]) }); });
+    /* A hinge, and the paper bent round it (see bendHinge): along a column fold, the panel's own row and, on a sheet
+       of two rows, the top row folded down in front of it, one layer on; along the top-row fold, the piece's width. */
+    const hinge = (parent, x, y, gapU, axis, sign, len = 0) => {
       const outer = new THREE.Group(), inner = new THREE.Group();
       outer.position.set(x, y, 0); outer.add(inner); parent.add(outer);
-      L.hinges.push({ outer, inner, gapU, axis, sign });
+      const bends = (axis === "y" ? range(0, rows) : [0]).map(at => {
+        const m = new THREE.Mesh(bandGeo(NB), L.bendMat);
+        m.position.set(x, y, 0); m.visible = false; m.frustumCulled = false;
+        m.userData = { at, span: axis === "y" ? [0, H] : [0, dir * len] };
+        parent.add(m);
+        return m;
+      });
+      L.hinges.push({ outer, inner, gapU, axis, sign, bends, drawn: null });
       return inner;
     };
     const place = (parent, r, p) => {
@@ -230,31 +294,54 @@ function makeSheet(entry) {
       return len;
     };
     let parent = L.group, prev = 0;
+    // a fold's name: its two panels, or the crease inside one; on a sheet of several rows, by column
+    const nameOf = c => rows > 1 ? `column ${c + 1}` : short(pageName(v.inside[prow][c]));
     pieces.forEach((p, j) => {
       let col = parent;
-      if (j > 0) col = hinge(parent, dir * prev, 0, rows * (pieces.length - j) + rows - 1, "y", -dir);
+      // a signed gap: in, the piece lands that far in front of the last; out, behind it
+      if (j > 0) {
+        col = hinge(parent, dir * prev, 0, fw[j].way * Math.abs(zOf(j) - zOf(j - 1)), "y", -dir * fw[j].way);
+        const a = pieces[j - 1].c;
+        L.hinges.at(-1).info = { way: fw[j].way, label: p.cont ? `the crease in ${nameOf(p.c)}` : rows > 1 ? `columns ${a + 1}–${p.c + 1}` : `${nameOf(a)}–${nameOf(p.c)}` };
+      }
       prev = place(col, prow, p);
-      if (rows > 1) place(hinge(col, 0, H, 1, "x", 1), prow === 1 ? 0 : 1, p);
+      if (rows > 1) place(hinge(col, 0, H, 1, "x", 1, p.b - p.a), prow === 1 ? 0 : 1, p);   // the top row folds down onto the front of the bottom row
       parent = col;
     });
     o.group.add(L.group);
     return L;
   };
   o.leaves = [buildLeaf(0), buildLeaf(1)];
+  /* The folds of each leaf as steps, in the order they open: along the strip from the spine, each fold carrying the
+     folded rest with it. They close in reverse. A sheet of two rows (the Rose) folds as one thing (o.linked): its
+     columns first, then the whole top half at once, across every column and both leaves. It is one strip: Yale's
+     photograph of the sheet half open (85r2 · 86v4 · 86v6) shows it folded down in one piece over the lower half.
+     A leaf with fewer column folds than the other waits its turn (a step with no hinge). */
+  const colSteps = L => [...L.hinges.keys()].filter(hi => L.hinges[hi].axis === "y").map(hi => ({ hs: [hi], info: L.hinges[hi].info }));
+  o.linked = rows > 1;
+  if (o.linked) {
+    const cs = o.leaves.map(colSteps), most = Math.max(...cs.map(c => c.length));
+    o.leaves.forEach((L, k) => {
+      L.steps = [...cs[k], ...range(cs[k].length, most).map(() => ({ hs: [], info: null })),
+                 { hs: [...L.hinges.keys()].filter(hi => L.hinges[hi].axis === "x"), info: { way: 1, row: true, label: "the top half" } }];
+    });
+  } else for (const L of o.leaves) L.steps = colSteps(L);
   o.S = range(0, s).reduce((a, c) => a + colW(c), 0);                 // width left of the spine, opened flat
   o.leaves[0].full = o.S; o.leaves[1].full = range(s, n).reduce((a, c) => a + colW(c), 0);
-  // the fold at the back: a strip joining the two leaves' spine edges, reshaped every frame
-  const NS = 12;
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array((NS + 1) * 2 * 3), 3));
-  const idx = [];
-  for (let i = 0; i < NS; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
-  geo.setIndex(idx);
+  /* The fold at the back: a band of paper as thick as the leaves, joining their spine edges, reshaped every frame. Its
+     faces are a shade darker than the edges; its head and tail are coloured like the leaves' edges, so from above a
+     leaf, its fold and the other leaf read as one line. */
   o.foldMat = o.lost ? M.ghostEdge : new THREE.MeshLambertMaterial({ color: FOLD, side: THREE.DoubleSide });
-  o.fold = new THREE.Mesh(geo, o.foldMat);
+  o.foldMats = o.lost ? o.foldMat : [o.foldMat, (o.leaves.find(L => L.base != null) || o.leaves[0]).bendMat];
+  o.fold = new THREE.Mesh(bandGeo(NS), o.foldMats);
   o.fold.userData = { sheet: o, ns: NS };
   o.fold.frustumCulled = false;
   o.group.add(o.fold); pickables.push(o.fold);
+  if (o.linked) {   // the top row's own fold at the spine (shapeFold)
+    o.fold2 = new THREE.Mesh(bandGeo(NS), o.foldMats);
+    o.fold2.userData = o.fold.userData; o.fold2.frustumCulled = false;
+    o.group.add(o.fold2); pickables.push(o.fold2);
+  }
   return o;
 }
 
@@ -309,6 +396,10 @@ function computeLayout() {
   const sc = Math.min(sp / 0.55, 1), F = 130 * (1 - Math.pow(1 - sc, 1.6));
   const e = open ? 0 : smooth(0.55, 1, sp);
   const cur = model.all[V.cur], al = new Array(N);
+  /* Open at an opening and unfolded: its two leaves open out. A sheet of two rows opens only at its own centre, where
+     both its leaves are the opening, since its top half is one piece across them. */
+  const unfoldsHere = (L, i) => (i === V.opening - 1 || i === V.opening)
+    && (!V.objs.get(L.e.id)?.linked || (leaves[V.opening - 1]?.e === L.e && leaves[V.opening]?.e === L.e));
   if (open) {
     // open at an opening: leaves before it in the left pile, the rest in the right; the opening faces you
     const o = clamp(V.opening, 0, N);
@@ -349,7 +440,7 @@ function computeLayout() {
     const off = L.k === 0 ? t / 2 : w - t / 2;
     // the current sheet stands a little proud; pulled out to inspect, a third of its height
     poses.set(L.key, { x: px + nx * off, y: e * .05 * H * L.depth, z: pz + nz * off, a: al[i],
-                       f: open && V.unfoldOpening && (i === V.opening - 1 || i === V.opening) ? 0 : 1,
+                       f: open && V.unfoldOpening && unfoldsHere(L, i) ? 0 : 1,
                        lift: !open && L.e === cur ? (V.inspect ? .34 : .12) * H * (1 - .6 * e) : 0 });
     px += nx * w; pz += nz * w;
   });
@@ -386,13 +477,16 @@ function computeLayout() {
     const m = inv.clone().multiply(world), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
     m.decompose(p, q, s);
     sg.set(cur.id, { p, q });
-    const phi = V.hand.flat ? 0 : 20, f = V.hand.folded ? 1 : 0;   // phi: how far each leaf is from lying flat
-    poses.set(`${cur.id}:0`, { x: 0, y: 0, z: 0, a: -(90 - phi), f, lift: 0 });
-    poses.set(`${cur.id}:1`, { x: 0, y: 0, z: 0, a: 90 - phi, f, lift: 0 });
+    // how far each leaf is from lying flat; a sheet of two rows is held flat, so its top half lifts in one piece across the spine
+    const phi = V.hand.flat || V.objs.get(cur.id)?.linked ? 0 : 20;
+    const f = k => { const n = foldsOf(cur, k); return n ? 1 - Math.min(V.hand.open[k], n) / n : 1; };
+    poses.set(`${cur.id}:0`, { x: 0, y: 0, z: 0, a: -(90 - phi), f: f(0), lift: 0 });
+    poses.set(`${cur.id}:1`, { x: 0, y: 0, z: 0, a: 90 - phi, f: f(1), lift: 0 });
   }
   const worldBox = place.box.clone();
   if (model.unplaced.length) worldBox.max.z += 1.3 * H;
-  return { poses, sg, t, lie, beta, place, box: worldBox, al };
+  const out = { poses, sg, t, lie, beta, place, box: worldBox, al };
+  return V.arrange ? arrangeLayout(out) : out;
 }
 
 // ---------------------------------------------------------------- animation
@@ -402,11 +496,14 @@ const IDENT = { p: new THREE.Vector3(), q: new THREE.Quaternion() };
 const mixPose = (a, b, q) => ({ x: lerp(a.x, b.x, q), y: lerp(a.y, b.y, q), z: lerp(a.z, b.z, q), a: lerp(a.a, b.a, q), f: lerp(a.f, b.f, q), lift: lerp(a.lift, b.lift, q) });
 const mixSg = (a, b, q) => ({ p: a.p.clone().lerp(b.p, q), q: a.q.clone().slerp(b.q, q) });
 const mixG = (a, b, q) => ({ t: lerp(a.t, b.t, q), lie: lerp(a.lie, b.lie, q), beta: lerp(a.beta, b.beta, q) });
+/* A keyframe is [time, value] or [time, value, "even"]: the stretch that ends at it runs at an even pace instead of
+   easing in and out, for folds, which ease one by one on their own (poseLeaf). */
 function at(track, k, mix) {
   let i = 0;
   while (i < track.length - 2 && k > track[i + 1][0]) i++;
-  const [k0, a] = track[i], [k1, b] = track[i + 1];
-  return mix(a, b, ease(clamp((k - k0) / Math.max(1e-6, k1 - k0))));
+  const [k0, a] = track[i], [k1, b, pace] = track[i + 1];
+  const x = clamp((k - k0) / Math.max(1e-6, k1 - k0));
+  return mix(a, b, pace === "even" ? x : ease(x));
 }
 function finishSwaps() {
   for (const sw of TW.swaps || []) {
@@ -417,13 +514,18 @@ function finishSwaps() {
 function relayout(dur = 650, morph = null) {
   if (!V.model) return;
   if (TW.on) finishSwaps();
+  if (TW.camAt) camHome();   // a camera move waiting for its moment: now
+  const keys = ARR.plan?.keys;
   const L = V.layout = computeLayout();
+  const replan = V.arrange && keys && ARR.plan?.keys !== keys;
+  if (replan) setTimeout(keepFramed, 0);   // the table's plan changed: does it still fit?
   const poses = new Map(), sgs = new Map();
   for (const [key, b] of L.poses) poses.set(key, [[0, CUR.poses.get(key) || b], [1, b]]);
   for (const en of V.model.all) sgs.set(en.id, [[0, CUR.sg.get(en.id) || IDENT], [1, L.sg.get(en.id) || IDENT]]);
   const tw = { poses, sgs, g: [[0, { t: CUR.t, lie: CUR.lie, beta: CUR.beta }], [1, { t: L.t, lie: L.lie, beta: L.beta }]], swaps: [], leaving: [] };
   if (morph) morph(tw, L);
-  TW = { ...tw, t0: performance.now(), dur: REDUCED ? 0 : dur, on: true };
+  TW = { ...tw, t0: performance.now(), dur: REDUCED ? 0 : dur, on: true, replan };
+  renderFoldBtn();
   for (const sw of TW.swaps) sw.show.group.visible = false;
   updateDetail();
   if (!TW.dur) tweenStep(TW.t0); else wake();
@@ -437,10 +539,45 @@ function tweenStep(now) {
   for (const [id, tr] of TW.sgs) sg.set(id, at(tr, k, mixSg));
   CUR.poses = poses; CUR.sg = sg;
   Object.assign(CUR, at(TW.g, k, mixG));
+  if (ARR.grow) for (const id of ARR.grow) V.objs.get(id)?.group.scale.setScalar(.5 + .5 * ease(k));   // sheets let go, growing as they land
+  if (TW.camAt && k >= TW.camAt.k) camHome();
   for (const sw of TW.swaps) { sw.hide.group.visible = k < sw.k && !hiddenObj(sw.hide); sw.show.group.visible = k >= sw.k && !hiddenObj(sw.show); }
   applyAll();
-  if (k >= 1) { TW.on = false; finishSwaps(); TW.swaps = []; TW.leaving = []; }
+  if (k >= 1) {
+    TW.on = false; finishSwaps(); TW.swaps = []; TW.leaving = [];
+    if (ARR.grow) growDone();
+    if (ARR.leaving) { ARR.leaving = false; applyAll(); }
+    if (ARR.after && V.arrange) { ARR.after = false; setTimeout(() => relayout(REDUCED ? 0 : 160), 0); }
+    if (ARR.recheck && V.arrange) {   // the sheets moved under a pointer that stayed still: what is under it now?
+      const r = ARR.recheck; ARR.recheck = null;
+      setTimeout(() => { if (V.arrange && !DRAG.on && !ARR.drag) pointAt(r, r.again); }, 0);
+    }
+  }
   return TW.on;
+}
+
+/* Stand one leaf of a sheet in a pose: where, at what angle, and how folded. p.f is how folded the leaf is (1 shut,
+   0 open); its folds open one step after another (L.steps), and shut in reverse. Each fold eases in and out within
+   its own turn, so a run of them reads as separate folds, not one long sweep. */
+function poseLeaf(L, p) {
+  L.group.position.set(p.x, p.y + p.lift, p.z);
+  L.group.rotation.y = (L.k === 0 ? p.a + 90 : p.a - 90) * DEG;
+  const u = (1 - p.f) * L.steps.length;
+  L.steps.forEach((st, i) => {
+    const f = 1 - ease(clamp(u - i));
+    for (const hi of st.hs) { const hg = L.hinges[hi]; if (hg.axis === "y") hg.outer.rotation.y = hg.sign * Math.PI * f; else hg.outer.rotation.x = Math.PI * f; }
+  });
+}
+/* The corners of every panel of a sheet, in the sheet's own frame, with its leaves in the given poses (key -> pose):
+   the sheet is stood that way for the measurement and put back as it was. `leaf`: only that leaf's panels. */
+function sheetCorners(o, id, poses, leaf = null) {
+  const stand = from => { for (const L of o.leaves) { const p = from.get(`${id}:${L.k}`); if (p) poseLeaf(L, p); } o.group.updateMatrixWorld(true); };
+  stand(poses);
+  const inv = o.group.matrixWorld.clone().invert(), pts = [];
+  for (const m of o.panels) if (leaf == null || m.userData.leaf.k === leaf) for (const [x, y] of [[-.5, -.5], [.5, -.5], [-.5, .5], [.5, .5]])
+    pts.push(new THREE.Vector3(x, y, 0).applyMatrix4(m.matrixWorld).applyMatrix4(inv));
+  stand(CUR.poses);
+  return pts;
 }
 
 /* Put every object where CUR says. */
@@ -454,49 +591,93 @@ function applyAll() {
     o.group.position.copy(g.p); o.group.quaternion.copy(g.q);
     for (const L of o.leaves) {
       const p = CUR.poses.get(`${id}:${L.k}`); if (!p) continue;
-      L.group.position.set(p.x, p.y + p.lift, p.z);
-      L.group.rotation.y = (L.k === 0 ? p.a + 90 : p.a - 90) * DEG;
-      for (const hg of L.hinges) {
-        if (hg.axis === "y") hg.outer.rotation.y = hg.sign * Math.PI * p.f; else hg.outer.rotation.x = Math.PI * p.f;
-        if (thick || o.t !== t) { hg.outer.position.z = hg.gapU * t / 2; hg.inner.position.z = -hg.gapU * t / 2; }
-      }
+      poseLeaf(L, p);
+      if (thick || o.t !== t) for (const hg of L.hinges) { hg.outer.position.z = hg.gapU * t / 2; hg.inner.position.z = -hg.gapU * t / 2; }
+      for (const hg of L.hinges) bendHinge(hg, t);
     }
-    if (thick || o.t !== t) { for (const m of o.panels) m.scale.z = t * .8; o.t = t; }
+    if (thick || o.t !== t) { for (const m of o.panels) m.scale.z = t * PAPER; o.t = t; }
     shapeFold(o, id);
   }
   appliedT = t;
-  const place = bookPlacement(CUR.poses, V.model, t, CUR.lie, CUR.beta);
+  // on the table the sheets are placed in the room, so the book's frame holds still (and on the way back to the book)
+  const place = (V.arrange || ARR.leaving) && V.layout?.place ? V.layout.place : bookPlacement(CUR.poses, V.model, t, CUR.lie, CUR.beta);
+  shadow.visible = !V.arrange && !ARR.leaving;
   book.position.copy(place.pos);
   book.quaternion.setFromRotationMatrix(place.R);
   shadow.position.set((place.box.min.x + place.box.max.x) / 2, .05, (place.box.min.z + place.box.max.z) / 2);
   shadow.scale.set(place.box.max.x - place.box.min.x + 60, place.box.max.z - place.box.min.z + 60, 1);
 }
 
-/* The fold at the back: from one leaf's spine edge, round behind the leaves it encloses, to the other's. */
+/* The paper round a hinge: a band as thick as a leaf, bent round the hinge's axis through the angle the hinge has
+   turned, so a flap stays joined to the panel it hangs from (a half circle when it lies folded, as in the Info page's
+   fold diagrams). The axis sits half the gap in front of the panel; a bend's layer (userData.at, in layers in front of
+   the panel) turns round it at its own radius. Redrawn only when the angle or the thickness changes. */
+function bendHinge(hg, t) {
+  const th = hg.axis === "y" ? hg.outer.rotation.y : hg.outer.rotation.x;
+  if (hg.drawn && Math.abs(hg.drawn[0] - th) < 1e-5 && hg.drawn[1] === t) return;
+  hg.drawn = [th, t];
+  const c = hg.gapU * t / 2, h = t * PAPER / 2;
+  for (const m of hg.bends) {
+    const v = m.userData.at * t - c, R = Math.abs(v), [e0, e1] = m.userData.span;
+    m.visible = Math.abs(th) > 1e-4 && R > h * .5;
+    if (!m.visible) continue;
+    const rs = [R + h, Math.max(0, R - h)];
+    fillBand(m.geometry, NB, i => {
+      const ph = th * i / NB, sn = Math.sign(v) * Math.sin(ph), cs = Math.sign(v) * Math.cos(ph);
+      // turned about y the layer swings in x; about x (the Rose's top row) it swings in y, and spans the piece's width
+      return rs.map(r => hg.axis === "y" ? [[sn * r, e0, c + cs * r], [sn * r, e1, c + cs * r]]
+                                          : [[e0, -sn * r, c + cs * r], [e1, -sn * r, c + cs * r]]);
+    });
+  }
+}
+
+/* The fold at the back: from one leaf's spine edge, round behind the leaves it encloses, to the other's. Its centre
+   line is a curve that leaves each leaf straight on; the band is that line thickened to a leaf's thickness either side.
+   Nested folds lie a layer apart all the way round, like the arcs of the Info page's diagrams. */
 function shapeFold(o, id) {
   const a = CUR.poses.get(`${id}:0`), b = CUR.poses.get(`${id}:1`);
-  if (!a || !b || !o.leaves[0].layers || !o.leaves[1].layers) { o.fold.visible = false; return; }
-  o.fold.visible = true;
-  const [ax, az] = dirOf(a.a), [bx, bz] = dirOf(b.a);
-  const d = Math.hypot(b.x - a.x, b.z - a.z), r = Math.max(d * .62, CUR.t * .9);
-  const P = [[a.x, a.z], [a.x - ax * r, a.z - az * r], [b.x - bx * r, b.z - bz * r], [b.x, b.z]];
-  const pos = o.fold.geometry.attributes.position, ns = o.fold.userData.ns;
-  for (let i = 0; i <= ns; i++) {
-    const s = i / ns, u = 1 - s;
-    const w = [u * u * u, 3 * u * u * s, 3 * u * s * s, s * s * s];
-    const x = w.reduce((m, k, j) => m + k * P[j][0], 0), z = w.reduce((m, k, j) => m + k * P[j][1], 0);
-    const y0 = lerp(a.y + a.lift, b.y + b.lift, s);
-    pos.setXYZ(i * 2, x, y0, z); pos.setXYZ(i * 2 + 1, x, y0 + H, z);
-  }
-  pos.needsUpdate = true;
-  o.fold.geometry.computeVertexNormals();
-  if (o.thread?.visible) {   // just outside the apex of the fold
-    const m = ns / 2 * 2, tp = o.thread.geometry.attributes.position;
-    const x = pos.getX(m), z = pos.getZ(m), y = pos.getY(m), [cx, cz] = [(a.x + b.x) / 2, (a.z + b.z) / 2];
-    const l = Math.hypot(x - cx, z - cz) || 1, k = CUR.t * .6 / l;
+  if (!a || !b || !o.leaves[0].layers || !o.leaves[1].layers) { o.fold.visible = false; if (o.fold2) o.fold2.visible = false; return; }
+  const mid = bandAround(o.fold, a, b, 0, 0);
+  if (o.thread?.visible && mid) {   // just outside the apex of the fold
+    const [x, y, z] = mid, tp = o.thread.geometry.attributes.position, [cx, cz] = [(a.x + b.x) / 2, (a.z + b.z) / 2];
+    const l = Math.hypot(x - cx, z - cz) || 1, k = CUR.t * (PAPER / 2 + .6) / l;
     tp.setXYZ(0, x + (x - cx) * k, y + H * .05, z + (z - cz) * k); tp.setXYZ(1, x + (x - cx) * k, y + H * .95, z + (z - cz) * k);
     tp.needsUpdate = true; o.thread.computeLineDistances();
   }
+  /* The Rose's top row crosses the spine too. Folded down, it lies a layer inside each leaf, so its fold is a smaller
+     band inside the first; opened up, it runs on above the first. Part way, it is turning about its own fold, and
+     not drawn. */
+  if (o.fold2) {
+    const up = o.leaves.map(L => Math.abs(L.hinges.find(hg => hg.axis === "x")?.outer.rotation.x ?? 0) / Math.PI);
+    const down = up.every(f => f > 1 - 1e-4), open = up.every(f => f < 1e-4);
+    o.fold2.visible = down || open;
+    if (o.fold2.visible) bandAround(o.fold2, a, b, down ? CUR.t : 0, open ? H : 0);
+  }
+}
+/* Shape a fold's band between leaf poses a and b, `inset` inside both leaves and `rise` above them. Returns the centre
+   of its apex, at its foot, or null when it is not drawn. */
+function bandAround(mesh, a, b, inset, rise) {
+  const [ax, az] = dirOf(a.a), [bx, bz] = dirOf(b.a), [anx, anz] = nrmOf(a.a), [bnx, bnz] = nrmOf(b.a), t = CUR.t;
+  // each leaf's inside faces the other: leaf 0's along the way later leaves stack, leaf 1's against it
+  const A = [a.x + anx * inset, a.z + anz * inset], B = [b.x - bnx * inset, b.z - bnz * inset];
+  const d = Math.hypot(B[0] - A[0], B[1] - A[1]);
+  // opened flat at the spine (held flat, or set aside on the table) the fold is flat paper: nothing to draw
+  mesh.visible = !(d < t * .5 && ax * bx + az * bz < -.95);
+  if (!mesh.visible) return null;
+  const r = Math.max(d, t) * .62, h = t * PAPER / 2;
+  const P = [A, [A[0] - ax * r, A[1] - az * r], [B[0] - bx * r, B[1] - bz * r], B];
+  const ns = mesh.userData.ns, mid = [];
+  fillBand(mesh.geometry, ns, i => {
+    const s = i / ns, u = 1 - s;
+    const w = [u * u * u, 3 * u * u * s, 3 * u * s * s, s * s * s], dw = [-3 * u * u, 3 * u * u - 6 * u * s, 6 * u * s - 3 * s * s, 3 * s * s];
+    const x = w.reduce((m, k, j) => m + k * P[j][0], 0), z = w.reduce((m, k, j) => m + k * P[j][1], 0);
+    let tx = dw.reduce((m, k, j) => m + k * P[j][0], 0), tz = dw.reduce((m, k, j) => m + k * P[j][1], 0);
+    const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+    const y0 = lerp(a.y + a.lift, b.y + b.lift, s) + rise, y1 = y0 + H;
+    if (i === ns / 2) mid.push(x, y0, z);
+    return [1, -1].map(k => [[x - tz * h * k, y0, z + tx * h * k], [x - tz * h * k, y1, z + tx * h * k]]);
+  });
+  return mid;
 }
 
 // ---------------------------------------------------------------- camera
@@ -535,16 +716,36 @@ function setGoal({ yaw, pitch, dist, target, fov }, k = 10) {
   wake();
 }
 /* How far back the camera must stand, looking from (yaw, pitch), for every point to fit the view. */
-function fitDist(points, center, yaw, pitch, margin = 1.1, fov = camera.fov) {
+function fitDist(points, center, yaw, pitch, margin = 1.1, fov = camera.fov, aspect = camera.aspect) {
   const f = camDir(yaw, pitch), right = new THREE.Vector3(0, 1, 0).cross(f).normalize(), up = f.clone().cross(right);
   if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
-  const tv = Math.tan(fov / 2 * DEG), th = tv * camera.aspect;
+  const tv = Math.tan(fov / 2 * DEG), th = tv * aspect;
   let need = 0;
   for (const p of points) {
     const d = p.clone().sub(center);
     need = Math.max(need, d.dot(f) + Math.abs(d.dot(right)) / th, d.dot(f) + Math.abs(d.dot(up)) / tv);
   }
   return need * margin;
+}
+/* Where to look and how far back to stand, from (yaw, pitch), for the points to fill the view and sit in the middle of
+   it. In perspective the middle of a thing is not the middle of its picture, so the target moves until it is. */
+function fitView(points, yaw, pitch, margin = 1.1, fov = camera.fov) {
+  const f = camDir(yaw, pitch), right = new THREE.Vector3(0, 1, 0).cross(f).normalize(), up = f.clone().cross(right);
+  if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
+  const tv = Math.tan(fov / 2 * DEG), th = tv * camera.aspect;
+  const target = new THREE.Box3().setFromPoints(points).getCenter(new THREE.Vector3());
+  let dist = fitDist(points, target, yaw, pitch, margin, fov);
+  for (let i = 0; i < 8; i++) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of points) {
+      const d = p.clone().sub(target), z = Math.max(1e-3, dist - d.dot(f));
+      const x = d.dot(right) / (z * th), y = d.dot(up) / (z * tv);
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+    target.addScaledVector(right, (x0 + x1) / 2 * th * dist).addScaledVector(up, (y0 + y1) / 2 * tv * dist);
+    dist *= Math.max((x1 - x0) / 2, (y1 - y0) / 2) * margin;
+  }
+  return { target, dist };
 }
 const boxPoints = b => [0, 1, 2, 3, 4, 5, 6, 7].map(i => new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z));
 const nearestYaw = y => { const c = CAM.yaw; return y + 360 * Math.round((c - y) / 360); };
@@ -569,6 +770,17 @@ function presetAngles(n, lay) {
   if (n === 4) return [yawOf(new THREE.Vector3(0, 0, 1)), 12];
   return [0, 78];
 }
+/* The corners of the two leaves at the opening, in book space, as the layout will have them (folded or unfolded). */
+function openingCorners(lay) {
+  return [V.model.leaves[V.opening - 1], V.model.leaves[V.opening]].filter(Boolean)
+    .flatMap(L => sheetCorners(V.objs.get(L.e.id), L.e.id, lay.poses, L.k));
+}
+/* The opening from wherever you are looking: after unfolding it at an angle of your own, bring all of it into view. */
+function frameOpening() {
+  const lay = V.layout, g = CAM.goal;
+  const pts = openingCorners(lay).map(p => p.applyMatrix4(lay.place.matrix));
+  if (pts.length) setGoal({ ...fitView(pts, g.yaw, g.pitch, 1.1, g.fov), fov: g.fov }, 4.5);
+}
 function preset(n, { instant = false } = {}) {
   if (!V.layout) return;
   if (n === 5 && V.mode !== "opening") { setMode("opening", { view: false }); }
@@ -578,12 +790,14 @@ function preset(n, { instant = false } = {}) {
   let pts = boxPoints(lay.box);
   // the spine and head views frame the region by the spine, where folds and nesting show
   if (n === 2 || n === 3) pts = leafCorners(lay.poses, V.model, lay.t, null, n === 2 ? .3 : .42);
-  if (n === 5) pts = leafCorners(lay.poses, V.model, lay.t, new Set([V.model.leaves[V.opening - 1]?.key, V.model.leaves[V.opening]?.key].filter(Boolean)));
+  if (n === 5) pts = openingCorners(lay);
   if (n !== 1 && n !== 4) pts = pts.map(p => p.applyMatrix4(lay.place.matrix));
   const center = n === 1 || n === 4 ? lay.box.getCenter(new THREE.Vector3()) : new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3());
   // the edge views use a long lens, so they read almost like a plan (the quire diagram) rather than a close-up
   const fov = n === 3 ? 6 : n === 2 || n === 4 ? 10 : 32;
-  setGoal({ yaw: nearestYaw(yaw), pitch, target: center, fov, dist: fitDist(pts, center, yaw, pitch, n === 5 ? 1.04 : 1.12, fov) }, instant ? 100 : 4.5);
+  // the opening sits in the middle of the view, whatever is unfolded; the other views are centred on the block
+  const fit = n === 5 ? fitView(pts, yaw, pitch, V.contact.on ? 1.24 : 1.1, fov) : { target: center, dist: fitDist(pts, center, yaw, pitch, 1.12, fov) };
+  setGoal({ ...fit, yaw: nearestYaw(yaw), pitch, fov }, instant ? 100 : 4.5);
   renderViews();
   renderNote();
   pushHash();
@@ -596,20 +810,36 @@ function frame(now) {
   raf = 0;
   const dt = lastT ? Math.min(.05, (now - lastT) / 1000) : 1 / 60;
   lastT = now;
-  const moving = camStep(dt);
+  const moving = camStep(dt) | shade(dt);
   const anim = tweenStep(now);
   renderer.render(scene, camera);
   drawLabels();
   if (moving || anim || DRAG.on) raf = requestAnimationFrame(frame); else lastT = 0;
 }
-function resize() {
-  if (!V.gl || !stage.clientWidth) return;
+/* Take the stage's size as it is now. Something beside it may just have opened (the inspector), and a view framed before
+   the ResizeObserver reports it would be framed for the old shape. True if the size changed. */
+function fitStage() {
   const w = stage.clientWidth, h2 = stage.clientHeight;
+  if (!V.gl || !w || !h2) return false;
+  const size = renderer.getSize(new THREE.Vector2());
+  if (size.x === w && size.y === h2) return false;
   renderer.setSize(w, h2, false);
   camera.aspect = w / h2; camera.updateProjectionMatrix();
-  // still at a named view (not turned, panned or zoomed since): keep it framed as the stage changes size
+  return true;
+}
+function resize() {
+  if (!V.gl || !stage.clientWidth) return;
+  if (fitStage() && V.model) renderer.render(scene, camera);
+  // still at a named view (not turned, panned or zoomed since), or holding a sheet: keep it framed as the stage changes size
   clearTimeout(resize.t);
-  resize.t = setTimeout(() => { if (V.preset && V.layout && !V.hand.on) preset(V.preset, { instant: REDUCED }); }, 120);
+  resize.pending = true;
+  resize.t = setTimeout(() => {
+    resize.pending = false;
+    if (!V.layout) return;
+    if (V.arrange) frameTable();   // Rearrange's table: fitted to the stage again (even while a sheet is moving: it frames the plan)
+    else if (TW.camAt) { /* leaving the table: the camera goes home with the book (setArrange), fitted then */ }
+    else if (V.hand.on) frameHand(); else if (V.preset) preset(V.preset, { instant: REDUCED });
+  }, 120);
   wake();
 }
 
@@ -627,16 +857,25 @@ function project(p, obj) {
   if (_v.z > 1 || _v.z < -1) return null;
   return [(_v.x + 1) / 2 * SW, (1 - _v.y) / 2 * SH];
 }
+/* How high a sheet stands (or one leaf of it): a page, plus the Rose's top row as far as it is folded up. */
+const topOf = (o, k = null) => H + Math.max(0, ...o.leaves.filter(L => k == null || L.k === k)
+  .flatMap(L => L.hinges.filter(hg => hg.axis === "x").map(hg => H * Math.cos(hg.outer.rotation.x))));
 function sheetAnchor(id) {
   const o = V.objs.get(id), a = CUR.poses.get(`${id}:0`), b = CUR.poses.get(`${id}:1`);
   if (!o || !a || !b) return null;
   const [dx, dz] = dirOf(a.a), w = o.leaves[0].w || o.leaves[1].w;
-  return { obj: o.group, p: new THREE.Vector3((a.x + b.x) / 2 + dx * w * .2, Math.max(a.y + a.lift, b.y + b.lift) + H + 2, (a.z + b.z) / 2 + dz * w * .2) };
+  return { obj: o.group, p: new THREE.Vector3((a.x + b.x) / 2 + dx * w * .2, Math.max(a.y + a.lift, b.y + b.lift) + topOf(o) + 2, (a.z + b.z) / 2 + dz * w * .2) };
 }
 function drawLabels() {
   if (!V.model) return;
   SW = stage.clientWidth; SH = stage.clientHeight;
   book.updateMatrixWorld();
+  if (V.arrange || ARR.leaving) {   // on the table the piles are named instead (placePiles)
+    for (const el of LBL.values()) if (el.style.display !== "none") el.style.display = "none";
+    placePiles();
+    return;
+  }
+  placePiles();
   const want = [];
   const lay = V.layout, e = V.mode === "opening" ? 0 : smooth(.55, 1, V.spread);
   const curEn = V.model.all[V.cur];
@@ -651,7 +890,7 @@ function drawLabels() {
     // by the spine in the spine and head views, mid-leaf otherwise
     const [dx, dz] = dirOf(p.a), w = o.leaves[mid.k].w * (V.preset === 2 ? -.05 : V.preset === 3 ? .12 : 1);
     const sec = (D.quires.find(x => x.q === q.quire) || {}).section || "";
-    want.push({ key: "q" + q.qi, cls: "q", pri: 1, obj: o.group, p: new THREE.Vector3(p.x + dx * w * .5, p.y + H + 6, p.z + dz * w * .5),
+    want.push({ key: "q" + q.qi, cls: "q", pri: 1, obj: o.group, p: new THREE.Vector3(p.x + dx * w * .5, p.y + topOf(o, mid.k) + 6, p.z + dz * w * .5),
                 html: `${qTag(q.quire)}${e > .35 || V.preset === 3 ? `<small>${esc(sec)}${q.type === "singulions" ? " · singulions" : ""}</small>` : ""}` });
   }
   for (const en of V.model.all) {
@@ -803,22 +1042,26 @@ function tint() {
   const curEn = V.model.all[V.cur], ov = OVERLAYS[V.overlay];
   for (const en of V.model.all) {
     const o = V.objs.get(en.id); if (!o) continue;
-    const hi = en === curEn || V.flash?.has(en.id) ? GOLD : en === V.hover ? 0xf7dc9a : null;
+    const picked = V.arrange ? V.sel.has(en.id) : en === curEn;
+    const hi = picked || V.flash?.has(en.id) ? GOLD : en === V.hover ? 0xf7dc9a : null;
     const sheetCols = [];
     for (const L of o.leaves) {
       if (L.base == null) continue;   // a lost leaf stays a ghost
       const cols = ov.cats ? colorsOf(ov, leafValues(ov, en, L.k)) : [];
       sheetCols.push(...cols);
       // the current sheet's edges turn gold; with an overlay they keep its colours and the label marks it
-      L.edge.color.setHex(hi ?? L.base);
+      L.edge.color.setHex(hi ?? L.base); L.bendMat.color.setHex(hi ?? L.base);
       for (const m of o.panels) if (m.userData.leaf === L) m.material[2] = ov.cats && cols.length ? overlayMat(cols) : L.edge;
+      for (const hg of L.hinges) for (const m of hg.bends) m.material = ov.cats && cols.length ? overlayMat(cols, true) : L.bendMat;
     }
     if (o.foldMat !== M.ghostEdge) {
       const fc = [...new Set(sheetCols)];
-      o.fold.material = ov.cats && fc.length ? overlayMat(fc, true) : o.foldMat;
+      o.fold.material = ov.cats && fc.length ? overlayMat(fc, true) : o.foldMats;
+      if (o.fold2) o.fold2.material = o.fold.material;
       o.foldMat.color.setHex(hi ?? FOLD);
     }
-    for (const m of o.panels) for (const mat of m.material.slice(0, 2)) if (mat.emissive) mat.emissive.setHex(en === V.hover ? 0x1c150a : 0);
+    const glow = V.arrange && V.sel.has(en.id) ? 0x3d2c08 : en === V.hover ? 0x1c150a : 0;
+    for (const m of o.panels) for (const mat of m.material.slice(0, 2)) if (mat.emissive) mat.emissive.setHex(glow);
   }
   wake();
 }
@@ -833,11 +1076,16 @@ function info(en) {
   const pos = en.unplaced ? (en.sheet.missing.every(Boolean) ? "lost, position unknown" : "set aside, not in the book") : en.type === "singulions" ? `singulion ${en.idx + 1} of ${en.count}` : `bifolium ${en.idx + 1} of ${en.count} from the outside`;
   return { sides, names, v, pos, title: `Sheet ${en.id}`, sub: en.unplaced ? `Not placed · ${pos}` : `${qWord(en.quire)} · ${pos}` };
 }
-function tip(en, e) {
+function tip(en, e, mesh = null) {
+  if (V.arrange) { tipEl.hidden = true; return hud(en); }   // on the table: in the panel, which stays put
   if (!en) { tipEl.hidden = true; return; }
   const { sides, names, v, sub, title } = info(en);
+  // over a flap of the sheet in hand: what a click on it does
+  const fold = V.hand.on && en === V.model.all[V.cur] ? foldOf(mesh) : null, st = fold && mesh.userData.leaf.steps[fold.i];
+  const flapOpen = fold && fold.i < Math.min(V.hand.open[fold.k], mesh.userData.leaf.steps.length);
   tipEl.innerHTML = "";
   tipEl.append(h("b", {}, title), h("div", {}, sub),
+    st?.info ? h("div", { class: "moved" }, `Click to ${flapOpen ? "fold" : "unfold"} ${st.info.label}`) : "",
     h("div", { class: "pages" }, `${names(sides[0])}, ${names(sides[1])} | ${names(sides[2])}, ${names(sides[3])}`),
     v.is.length || v.hs.length ? h("div", { class: "muted" }, [v.is.join(", "), v.hs.map(x => SCRIBES[x]).join(" + ")].filter(Boolean).join(" · ")) : "",
     en.moved ? h("div", { class: "moved" }, "• placed differently from the current binding") : "",
@@ -911,6 +1159,7 @@ function setCur(i, { follow = true } = {}) {
 }
 /* In a wide (exploded) layout, keep the current sheet on screen. */
 function followCur() {
+  if (V.arrange) return;
   const an = sheetAnchor(V.model.all[V.cur]?.id); if (!an || !V.layout) return;
   const lp = V.layout.poses.get(`${V.model.all[V.cur].id}:0`); if (!lp) return;
   book.updateMatrixWorld();
@@ -975,6 +1224,586 @@ function setThick(x) {
   relayout(500);
 }
 
+// ---------------------------------------------------------------- Rearrange: the book taken apart on the table
+/* In Rearrange (arrange.js) the book comes apart on the table, the background darkens, and every quire lies open as a
+   pile of open sheets, in the order of the book, row by row from the back. A quire whose sheets are tucked inside each
+   other is stacked the way it lies opened at its centre: the centre sheet on top, each sheet further out a little
+   lower and further forward, so its edge shows. Sheets read one by one are fanned left to right like cards, the first
+   on the left. Set-aside sheets lie in a last pile.
+   It works like a drawing program: click a sheet to select it, ⇧- or ⌘-click to add more, drag across the table to
+   select a box of them; drag the selection onto a pile (it opens where they will go) or into the gap between two piles
+   (a new quire there). The book's frame (posture, place) holds still while the sheets are on the table. */
+const ARR = { leaving: false, drag: null, gap: null, gapKey: "", cam: null, dk: 0, goal: 0, sig: "", tray: null, hl: null, ins: null,
+              qsel: [], plan: null, box: null, space: false, hudT: 0 };
+const ARR_UP = 7, ARR_FWD = 10, ARR_FAN = .42, ARR_LIFT = 46;
+const ARR_UP_OPEN = 12, ARR_FWD_OPEN = 22;   // a stack under the pointer opens out, so each of its sheets is easy to point at
+const BG = new THREE.Color(0x221e1a), BG_DARK = new THREE.Color(0x100e0c), TBL = new THREE.Color(0x3a3129), TBL_DARK = new THREE.Color(0x1f1a16);
+const TABLE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const nth = k => ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth"][k] || `${k + 1}th`;
+/* where a sheet is, in words (for screen readers): "the third sheet from the outside" */
+function whereText(en) {
+  if (en.unplaced) return en.sheet.missing.every(Boolean) ? "lost, and given no place" : "set aside, out of the book";
+  if (en.count === 1) return "the only sheet";
+  if (en.type === "singulions") return `the ${nth(en.idx)} of ${en.count}, read one by one`;
+  return en.idx === en.count - 1 ? "the centre sheet" : en.idx === 0 ? "the outermost sheet" : `the ${nth(en.idx)} sheet from the outside`;
+}
+const sheetWidth = id => { const o = V.objs.get(id); return o ? (o.leaves[0].w || o.leaves[1].w) + (o.leaves[1].w || o.leaves[0].w) : H * 1.4; };
+const GX = H * .38, CAP = H * .72;   // the gap between piles, and the room in front of a row for its names (enough in a small window)
+
+function arrangeLayout(base) {
+  const model = V.model, place = base.place, inv = place.matrix.clone().invert(), hid = hiddenQuires();
+  const lifted = new Set(ARR.drag?.ids || []), gap = ARR.gap;
+  const poses = new Map(), sg = new Map(), centers = new Map(), picks = new Map();
+  const W0 = H * 1.45;   // an empty pile's room (set aside)
+  const piles = model.quires.filter(q => !hid.has(String(q.quire))).map(q => ({ key: String(q.quire), gi: q.qi, quire: q.quire, type: q.type,
+    ens: model.sheets.filter(en => en.qi === q.qi) }));
+  piles.push({ key: "aside", gi: -1, quire: null, type: "aside", ens: model.unplaced });
+  for (const p of piles) {
+    p.ids = p.ens.map(en => en.id).filter(id => !lifted.has(id));       // what stays in it while sheets are dragged
+    p.slots = p.ids.slice();
+    if (gap?.kind === "into" && gap.key === p.key) p.slots.splice(gap.index, 0, ...[...lifted].map(() => null));   // room for them
+    p.fan = p.type !== "nested";
+    p.sw = Math.max(...p.ens.map(en => sheetWidth(en.id)), p.ens.length ? 0 : W0);   // its widest sheet, lying open
+    const open = !p.fan && (p.key === V.hoverPile || (gap?.kind === "into" && gap.key === p.key));
+    p.fwd = open ? ARR_FWD_OPEN : ARR_FWD; p.up = open ? ARR_UP_OPEN : ARR_UP;
+    const n = Math.max(1, p.slots.length);
+    p.d = H + (p.fan ? 0 : p.fwd * (n - 1));
+  }
+  /* The plan of the table: each quire has a room of its own, sized for what it holds and one sheet more, at a fixed
+     place. It is made when the book comes apart (or another order is chosen). Moving sheets about never changes it:
+     a pile grows back into the space behind it and nothing else moves. A quire made, merged or split changes only its
+     own row; a quire moved keeps every row as long as it was. Its shape doesn't depend on the window. */
+  const kind = p => p.fan ? "f" : "n";
+  const room = p => p.fan ? p.sw * (1 + ARR_FAN * Math.max(p.ens.length, p.key === "aside" ? 2 : 0)) : p.sw;   // a fan: room for one card more (set aside: three)
+  const reach = p => p.fan ? H * 1.16 : H + (ARR_FWD_OPEN + ARR_UP_OPEN / 1.6) * p.ens.length;   // a fan: room for a card drawn out; a stack: open (its rise looks like depth from above), one sheet deeper
+  const keys = piles.map(p => `${p.key}:${kind(p)}`).join("|");
+  const depthOf = row => Math.max(...row.map(reach)) + CAP;
+  const place2 = rows => {   // x for every pile, each row centred; rows keep the depth they had (new ones after)
+    const at = new Map(), old = ARR.plan;
+    let z = -rows.reduce((a, row) => a + depthOf(row), 0) / 2;
+    const rowZ = rows.map((row, j) => old?.rowZ[j] ?? (z += depthOf(row), z - CAP));
+    if (old) for (let j = old.rowZ.length; j < rows.length; j++) rowZ[j] = rowZ[j - 1] + depthOf(rows[j]);
+    rows.forEach((row, j) => {
+      const w = p => { const a = old?.at.get(p.key); return a && a.kind === kind(p) ? a.w : room(p); };
+      // a row that only lost piles (a quire merged away, hidden or emptied) keeps the others where they were: a gap is
+      // left rather than the rest sliding over. Anything new in it, or in another order, and it is centred again
+      const was = row.map(p => old?.at.get(p.key));
+      const keep = was.every((a, i) => a && a.kind === kind(row[i]) && a.row === j && (i === 0 || a.x0 > was[i - 1].x0));
+      let x = -row.reduce((a, p) => a + w(p) + GX, -GX) / 2;
+      row.forEach((p, i) => { at.set(p.key, { x0: keep ? was[i].x0 : x, w: w(p), row: j, z1: rowZ[j], kind: kind(p), r: reach(p) }); x += w(p) + GX; });
+    });
+    const base = old?.base ?? Math.max(...rows.map(row => row.reduce((a, p) => a + room(p) + GX, -GX)));   // the widest row, laid out afresh
+    return { keys, counts: rows.map(r => r.length), at, rowZ, base, order: V.order?.id };
+  };
+  if (!ARR.plan || ARR.plan.keys !== keys) {
+    let rows = null;
+    if (ARR.plan && ARR.plan.counts.reduce((a, c) => a + c, 0) === piles.length) {          // a quire moved: the rows as they were
+      let i = 0; rows = ARR.plan.counts.map(c => piles.slice(i, i += c));
+    } else if (ARR.plan) {   // quires made, merged or split: each stays in its row, a new one goes into the row before it
+      let r = 0;
+      const rowOf = piles.map(p => (r = Math.max(r, ARR.plan.at.get(p.key)?.row ?? r)));
+      rows = []; piles.forEach((p, i) => (rows[rowOf[i]] ||= []).push(p));
+      rows = rows.filter(Boolean);
+      // unless a row has grown a third wider than the widest was when the table was laid out (step by step or at once)
+      const width = row => row.reduce((a, p) => a + room(p) + GX, -GX);
+      if (Math.max(...rows.map(width)) > ARR.plan.base * 1.34) { ARR.plan = null; rows = null; }
+    }
+    if (!rows) {   // a fresh table: as many rows as make it closest to 7 by 4 (the camera then fits it to the window)
+      const total = piles.reduce((a, p) => a + room(p) + GX, -GX), aspect = 1.75, slant = .88;
+      const pack = limit => { const out = [[]]; let x = 0;
+        for (const p of piles) { if (x > 0 && x + room(p) > limit) { out.push([]); x = 0; } out.at(-1).push(p); x += room(p) + GX; }
+        return out; };
+      let best = Infinity;
+      for (let n = 1; n <= 9; n++) {
+        const cand = pack(Math.max(...piles.map(room), total / n + 1));
+        const fit = Math.max(Math.max(...cand.map(row => row.reduce((a, p) => a + room(p) + GX, -GX))) / aspect, cand.reduce((a, row) => a + depthOf(row), 0) * slant);
+        if (fit < best - 1e-6) { best = fit; rows = cand; }
+      }
+    }
+    ARR.plan = place2(rows);
+  }
+  for (const p of piles) {
+    Object.assign(p, ARR.plan.at.get(p.key));
+    p.z0 = p.z1 - p.d;
+    // a fan's cards sit in the middle of its room, closing up if more come than the room was made for
+    const fan = n => n > 1 ? Math.max(p.sw * .08, Math.min(ARR_FAN * p.sw, (p.w - p.sw) / (n - 1))) : 0;
+    p.step = fan(p.slots.length); p.fx = p.x0 + (p.w - p.sw - p.step * Math.max(0, p.slots.length - 1)) / 2 + p.sw / 2;
+    p.step0 = fan(p.ids.length); p.fx0 = p.x0 + (p.w - p.sw - p.step0 * Math.max(0, p.ids.length - 1)) / 2 + p.sw / 2;
+  }
+  const flat = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+  const put = (en, wx, wy, wz) => {
+    const o = V.objs.get(en.id), wl = o?.leaves[0].w || 0, wr = o?.leaves[1].w || 0;
+    const world = new THREE.Matrix4().makeTranslation(wx + (wl - wr) / 2, wy, wz).multiply(flat);   // spine placed so the sheet is centred
+    const m = inv.clone().multiply(world), pp = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    m.decompose(pp, q, sc);
+    sg.set(en.id, { p: pp, q });
+    poses.set(`${en.id}:0`, { x: 0, y: 0, z: 0, a: -90, f: 1, lift: 0 });
+    poses.set(`${en.id}:1`, { x: 0, y: 0, z: 0, a: 90, f: 1, lift: 0 });
+  };
+  const byId = new Map(model.all.map(en => [en.id, en]));
+  for (const p of piles) {
+    p.anchors = [];
+    p.slots.forEach((id, j) => {
+      const cx = p.fan ? p.fx + j * p.step : p.x0 + p.w / 2;
+      const y = 1 + (p.fan ? j * 1.6 : j * p.up), z = p.fan ? p.z1 : p.z1 - j * p.fwd;
+      if (id == null) return;
+      // selected sheets are drawn a little out of a stack, toward you (the main one more); the one pointed at, less. A card
+      // in a fan stays where it lies (drawn out either way it only looked out of line, the next card still over most of
+      // it): its gold outline, drawn over its neighbours, shows the whole of it
+      const pull = p.fan ? 0 : V.sel.has(id) ? H * (id === V.selMain ? .16 : .1) : id === V.hover?.id ? H * .07 : 0;
+      put(byId.get(id), cx, y + (pull ? .6 : 0), z + pull);
+      centers.set(id, new THREE.Vector3(cx, y, z + pull - H / 2));
+      // a point on the part of it that shows: the strip in front of the sheet above, or (a fan) its own uncovered side
+      const top = j === p.slots.length - 1;
+      picks.set(id, new THREE.Vector3(p.fan && !top ? cx - p.sw / 2 + Math.max(4, p.step / 2) : cx, y, top ? z + pull - H / 2 : p.fan ? z + pull - H / 2 : z + pull - Math.min(p.fwd, H) / 2));
+    });
+    // where a dragged sheet would land, slot by slot, measured without the room made for it (so the room doesn't move them)
+    for (let j = 0; j <= p.ids.length; j++) {
+      const cx = p.fan ? p.fx0 + (j - .5) * (p.step0 || ARR_FAN * p.sw) : p.x0 + p.w / 2;
+      p.anchors.push(new THREE.Vector3(cx, 1 + (p.fan ? 0 : (j - .5) * p.up), p.fan ? p.z1 : p.z1 - Math.max(0, j - .5) * p.fwd));
+    }
+    p.label = new THREE.Vector3(p.x0 + p.w / 2, 0, p.z1 + 6);   // its name is a caption, just in front of it
+  }
+  // sheets of hidden quires stay where they were; the ones in hand follow the pointer
+  for (const en of model.all) if (!sg.has(en.id)) { sg.set(en.id, CUR.sg.get(en.id) || IDENT); poses.set(`${en.id}:0`, CUR.poses.get(`${en.id}:0`) || base.poses.get(`${en.id}:0`)); poses.set(`${en.id}:1`, CUR.poses.get(`${en.id}:1`) || base.poses.get(`${en.id}:1`)); }
+  for (const id of lifted) {
+    const g = ARR.drag.gs?.get(id); if (!g) continue;
+    sg.set(id, g); poses.set(`${id}:0`, { x: 0, y: 0, z: 0, a: -90, f: 1, lift: 0 }); poses.set(`${id}:1`, { x: 0, y: 0, z: 0, a: 90, f: 1, lift: 0 });
+  }
+  const box = new THREE.Box3();
+  for (const p of piles) { box.expandByPoint(new THREE.Vector3(p.x0, 0, p.z0 - H * .05)); box.expandByPoint(new THREE.Vector3(p.x0 + p.w, 30, p.z1 + CAP * .8)); }
+  // what the camera frames: the plan's rooms (a stack's room has space for it open), so pointing at a stack, opening
+  // it or dragging over it never moves the camera
+  const frame = new THREE.Box3();
+  for (const a of ARR.plan.at.values()) { frame.expandByPoint(new THREE.Vector3(a.x0, 0, a.z1 - (a.r ?? H))); frame.expandByPoint(new THREE.Vector3(a.x0 + a.w, 30, a.z1 + CAP * .8)); }
+  return { ...base, poses, sg, place, box, frame, piles, centers, picks, W0 };
+}
+const rowsOf = piles => { const rows = []; for (const p of piles) (rows[p.row] ||= []).push(p); return rows.filter(Boolean); };
+
+/* Lost sheets in or out of the 3D book (the order keeps them; the Reader still shows where they were). */
+function setHideLost(on) {
+  V.hideLost = on; store.set("3d:hideLost", on);
+  const b = $("#v3-lost"); if (b) { b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); }
+  if (V.order) open(V.order, { ms: 600 });
+  toast(on ? "Lost sheets are hidden in 3D" : "Lost sheets are shown again");
+  Arrange.render();
+}
+
+/* Darken the room for Rearrange, and light it again after. */
+function shade(dt) {
+  if (ARR.dk === ARR.goal) return false;
+  ARR.dk = REDUCED ? ARR.goal : clamp(ARR.dk + Math.sign(ARR.goal - ARR.dk) * dt * 2.2);
+  scene.background.lerpColors(BG, BG_DARK, ARR.dk); scene.fog.color.copy(scene.background);
+  table.material.color.lerpColors(TBL, TBL_DARK, ARR.dk);
+  return ARR.dk !== ARR.goal;
+}
+
+/* Taking the book apart, and putting it back, one sheet after another in reading order. The book stands in the middle of
+   the table, where piles will lie, so it first glides to the far side of the table, behind the first row; then each
+   sheet rises straight up out of it, arcs over everything, and comes straight down onto its pile, its leaves opening on
+   the way. Putting it back is the same backwards: each sheet arcs from its pile into the book at the far side, closing as
+   it goes, and once they are all in, the book glides home. Nothing passes through anything. */
+const TABLE_MS = 2000;
+function tableMorph(tw, L) {
+  const all = V.model.all, n = Math.max(1, all.length - 1), coming = V.arrange;
+  const inv = new THREE.Quaternion().setFromRotationMatrix(L.place.matrix).invert();
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(inv);   // the room's up, in the book's frame
+  if (coming) {   // where the book goes first (in the book's frame): kept for putting it back
+    const box = new THREE.Box3();
+    book.updateMatrixWorld(true);
+    for (const en of all) { const o = V.objs.get(en.id); if (o?.group.visible) box.expandByObject(o.group); }
+    const back = Math.min(...L.piles.filter(p => p.row === 0).map(p => p.z0)), f = L.frame;
+    ARR.away = box.isEmpty() ? new THREE.Vector3()
+      : new THREE.Vector3((f.min.x + f.max.x) / 2 - (box.min.x + box.max.x) / 2, 0, Math.min(0, back - H * .2 - box.max.z)).applyQuaternion(inv);
+  }
+  const D = ARR.away || new THREE.Vector3(), GLIDE = .14, FLY = .56, SPREAD = .3, HIGH = H * 2.1;
+  const away = s => ({ p: s.p.clone().add(D), q: s.q.clone() });
+  // from one place to the other on a curve that leaves straight up and lands straight down, eased along its length
+  const arc = (from, to, t0, t1) => {
+    const P1 = from.p.clone().addScaledVector(up, HIGH), P2 = to.p.clone().addScaledVector(up, HIGH), out = [];
+    for (let j = 1; j <= 10; j++) {
+      const u = ease(j / 10), v = 1 - u;
+      const p = from.p.clone().multiplyScalar(v * v * v).addScaledVector(P1, 3 * v * v * u).addScaledVector(P2, 3 * v * u * u).addScaledVector(to.p, u * u * u);
+      out.push([t0 + (t1 - t0) * j / 10, { p, q: from.q.clone().slerp(to.q, ease(clamp((u - .1) / .7))) }, "even"]);
+    }
+    return out;
+  };
+  all.forEach((en, i) => {
+    const sgt = tw.sgs.get(en.id); if (!sgt) return;
+    const a = sgt[0][1], b = sgt.at(-1)[1], st = (coming ? GLIDE : 0) + SPREAD * i / n;
+    tw.sgs.set(en.id, coming
+      ? [[0, a], [GLIDE, away(a)], [st, away(a)], ...arc(away(a), b, st, st + FLY), [1, b]]
+      : [[0, a], [st, a], ...arc(a, away(b), st, st + FLY), [1 - GLIDE, away(b)], [1, b]]);
+    for (const key of [`${en.id}:0`, `${en.id}:1`]) {   // the leaves open in the air, and close in the air
+      const tr = tw.poses.get(key); if (!tr) continue;
+      const pa = tr[0][1], pb = tr.at(-1)[1];
+      tw.poses.set(key, coming ? [[0, pa], [st + FLY * .25, pa], [st + FLY * .8, pb], [1, pb]] : [[0, pa], [st + FLY * .15, pa], [st + FLY * .7, pb], [1, pb]]);
+    }
+  });
+}
+
+/* The camera onto the table, which is fitted to the stage beside the panel on the left (#v3-hud). `pts`: fit those
+   instead (zoom to the selection). */
+function frameTable(instant = false, pts = null) {
+  const b = V.layout?.frame; if (!b || b.isEmpty()) return;
+  const pitch = 58;
+  if (!pts) {
+    pts = boxPoints(b);
+    pts.push(new THREE.Vector3(b.getCenter(new THREE.Vector3()).x, 0, b.max.z + H * .9));   // room in front for the selection's bar
+    ARR.box = b.clone();
+  }
+  const c = new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3());
+  const W = stage.clientWidth || 1, Hs = stage.clientHeight || 1, side = stage.contains($("#v3-hud")) ? hudW() : 0;   // (with the list open, the panel is over the list)
+  stage.classList.toggle("hudcol", side > 0);   // the selection's bar and the messages keep out of the column (style.css)
+  if (stage.classList.contains("tsmall") !== W - side < 900) {   // a small table: smaller names under its piles (measured again)
+    stage.classList.toggle("tsmall", W - side < 900);
+    for (const el of $$(".v3-pile")) el._fullW = null;
+  }
+  document.documentElement.style.setProperty("--hud-col", side + "px");
+  const dist = fitDist(pts, c, 0, pitch, 1.07, 32, (W - side) / Hs);
+  c.x -= side / 2 * (2 * Math.tan(16 * DEG) * dist / Hs);   // half the panel's column, in world units at the table
+  setGoal({ yaw: nearestYaw(0), pitch, target: c, fov: 32, dist }, instant ? 100 : 3.6);
+  V.preset = null; renderViews();
+}
+/* After the plan changed (a quire made, merged, split): frame the table again only if it no longer fits. */
+function keepFramed() {
+  const b = V.layout?.frame, was = ARR.box;
+  if (!b || !was) return;
+  const grow = (b.max.x - b.min.x) > (was.max.x - was.min.x) * 1.02 || (b.max.z - b.min.z) > (was.max.z - was.min.z) * 1.02
+    || b.min.x < was.min.x - 1 || b.max.x > was.max.x + 1;
+  if (grow) frameTable();
+}
+
+function setArrange(on) {
+  if (!V.model || on === V.arrange) return;
+  if (on) {
+    if (TW.camAt) TW.camAt = null;   // back onto the table before the camera went home: it stays on the table
+    if (V.hand.on) putBack({ silent: true });
+    if (V.inspect) { V.inspect = false; renderInspector(); pushHash(); }
+    if (V.contact.on) setContactView(false);
+    if (V.mode === "opening") setMode("block", { view: false });
+    ARR.cam = { yaw: CAM.goal.yaw, pitch: CAM.goal.pitch, dist: CAM.goal.dist, fov: CAM.goal.fov, target: CAM.goal.target.clone(), preset: V.preset };
+  }
+  V.arrange = on; ARR.leaving = !on; ARR.goal = on ? 1 : 0;
+  ARR.drag = ARR.gap = null; ARR.gapKey = "";
+  if (on) ARR.plan = null; else { V.sel = new Set(); V.selQ = new Set(); V.selMain = null; }
+  $("#v-three").classList.toggle("table", on);
+  tip(null);
+  relayout(REDUCED ? 0 : TABLE_MS, tableMorph);
+  TW.long = true;   // a hover doesn't cut this move short (see wire)
+  if (on) frameTable();
+  else if (ARR.cam) {   // the camera holds the table while the book comes together at its far side, then goes home with it
+    TW.camAt = { k: .7, cam: ARR.cam };   // (tweenStep: on the movement's own clock)
+    if (!TW.on || !TW.dur) camHome();
+    V.preset = ARR.cam.preset; renderViews();
+  }
+  ARR.sig = ""; placePiles(); hud(null); tint(); wake();
+}
+
+/* Off the table: the camera back to where it was, a named view fitted to the stage as it is now. */
+function camHome() {
+  const c = TW.camAt?.cam; TW.camAt = null;
+  if (!c || V.arrange) return;
+  if (c.preset) preset(c.preset, { instant: REDUCED }); else setGoal(c, 3);
+}
+
+/* The selection, from arrange.js: sheets (the main one is the current sheet) or whole quires. */
+function setSelection(ids, quires, main) {
+  V.sel = new Set(ids); V.selQ = new Set(quires.map(String)); V.selMain = main ?? null;
+  const i = main ? V.model?.all.findIndex(en => en.id === main) : -1;
+  if (i >= 0 && i !== V.cur) { V.cur = i; renderStrip(); pushHash(); report(); }
+  tint();
+  // selected sheets come a little out of their piles: now, or, while sheets are still moving, once they have landed
+  if (V.arrange) { if (TW.on) ARR.after = true; else relayout(REDUCED ? 0 : 160); }
+  placePiles();
+}
+
+/* The piles' names (from arrange.js) under each pile, the gold marks on the table, and the panel. */
+function placePiles() {
+  const host = $("#v3-piles"); if (!host) return;
+  const piles = V.arrange && V.layout?.piles;
+  if (!piles) {
+    if (host.childElementCount) host.replaceChildren();
+    for (const m of [ARR.tray, ARR.hl, ARR.ins, ...ARR.qsel, ...(ARR.ssel || [])]) if (m) m.visible = false;
+    return;
+  }
+  const sig = piles.map(p => `${p.key}:${p.ens.map(en => en.id).join(",")}`).join("|") + "#" + V.order?.id + "#" + [...(Arrange.ch?.booklets || [])].join(",");
+  if (sig !== ARR.sig) {   // the same element for the same quire, its contents renewed: a name being pointed at stays put
+    ARR.sig = sig;
+    const had = new Map([...host.children].map(e => [e.dataset.key, e]));
+    host.replaceChildren(...piles.map(p => {
+      const fresh = Arrange.pileLabel(p), el = had.get(p.key);
+      if (!el || el.querySelector("input")) return el || fresh;   // a name being typed stays as it is
+      el.className = fresh.className; el.title = fresh.title; el.dataset.gi = fresh.dataset.gi; el._fullW = null;
+      el.setAttribute("aria-pressed", fresh.getAttribute("aria-pressed"));
+      el.replaceChildren(...fresh.childNodes);
+      return el;
+    }));
+  }
+  const settling = TW.on && !!(TW.long || TW.replan);   // the book coming apart, or the table laid out again
+  host.classList.toggle("moving", TW.on && !!TW.long);   // the names come once the sheets have landed (and the marks below)
+  const t = ARR.drag && ARR.gap;   // where dragged sheets would go
+  // each name may be as wide as its share of its row: halfway to the names beside it (to the edge, at either end)
+  const at = new Map(piles.map(p => [p.key, project(p.label, scene)]));
+  const share = new Map();
+  for (const row of rowsOf(piles)) {
+    const xs = row.map(p => at.get(p.key)?.[0]).filter(x => x != null).sort((x, y) => x - y);
+    for (const p of row) {
+      const x = at.get(p.key)?.[0]; if (x == null) continue;
+      const i = xs.indexOf(x), l = i > 0 ? (x - xs[i - 1]) / 2 : x, r = i < xs.length - 1 ? (xs[i + 1] - x) / 2 : stage.clientWidth - x;
+      share.set(p.key, 2 * Math.min(l, r) - 6);
+    }
+  }
+  for (const el of host.children) {
+    const p = piles.find(x => x.key === el.dataset.key); if (!p) continue;
+    el.classList.toggle("target", !!t && t.kind === "into" && t.key === p.key);
+    const on = V.selQ.has(p.key);
+    if (el.classList.contains("sel") !== on) { el.classList.toggle("sel", on); el.setAttribute("aria-pressed", String(on)); }
+    const xy = at.get(p.key);
+    if (!xy) { el.style.display = "none"; continue; }
+    el.style.display = "";
+    const tf = `translate(${Math.round(xy[0])}px, ${Math.round(xy[1])}px) translate(-50%, 0)`;
+    // the table laid out again: a name whose pile moves waits until it has landed; the others stay where they are
+    el._moving = settling && (el._moving || (!!el._tf && el._tf !== tf));
+    el.classList.toggle("moving", el._moving);
+    if (el._tf !== tf) { el._tf = tf; el.style.transform = tf; }
+    // a name that doesn't fit its share leaves out the sections' icons, then (a small window) the count: only the quire
+    // shows; the rest is always in its tooltip
+    if (!el._fullW && !el.classList.contains("target")) {
+      el.classList.remove("mid", "tight");
+      el._fullW = el.offsetWidth; el._icW = (el.querySelector(".pl-ics")?.offsetWidth || 0) + 5;
+    }
+    const room = share.get(p.key) ?? Infinity;
+    el.classList.toggle("mid", el._fullW > room && el._fullW - el._icW <= room);
+    el.classList.toggle("tight", el._fullW - el._icW > room);
+  }
+  const flatGold = (fill, line) => {   // a gold mark lying on the table: a wash and/or an outline
+    const g = new THREE.Group();
+    if (fill) g.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: fill, depthWrite: false })));
+    if (line) g.add(new THREE.Line(RECT, new THREE.LineBasicMaterial({ color: GOLD, transparent: true, opacity: line })));
+    g.rotation.x = -Math.PI / 2; scene.add(g); return g;
+  };
+  // an empty set-aside pile is a dashed place on the table
+  const aside = piles.find(p => p.key === "aside");
+  if (!ARR.tray) {
+    ARR.tray = new THREE.Line(RECT, new THREE.LineDashedMaterial({ color: 0x8f877a, dashSize: .025, gapSize: .018 }));
+    ARR.tray.rotation.x = -Math.PI / 2; scene.add(ARR.tray);
+  }
+  ARR.tray.visible = !aside.ids.length && !settling;
+  ARR.tray.position.set(aside.x0 + aside.w / 2, .5, aside.z1 - H / 2);   // in the middle of its room, under its name
+  ARR.tray.scale.set(aside.sw, H, 1); ARR.tray.computeLineDistances();
+  // selected quires: an outline under each
+  const sel = piles.filter(p => V.selQ.has(p.key));
+  while (ARR.qsel.length < sel.length) ARR.qsel.push(flatGold(.08, .9));
+  ARR.qsel.forEach((m, i) => {
+    const p = sel[i]; m.visible = !!p && !settling; if (!p) return;
+    m.position.set(p.x0 + p.w / 2, .3, (p.z0 + p.z1) / 2); m.scale.set(p.w + 14, p.d + 14, 1);
+  });
+  // selected sheets: a gold outline round each (the parts under other sheets stay hidden, as the sheets do)
+  ARR.ssel ||= [];
+  const ids = V.arrange ? [...V.sel].filter(id => V.layout.centers.has(id) && !ARR.drag?.ids.includes(id)) : [];
+  const inFan = new Set(piles.filter(p => p.fan).flatMap(p => p.ids));
+  while (ARR.ssel.length < ids.length) { const l = new THREE.Line(RECT, new THREE.LineBasicMaterial({ color: GOLD })); l.rotation.x = -Math.PI / 2; scene.add(l); ARR.ssel.push(l); }
+  ARR.ssel.forEach((l, i) => {
+    const id = ids[i]; l.visible = !!id && !settling; if (!id) return;
+    const c = V.layout.centers.get(id), fan = inFan.has(id);
+    l.position.set(c.x, c.y + 1.4, c.z); l.scale.set(sheetWidth(id) + 3, H + 3, 1);
+    l.material.depthTest = !fan; l.renderOrder = fan ? 5 : 0;   // a card in a fan: its whole outline, over the cards on it
+  });
+  // dragging: a gold wash under the pile they would go into, or a gold bar in the gap a new quire would fill
+  ARR.hl ||= flatGold(.2, 1);
+  ARR.ins ||= flatGold(.85, 0);
+  const tp = t?.kind === "into" && piles.find(x => x.key === t.key);
+  ARR.hl.visible = !!tp;
+  if (tp) { ARR.hl.position.set(tp.x0 + tp.w / 2, .4, (tp.z0 + tp.z1) / 2); ARR.hl.scale.set(tp.w + 18, tp.d + 18, 1); }
+  ARR.ins.visible = t?.kind === "new";
+  if (t?.kind === "new") { ARR.ins.position.set(t.x, .5, t.z); ARR.ins.scale.set(5, t.depth, 1); }
+  if (ARR.drag) hud(null, t || null);
+  // these marks are set after the frame was drawn: if one changed, draw another, or it shows only when something moves
+  const r = m => m ? `${+m.visible}${m.position.x.toFixed(1)},${m.position.z.toFixed(1)},${m.scale.x.toFixed(1)}` : "";
+  const drawn = [ARR.tray, ARR.hl, ARR.ins, ...ARR.qsel, ...(ARR.ssel || [])].map(r).join("|");
+  if (drawn !== ARR.drawn) { ARR.drawn = drawn; wake(); }
+}
+
+/* A pile drawn small at the table's slant, for the panel and the selection's bar: a stack of layers (the outermost at
+   the bottom) or a row of cards, the sheets in `hi` in gold. `labels`: name each layer (in a fan, only the gold ones). */
+function glyph(ids, { fan = false, hi = new Set(), labels = false, size = "s" } = {}) {
+  const NS = "http://www.w3.org/2000/svg", el = (tag, at) => { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); return e; };
+  const pair = x => x.replace("|", "+");
+  const [W, D, S, G] = size === "s" ? [30, 7, 9, 6] : [54, 14, 16, 12];
+  const svg = el("svg", { "aria-hidden": "true", class: `glyph ${size}` });
+  const card = (x0, y, gold) => el("polygon", { points: `${x0},${y} ${x0 + W},${y} ${x0 + W + S},${y - D} ${x0 + S},${y - D}`, class: gold ? "g-hi" : "g-sh" });
+  const text = (x, y, s, gold) => { const t = el("text", { x, y, class: gold ? "g-thi" : "g-t" }); t.textContent = s; return t; };
+  const lw = labels ? 10 + 6.4 * Math.max(0, ...ids.map(x => pair(x).length)) : 0;
+  if (fan || ids.length <= 1) {
+    const step = ids.length > 1 ? Math.min(size === "s" ? 9 : 20, (size === "s" ? 70 : 190) / (ids.length - 1)) : 0;
+    const lift = size === "s" ? 5 : 9, w = W + S + step * Math.max(0, ids.length - 1) + 4, hh = D + lift + 4 + (labels ? 16 : 0);
+    svg.setAttribute("width", w); svg.setAttribute("height", hh); svg.setAttribute("viewBox", `0 0 ${w} ${hh}`);
+    ids.forEach((x, j) => svg.append(card(2 + j * step, D + lift + 2 - (hi.has(x) ? lift : 0), hi.has(x))));
+    if (labels) ids.forEach((x, j) => hi.has(x) && svg.append(text(2 + j * step, hh - 2, pair(x), true)));
+  } else {
+    const n = ids.length, g = Math.min(G, (size === "s" ? 26 : 120) / (n - 1)), w = W + S + 4 + lw, shift = size === "s" ? 5 : 9, hh = D + g * (n - 1) + 4;
+    svg.setAttribute("width", w + shift); svg.setAttribute("height", hh); svg.setAttribute("viewBox", `0 0 ${w + shift} ${hh}`);
+    ids.forEach((x, j) => {   // bottom (outermost) first, so each layer lies over the one under it
+      const y = hh - 2 - j * g, gold = hi.has(x);
+      svg.append(card(2 + (gold ? shift : 0), y, gold));
+      if (labels && (gold || g >= 10)) svg.append(text(W + S + 10 + shift, y - D / 2 + 3.5, pair(x), gold));
+    });
+  }
+  return svg;
+}
+
+/* On the table, one panel in a fixed place (top left, a column of its own): the sheet pointed at (its place in its
+   pile, and both its sides in one piece), or, while sheets are dragged, where they would land. Hidden otherwise. */
+const HUD_W = 300;
+const hudW = () => (stage.clientWidth > 1000 ? HUD_W : 220);   // a narrower panel (and column) in a small window
+function hud(en, drop) {
+  const el = $("#v3-hud"); if (!el) return;
+  if (!V.arrange) { clearTimeout(ARR.hudT); ARR.hudT = 0; el.hidden = true; el._k = ""; return; }
+  const show = (k, kids) => { clearTimeout(ARR.hudT); ARR.hudT = 0; el.hidden = false; el.style.maxWidth = stage.contains(el) ? hudW() + "px" : "";
+    if (el._k !== k) { el._k = k; el.replaceChildren(...kids); } };
+  // after a moment (sliding from one sheet to the next doesn't flicker); a hide on its way isn't put off by more calls
+  const hide = () => { if (!ARR.hudT && !el.hidden) ARR.hudT = setTimeout(() => { ARR.hudT = 0; el.hidden = true; el._k = ""; }, 140); };
+  const name = (key, q) => key === "aside" ? "Set aside" : qTag(q);
+  if (ARR.drag) {
+    if (!drop) return hide();
+    const moving = ARR.drag.ids, set = new Set(moving);
+    const froms = new Set(moving.map(id => { const x = V.model.all.find(en => en.id === id); return x?.unplaced ? "aside" : String(x?.quire); }));
+    const from = V.model.all.find(x => x.id === ARR.drag.id), fromKey = froms.size === 1 ? [...froms][0] : null;
+    const src = fromKey ? h("b", {}, name(fromKey, from?.quire)) : `${moving.length} sheets`;
+    if (drop.kind === "new")
+      return show(`new:${drop.after}:${moving}`, [h("div", { class: "hud-head" }, src, " → ", h("b", {}, "new quire")),
+        glyph(moving, { hi: set, labels: true, size: "m" })]);
+    const p = V.layout.piles.find(x => x.key === drop.key), ids = p.ids.slice();
+    ids.splice(drop.index, 0, ...moving);
+    return show(`into:${drop.key}:${drop.index}:${moving}`, [
+      fromKey !== drop.key ? h("div", { class: "hud-head" }, src, " → ", h("b", {}, name(drop.key, p.quire))) : "",
+      glyph(ids, { fan: p.fan, hi: set, labels: true, size: "m" })].filter(Boolean));
+  }
+  if (!en) return hide();
+  const p = V.layout?.piles.find(x => x.key === (en.unplaced ? "aside" : String(en.quire)));
+  const ids = p ? p.ens.map(x => x.id) : [en.id];
+  show(`sheet:${en.id}:${JSON.stringify(en.opts)}:${ids}`, [
+    h("div", { class: "hud-where", role: "img", "aria-label": `${en.unplaced ? "" : qWord(en.quire) + ", "}${whereText(en)}` },
+      glyph(ids, { fan: p?.fan, hi: new Set([en.id]) }), h("span", {}, en.unplaced ? "Set aside" : qTag(en.quire))),
+    h("div", { class: "hud-id" }, en.id.replace("|", " + ")),
+    h("div", { class: "hud-faces" }, sheetFaces(en.id, en.opts, 110, (stage.contains(el) ? hudW() : HUD_W) - 30, 150, { side: true }))]);
+}
+
+/* The sheet under the pointer (`e`: anything with clientX, clientY). On the table it slides a little out of its pile and the
+   stack it is in opens out, which moves the sheets under a pointer that stays still: once they have moved, look again
+   (up to `again` times), so the sheet the panel shows is always the one a click would take. */
+function pointAt(e, again = 0) {
+  const hit = pick(e);
+  const en = hit?.en || null;
+  if (en !== V.hover) {
+    V.hover = en; tint(); stage.style.cursor = en ? (V.arrange ? "grab" : "pointer") : "";
+    const pile = en ? (en.unplaced ? "aside" : String(en.quire)) : null;
+    if (V.arrange && pile !== V.hoverPile && (pile || !hoverNear(e))) V.hoverPile = pile;   // leaving a stack's edge for the table: close it
+    if (V.arrange && !(TW.on && TW.long)) {
+      if (again > 0) ARR.recheck = { clientX: e.clientX, clientY: e.clientY, again: again - 1 };
+      relayout(REDUCED ? 0 : 160);   // the sheet pointed at slides a little out of its pile
+    }
+  } else if (V.arrange && !en && V.hoverPile && !hoverNear(e)) { V.hoverPile = null; relayout(REDUCED ? 0 : 160); }
+  tip(en, e, hit?.mesh);
+}
+
+/* Whether the pointer is still over the open stack's room (between its sheets' edges the table shows through). */
+function hoverNear(e) {
+  const p = V.layout?.piles?.find(x => x.key === V.hoverPile); if (!p) return false;
+  const r = stage.getBoundingClientRect();
+  ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const P = ray.ray.intersectPlane(TABLE, new THREE.Vector3());
+  return !!P && P.x > p.x0 - 4 && P.x < p.x0 + p.w + 4 && P.z > p.z0 - 4 && P.z < p.z1 + 4;
+}
+
+/* Sheets taken from the table follow the pointer above it, fanned a little if there are several; the pile under them
+   opens where they would go, or the gap between two piles shows a gold bar for a new quire. */
+function dragSheet(e, en) {
+  if (!ARR.drag) {
+    const ids = Arrange.dragSet(en.id);   // the selection, if this sheet is in it; else this sheet alone (now selected)
+    ARR.drag = { id: en.id, ids, gs: new Map() }; V.hover = null; tip(null); stage.classList.add("lifting");
+    if (ARR.grow) growDone();   // the last ones let go are full size at once
+    for (const id of ids) V.objs.get(id)?.group.scale.setScalar(.5);   // small in the hand, so they don't hide where they go
+  }
+  const r = stage.getBoundingClientRect();
+  ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const P = ray.ray.intersectPlane(TABLE, new THREE.Vector3()); if (!P) return;
+  const inv = V.layout.place.matrix.clone().invert(), flat = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+  ARR.drag.ids.forEach((id, j) => {
+    const o = V.objs.get(id), wl = o.leaves[0].w || 0, wr = o.leaves[1].w || 0;
+    const world = new THREE.Matrix4().makeTranslation(P.x + (wl - wr) / 4 + j * 5, ARR_LIFT + j * 2, P.z + H / 4 - j * 4).multiply(flat);
+    const m = inv.clone().multiply(world), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    m.decompose(p, q, sc);
+    ARR.drag.gs.set(id, { p, q });
+  });
+  const t = dropTarget(P, e), k = t ? `${t.kind}:${t.key ?? t.after}:${t.index ?? ""}` : "";
+  if (k !== ARR.gapKey) { ARR.gap = t; ARR.gapKey = k; relayout(REDUCED ? 0 : 180); }
+  for (const [id, g] of ARR.drag.gs) { CUR.sg.set(id, g); V.layout.sg.set(id, g); if (TW.on) TW.sgs.set(id, [[0, g], [1, g]]); }
+  applyAll(); placePiles(); wake();
+}
+/* Where dragged sheets would go: the gap between two piles of a row (or past either end of it) makes a new quire
+   there; over a pile, into it: for a stack, at the height of the pointer against its sheets' edges, for a fan, as far
+   along as the pointer. */
+function dropTarget(P, e) {
+  const piles = V.layout?.piles; if (!piles) return null;
+  const order = piles.filter(p => p.key !== "aside");
+  const EDGE = H * .12, END = H * 1.1;
+  for (const row of rowsOf(piles)) {
+    const z0 = Math.min(...row.map(p => p.z0)) - H * .15, z1 = Math.max(...row.map(p => p.z1)) + H * .2;
+    if (P.z < z0 || P.z > z1) continue;
+    for (let j = 0; j <= row.length; j++) {
+      const a = row[j - 1], b = row[j];
+      const left = a ? a.x0 + a.w - EDGE : b.x0 - END, right = b ? b.x0 + EDGE : a.x0 + a.w + END;
+      if (P.x <= left || P.x >= right) continue;
+      // the new quire comes after the quire on the left (or, at the start of a row, after the one before it)
+      const prev = a?.key === "aside" ? order.at(-1) : a || order[order.indexOf(b) - 1] || (b?.key === "aside" ? order.at(-1) : null);
+      const x = a && b ? (a.x0 + a.w + b.x0) / 2 : a ? a.x0 + a.w + GX / 2 : b.x0 - GX / 2;
+      return { kind: "new", after: prev ? prev.key : null, x, z: (z0 + z1) / 2, depth: z1 - z0 };
+    }
+  }
+  const m = H * .3;
+  const p = piles.find(q => P.x > q.x0 - m && P.x < q.x0 + q.w + m && P.z > q.z0 - m * 2 && P.z < q.z1 + m);
+  if (!p) return null;
+  let index;
+  if (p.fan) index = p.anchors.filter(a => a.x < P.x).length - 1;
+  else {
+    const r = stage.getBoundingClientRect(), y = e.clientY - r.top;
+    index = p.anchors.filter(a => { const xy = project(a, scene); return xy && xy[1] > y; }).length - 1;
+  }
+  return { kind: "into", key: p.key, gi: p.gi, index: clamp(index, 0, p.ids.length), ids: p.ids };
+}
+function dropSheet(cancel = false) {
+  const d = ARR.drag, t = ARR.gap;
+  ARR.drag = ARR.gap = null; ARR.gapKey = "";
+  stage.classList.remove("lifting");
+  placePiles(); hud(null);
+  if (!d) return;
+  const done = !cancel && t && (t.kind === "new" ? Arrange.newQuireAt(d.ids, t.after) : Arrange.dropAt(d.ids, t.key, t.ids, t.index));
+  if (!done) relayout(REDUCED ? 0 : 380);   // nowhere, or where they were: back they go
+  // they grow back to their size as they land (tweenStep), not all at once
+  if (TW.on && TW.dur) ARR.grow = d.ids; else growDone(d.ids);
+}
+function growDone(ids = ARR.grow || []) {
+  const held = new Set(ARR.drag?.ids || []);
+  for (const id of ids) if (!held.has(id)) V.objs.get(id)?.group.scale.setScalar(1);
+  ARR.grow = null;
+}
+
+/* Drag across empty table: a box, and every sheet whose middle is in it is selected (with ⇧, ⌘ or Ctrl, added). */
+function marquee(e, end = false) {
+  const box = $("#v3-marquee"), r = stage.getBoundingClientRect();
+  const x0 = DRAG.downAt.x - r.left, y0 = DRAG.downAt.y - r.top, x1 = e.clientX - r.left, y1 = e.clientY - r.top;
+  const [l, t, rr, b] = [Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1)];
+  Object.assign(box.style, { left: l + "px", top: t + "px", width: rr - l + "px", height: b - t + "px" });
+  box.hidden = end;
+  const ids = [];
+  for (const [id, c] of V.layout?.centers || []) { const xy = project(c, scene); if (xy && xy[0] >= l && xy[0] <= rr && xy[1] >= t && xy[1] <= b) ids.push(id); }
+  Arrange.marquee(ids, DRAG.add, end);
+}
+
 // ---------------------------------------------------------------- input
 const DRAG = { on: false, id: null, x: 0, y: 0, moved: false, mode: "orbit", pts: new Map(), pinch: 0 };
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
@@ -984,7 +1813,7 @@ function pick(e) {
   ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(ndc, camera); ray.far = Infinity;
   const hit = ray.intersectObjects(live.filter(shown), false)[0];
-  return hit ? { en: hit.object.userData.sheet.entry, point: hit.point } : null;
+  return hit ? { en: hit.object.userData.sheet.entry, point: hit.point, mesh: hit.object } : null;
 }
 function isLive(m) { let o = m; while (o && o !== book) o = o.parent; return !!o; }
 function shown(m) { let o = m; while (o && o !== book) { if (!o.visible) return false; o = o.parent; } return !!o; }
@@ -1011,13 +1840,25 @@ function zoomBy(f, e) {
 
 function wire() {
   const cv = renderer.domElement;
-  cv.addEventListener("contextmenu", e => e.preventDefault());
+  cv.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    if (V.arrange) { const hit = pick(e); Arrange.context(e.clientX, e.clientY, hit?.en.id || null); }
+  });
+  // Space held: drag pans the table (as in drawing programs)
+  addEventListener("keydown", e => { if (V.arrange && e.key === " " && !e.target.closest?.("input, textarea, button, select")) { ARR.space = true; stage.classList.add("panning"); e.preventDefault(); } });
+  addEventListener("keyup", e => { if (e.key === " ") { ARR.space = false; stage.classList.remove("panning"); } });
   cv.addEventListener("pointerdown", e => {
     DRAG.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { cv.setPointerCapture(e.pointerId); } catch { /* gone */ }
     if (DRAG.pts.size === 2) { DRAG.mode = "pinch"; DRAG.pinch = 0; return; }
     DRAG.on = true; DRAG.moved = false; DRAG.x = e.clientX; DRAG.y = e.clientY; DRAG.downAt = { x: e.clientX, y: e.clientY };
     DRAG.mode = e.button === 2 || e.button === 1 || e.shiftKey ? "pan" : "orbit";
+    if (V.arrange) {   // on the table: a sheet is taken, empty table draws a box; the middle button or Space+drag pans
+      if (e.button === 2) { DRAG.on = false; return; }   // the context menu (below)
+      const hit = e.button === 0 && !ARR.space ? pick(e) : null;
+      DRAG.en = hit?.en || null; DRAG.add = e.shiftKey || e.metaKey || e.ctrlKey;
+      DRAG.mode = e.button === 1 || ARR.space ? "pan" : DRAG.en ? "sheet" : "marquee";
+    }
     tip(null);
     stage.classList.add("dragging");
   });
@@ -1035,36 +1876,45 @@ function wire() {
       DRAG.x = e.clientX; DRAG.y = e.clientY;
       if (Math.hypot(e.clientX - DRAG.downAt.x, e.clientY - DRAG.downAt.y) > 4) DRAG.moved = true;
       if (!DRAG.moved) return;
-      if (DRAG.mode === "pan") panBy(dx, dy); else orbitBy(dx, dy);
+      if (DRAG.mode === "sheet") dragSheet(e, DRAG.en);
+      else if (DRAG.mode === "marquee") marquee(e);
+      else if (DRAG.mode === "pan") panBy(dx, dy); else orbitBy(dx, dy);
       return;
     }
-    const hit = pick(e);
-    const en = hit?.en || null;
-    if (en !== V.hover) { V.hover = en; tint(); stage.style.cursor = en ? "pointer" : ""; }
-    tip(en, e);
+    ARR.recheck = null;
+    pointAt(e, 2);
   });
   const up = e => {
     DRAG.pts.delete(e.pointerId);
     if (DRAG.mode === "pinch") { if (!DRAG.pts.size) DRAG.mode = "orbit"; DRAG.on = false; stage.classList.remove("dragging"); return; }
     if (!DRAG.on) return;
     DRAG.on = false; stage.classList.remove("dragging");
+    if (DRAG.mode === "sheet" && DRAG.moved) { dropSheet(e.type === "pointercancel"); return; }
+    if (DRAG.mode === "marquee" && DRAG.moved) { marquee(e, true); return; }
     if (DRAG.moved) return;
     const hit = pick(e);
+    if (V.arrange) { Arrange.click(hit?.en.id || null, e); return; }   // on the table: select (no inspector)
     if (!hit) return;
     clearTimeout(DRAG.click);
     const i = V.model.all.indexOf(hit.en);
-    DRAG.click = setTimeout(() => selectSheet(i), 230);
+    const fold = V.hand.on && i === V.cur ? foldOf(hit.mesh) : null;   // a flap of the sheet in hand: fold or unfold it
+    DRAG.click = setTimeout(() => fold ? toggleFold(fold.k, fold.i) : selectSheet(i), 230);
   };
   cv.addEventListener("pointerup", up);
   cv.addEventListener("pointercancel", up);
-  cv.addEventListener("pointerleave", () => { if (!DRAG.on && V.hover) { V.hover = null; tint(); } tip(null); });
+  cv.addEventListener("pointerleave", () => { ARR.recheck = null; if (!DRAG.on && (V.hover || V.hoverPile)) { V.hover = null; V.hoverPile = null; tint(); if (V.arrange) relayout(160); } tip(null); });
   cv.addEventListener("dblclick", e => {
+    if (V.arrange) return;   // on the table a double click is two clicks
     clearTimeout(DRAG.click);
     const hit = pick(e);
     if (hit) readSheet(hit.en);
   });
   cv.addEventListener("wheel", e => {
     e.preventDefault();
+    if (V.arrange && !e.ctrlKey && !e.metaKey) {   // on the table, as in drawing programs: scroll pans, pinch or ⌘ zooms
+      const k = e.deltaMode === 1 ? 16 : 1;
+      panBy(-e.deltaX * k, -e.deltaY * k); tip(null); return;
+    }
     const d = Math.max(-60, Math.min(60, e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY));
     zoomBy(Math.exp(d * (e.ctrlKey ? .012 : .0022)), e);
     tip(null);
@@ -1100,7 +1950,8 @@ function renderOpening() {
   const el = $("#v3-opening"); if (!el || V.mode !== "opening" || !V.order) return;
   const pages = linearize(V.order, { ghosts: true });
   const L = pages[2 * V.opening - 1], R = pages[2 * V.opening];
-  $("#v3-open-lbl").textContent = `${L ? short(sideLabel(L)) : "cover"} | ${R ? short(sideLabel(R)) : "cover"}`;
+  const lbl = p => p ? facesOf(p, V.order).map(f => f.label.replace(PART, "")).join(" · ") : "cover";   // a folded foldout can show several faces
+  $("#v3-open-lbl").textContent = `${lbl(L)} | ${lbl(R)}`;
 }
 function renderStrip() {
   const el = $("#v3-strip"); if (!el || !V.model) return;
@@ -1115,9 +1966,9 @@ function renderStrip() {
           onclick: () => { if (V.mode === "opening") setMode("block", { view: false }); setCur(i); } }, en.unplaced ? (V.order.mine ? "aside" : "lost") : qTag(en.quire)));
         el.append(grp);
       }
-      const lost = en.sheet.missing.every(Boolean);
-      grp.append(h("button", { class: `v3-tick${lost ? " lost" : ""}${en.moved ? " moved" : ""}${en.resewn ? " resewn" : ""}`, "data-i": i,
-        title: `${en.id}${en.moved ? " • moved" : en.resewn ? " ○ re-sewn" : ""}${lost ? " (lost)" : ""}`, "aria-label": `Sheet ${en.id}`,
+      const lost = en.sheet.missing.every(Boolean), fold = !lost && (en.sheet.inside[0].length > 2 || en.sheet.inside.length > 1);   // a foldout stands taller
+      grp.append(h("button", { class: `v3-tick${lost ? " lost" : ""}${en.moved ? " moved" : ""}${en.resewn ? " resewn" : ""}${fold ? " fold" : ""}`, "data-i": i,
+        title: `${en.id}${en.moved ? " • moved" : en.resewn ? " ○ re-sewn" : ""}${lost ? " (lost)" : ""}${fold ? " · foldout" : ""}`, "aria-label": `Sheet ${en.id}${fold ? ", a foldout" : ""}`,
         onclick: () => { if (V.mode === "opening") setMode("block", { view: false }); setCur(i); } }));
     });
   }
@@ -1173,6 +2024,7 @@ function build() {
         (() => { const s2 = h("select", { id: "v3-overlay", "aria-label": "Colour the edges by", onchange: e => setOverlay(e.target.value) },
           OVERLAY_KEYS.map(k2 => h("option", { value: k2 }, OVERLAYS[k2].name))); s2.value = V.overlay; return s2; })()),
       h("button", { id: "v3-contacts", title: "Faces that lay against each other when the book was closed (K)", onclick: () => setContactView(!V.contact.on) }, "Touching faces"),
+      h("button", { id: "v3-lost", class: V.hideLost ? "on" : "", "aria-pressed": String(V.hideLost), title: "Leave the lost sheets out of the 3D book (L)", onclick: () => setHideLost(!V.hideLost) }, "Hide lost sheets"),
       h("button", { id: "v3-arr-btn", class: `v3-arr-btn${Arrange.on ? " on" : ""}`, title: "Put the sheets in your own order (A)", onclick: () => Arrange.toggle() }, "✎ Rearrange"),
       h("label", { class: "v3-thick", title: "Sheet thickness. Real vellum is too thin to see the structure, so it is exaggerated." }, "Thickness",
         (() => { const s = h("select", { "aria-label": "Sheet thickness", onchange: e => setThick(+e.target.value) },
@@ -1181,17 +2033,24 @@ function build() {
         PRESETS.slice(1).map((p, i) => h("button", { "data-n": i + 1, title: `${p.name} (${p.key})`, onclick: () => preset(i + 1) }, h("kbd", {}, p.key), h("span", { class: "vn" }, " " + p.name))),
         h("button", { title: "Reset view (0)", "aria-label": "Reset view", onclick: () => preset(1) }, "⟲"))),
     h("div", { class: "v3-body" },
-    h("aside", { class: "v3-arrange", id: "v3-arrange", hidden: true, "aria-label": "Rearrange the sheets" }),
     stage = h("div", { class: "v3-stage", id: "v3-stage" },
       labelsEl = h("div", { class: "v3-labels", "aria-hidden": "true" }),
+      h("div", { class: "v3-piles", id: "v3-piles", "aria-label": "Quires on the table" }),   // Rearrange: the piles' names
+      h("div", { class: "v3-arr-acts", id: "v3-arr-acts", hidden: true }),                  // and the picked sheet's buttons
+      h("div", { class: "v3-hud", id: "v3-hud", hidden: true }),                              // and a panel: the sheet pointed at, or where dragged ones would go
+      h("div", { class: "v3-marquee", id: "v3-marquee", hidden: true }),                      // and the box drawn to select sheets
       tipEl = h("div", { class: "v3-tip", hidden: true }),
       h("div", { class: "v3-note", id: "v3-note", hidden: true }),
       h("div", { class: "v3-legend", id: "v3-legend", hidden: true }),
       h("div", { class: "v3-contact", id: "v3-contact", hidden: true, role: "group", "aria-label": "Touching faces" }),
       store.get("3d:hinted", false) ? "" : h("div", { class: "v3-hint", id: "v3-hint" },
         h("span", {}, "Drag to turn the book · ⇧-drag to pan · scroll to zoom · ", h("kbd", {}, "1"), "–", h("kbd", {}, "5"), " views · ", h("kbd", {}, "←"), h("kbd", {}, "→"), " thumb through · double-click to read"),
-        h("button", { onclick: () => { store.set("3d:hinted", true); $("#v3-hint").remove(); } }, "Got it"))),
-      h("aside", { class: "v3-insp", id: "v3-insp", hidden: true, "aria-label": "Sheet inspector" })),
+        h("button", { onclick: () => { store.set("3d:hinted", true); $("#v3-hint").remove(); } }, "Got it")),
+      // after the hint, so that it can stand clear of it (style.css)
+      h("button", { class: "v3-fold", id: "v3-fold", hidden: true, onclick: () => unfoldHere() })),
+      h("aside", { class: "v3-insp", id: "v3-insp", hidden: true, "aria-label": "Sheet inspector" }),
+      h("aside", { class: "v3-list", id: "v3-list", hidden: true, "aria-label": "Quires and their sheets, as a list" })),   // Rearrange's list (arrange.js)
+    h("section", { class: "v3-arrange", id: "v3-arrange", hidden: true, "aria-label": "Rearrange the sheets" }),
     h("div", { class: "v3-strip", id: "v3-strip", title: "Every sheet in reading order. Scroll here to thumb through the book.",
       onwheel: e => { e.preventDefault(); const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; STRIP.acc += d;
         if (Math.abs(STRIP.acc) > 40) { if (V.mode === "opening") setOpening(V.opening + Math.sign(STRIP.acc)); else step(Math.sign(STRIP.acc)); STRIP.acc = 0; } } }));
@@ -1345,9 +2204,11 @@ function open(order, { instant = false, ms, moved } = {}) {
   const keep = V.model?.all[V.cur]?.id;
   const first = !V.model;
   const prev = !first && V.order !== order ? { model: V.model, objs: V.objs } : null;
+  const other = V.order && order.id !== V.order.id && !(order.mine && order.from === V.order.title);
+  if (V.arrange && other) ARR.plan = null;   // another order on the table: its own plan (and the camera follows, below)
   if (prev && V.order.id !== order.id) V.prevOrder = V.order.id;
   if (ms === 0) instant = true;
-  if (V.hand.on) Object.assign(V.hand, { on: false, turned: false, folded: true, flat: false });
+  if (V.hand.on) Object.assign(V.hand, { on: false, turned: false, open: [0, 0], flat: false });
   V.order = order;
   V.model = modelOf(order);
   const used = new Set();
@@ -1360,7 +2221,7 @@ function open(order, { instant = false, ms, moved } = {}) {
   if (k < 0) V.inspect = false;
   if (V.mode === "opening") V.opening = clamp(V.opening, 0, V.model.leaves.length);
   renderBar(); renderStrip(); renderOpening(); renderInspector();
-  relayout(first || instant ? 0 : ms ?? morphMs(), prev && !instant ? morphFrom(prev, moved) : null);
+  relayout(first || instant ? 0 : V.arrange ? Math.min(ms ?? 700, 700) : ms ?? morphMs(), prev && !instant && !V.arrange ? morphFrom(prev, moved) : null);
   if (first) preset(V.preset || 1, { instant: true });
   if (prev && !instant && REDUCED) {   // no motion: flash what moved instead
     V.flash = new Set(V.model.all.filter(en => en.moved || en.resewn || prev.objs.get(en.id) !== V.objs.get(en.id)).map(en => en.id));
@@ -1371,6 +2232,7 @@ function open(order, { instant = false, ms, moved } = {}) {
   if (V.preset === 2) setTimeout(() => showThreads(true), first ? 0 : morphMs() + 50);
   Arrange.mark(curSheet());
   marks();
+  if (V.arrange && other) frameTable();
 }
 
 // ---------------------------------------------------------------- quires hidden like layers (3D only; the order is not changed)
@@ -1390,8 +2252,21 @@ function setHidden(quire, hide, { quiet = false } = {}) {
     if (vis.length) { if (V.inspect) closeInspector(); V.cur = vis[0][1]; renderInspector(); pushHash(); }
   }
   if (!quiet) toast(hide ? `${qWord(quire)} hidden in 3D` : `${qWord(quire)} shown again`);
+  if (V.arrange) relayout(REDUCED ? 0 : 400);   // on the table the other piles close up (or make room)
   tint(); marks(); wake(); Arrange.render();
 }
+/* Your order changed (arrange.js edit): its hidden quires go along with it. A copy starts with the ones hidden in the order it
+   was made from, a renamed quire stays hidden under its new name, and a name the order no longer has is forgotten (so a
+   quire merged away, or one put back later under that name, isn't hidden by mistake). */
+function keepHidden(order, { from = null, renamed = null } = {}) {
+  const names = new Set(HID[order.id] || (from && HID[from]) || []);
+  if (renamed && names.delete(String(renamed[0]))) names.add(String(renamed[1]));
+  const have = new Set(order.gatherings.map(g => String(g.quire)));
+  const keep = [...names].filter(n => have.has(n));
+  if (keep.length) HID[order.id] = keep; else delete HID[order.id];
+  store.set("3d:hidden", HID);
+}
+function dropHidden(id) { if (HID[id]) { delete HID[id]; store.set("3d:hidden", HID); } }
 function showAllQuires() { for (const q of hiddenQuires()) setHidden(q, false, { quiet: true }); toast("Every quire is shown"); }
 /* Strip ticks: the current sheet, hidden quires, bookmarked sheets. */
 function marks() {
@@ -1412,6 +2287,7 @@ const NARROW = () => matchMedia("(max-width: 760px)").matches;   // phones: the 
 function setPanel(on) {
   if (on && NARROW() && V.inspect) closeInspector();
   $("#v3-arr-btn")?.classList.toggle("on", on);
+  $("#v-three")?.classList.toggle("arranging", on);   // the dock takes the place of the strip of sheets
   setTimeout(resize, 0);
 }
 const curSheet = () => V.model?.all[V.cur]?.id || null;
@@ -1441,45 +2317,81 @@ function refresh(ids) {
 // ---------------------------------------------------------------- what touched what
 /* Faces that lay against each other in the closed book. Between leaves they are Read's openings: pages that face
    each other, across quire boundaries too, with the first and last pages on the covers. Inside a folded foldout they
-   come from the hinge chain at the closed state (which panel faces lie on which), so they rest on the fold direction
-   and are inferred. */
-const pairKey = (a, b) => [a, b].sort().join(" ↔ ");
+   come from the hinge chain at the closed state (which panel faces lie on which). Whatever rests on which way a fold
+   goes is marked: confirmed where Lisa Fagin Davis described the sheet as it is bound today (data/folds.json, whose
+   faces are used as she gave them), inferred where it is worked out here. */
+const PART = / \(part\)$/;
+const pairKey = (a, b) => [a, b].map(x => x.replace(PART, "")).sort().join(" ↔ ");
 const pageLbl = p => short(sideLabel(p)).replace("[f", "[");
+const optsIn = (order, id) => (order.gatherings.find(g => g.bifolia.includes(id))?.sheets || {})[id] || {};
+/* Davis's account of a sheet, if it is sewn and folded as it is bound today. */
+function recordOf(id, opts = {}) {
+  const r = D.folds?.sheets?.[id], was = bindingOf(id);
+  return r && was && JSON.stringify(opts) === JSON.stringify(was.opts || {}) ? r : null;
+}
+/* What one side of a closed leaf shows the page it faces: the faces Davis gave for a folded leaf, else the page sidesOf
+   names. `fold` is whether that rests on a fold, and how we know: "confirmed", "inferred" or "". */
+function facesOf(p, order) {
+  const rec = p.lost ? null : recordOf(p.sheet, optsIn(order, p.sheet));
+  const given = p.face === "inside" ? rec?.shows?.[p.leafNo] : null;
+  if (given) return given.map(f => ({ name: f.replace(PART, ""), label: short(f), fold: "confirmed" }));
+  const spine = p.segs[p.hinge === "left" ? 0 : p.segs.length - 1];
+  const onFold = !p.lost && (p.grid || p.segs.length > 1 && p.shown.page !== spine.page);   // a flap's back, or the Rose's reading
+  return [{ name: pageName(p.shown), label: pageLbl(p), fold: onFold ? (rec?.touch === "all" ? "confirmed" : "inferred") : "" }];
+}
+const worst = (...fs) => fs.includes("inferred") ? "inferred" : fs.includes("confirmed") ? "confirmed" : "";
 function facingPairs(order) {
   const pages = linearize(order, { ghosts: true }), out = [];
   for (let i = 0; i <= pages.length / 2; i++) {
     const a = pages[2 * i - 1] || null, b = pages[2 * i] || null;
     if (!a && !b) continue;
-    out.push({ kind: "facing", opening: i, pa: a, pb: b, a: a ? pageLbl(a) : "front cover", b: b ? pageLbl(b) : "back cover", pos: i });
+    const fa = a ? facesOf(a, order) : [{ label: "front cover", fold: "" }], fb = b ? facesOf(b, order) : [{ label: "back cover", fold: "" }];
+    for (const x of fa) for (const y of fb)
+      out.push({ kind: "facing", opening: i, pa: a, pb: b, fa: x, fb: y, a: x.label, b: y.label, fold: worst(x.fold, y.fold), pos: i });
   }
   return out;
 }
 /* A face's name; panels that share a label (the Rosettes' "Ros 86r top" is two panels) add their image id. */
 const segLabel = (seg, part, shared) => seg.missing ? `[${short(seg.page)}]`
   : short(pageName(seg)) + (shared?.has(pageName(seg)) && seg.img ? ` [${seg.img.replace(/^f?Ros-/, "")}]` : "") + (part ? " (part)" : "");
-function foldContacts(o) {
-  const out = [], seen = new Map();
-  for (const m of o.panels) for (const x of [m.userData.front, m.userData.back]) if (!x.missing) seen.set(pageName(x), (seen.get(pageName(x)) || new Set()).add(x.img));
-  const shared = new Set([...seen].filter(([, imgs]) => imgs.size > 1).map(([k]) => k));
+/* A sheet folded shut: where each panel of each leaf lies in its leaf's frame, which way its front faces, and its extent. */
+function closedLay(o) {
+  const lay = new Map();
   for (const L of o.leaves) {
     const ps = o.panels.filter(m => m.userData.leaf === L);
-    if (ps.length < 2) continue;
     // closed: every hinge of the leaf at 180 degrees
     const saved = L.hinges.map(hg => [hg.outer.rotation.x, hg.outer.rotation.y]);
     for (const hg of L.hinges) { if (hg.axis === "y") hg.outer.rotation.y = hg.sign * Math.PI; else hg.outer.rotation.x = Math.PI; }
     L.group.updateMatrixWorld(true);
     const inv = L.group.matrixWorld.clone().invert();
-    const lay = ps.map(m => {
+    for (const m of ps) {
       const mm = inv.clone().multiply(m.matrixWorld), c = new THREE.Vector3().setFromMatrixPosition(mm);
       const up = new THREE.Vector3(0, 0, 1).transformDirection(mm).z > 0, half = m.scale.x / 2;
-      return { m, z: c.z, up, x0: c.x - half, x1: c.x + half, y0: c.y - H / 2, y1: c.y + H / 2 };
-    });
+      lay.set(m, { m, L, z: c.z, up, x0: c.x - half, x1: c.x + half, y0: c.y - H / 2, y1: c.y + H / 2 });
+    }
     L.hinges.forEach((hg, i) => { hg.outer.rotation.x = saved[i][0]; hg.outer.rotation.y = saved[i][1]; });
     L.group.updateMatrixWorld(true);
-    const over = (a, b) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 1 && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > 1;
-    for (const a of lay) {
+  }
+  return lay;
+}
+const overlaps = (a, b) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 1 && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > 1;
+const facesUp = (l, face) => (face === 1) === l.up;   // that face of the panel looks along +z, toward the inside of the leaf
+/* The panel faces of a sheet that answer to a name ("f72r3", "f70r2 (1)"): by label, else by page. */
+function facesNamed(o, name) {
+  const all = o.panels.flatMap(m => [[m, 1, m.userData.front], [m, -1, m.userData.back]]).filter(([, , s]) => !s.missing);
+  const hit = all.filter(([, , s]) => pageName(s) === name);
+  return (hit.length ? hit : all.filter(([, , s]) => s.page === name)).map(([m, face]) => ({ m, face }));
+}
+function foldContacts(o) {
+  const out = [], seen = new Map(), lay = closedLay(o);
+  for (const m of o.panels) for (const x of [m.userData.front, m.userData.back]) if (!x.missing) seen.set(pageName(x), (seen.get(pageName(x)) || new Set()).add(x.img));
+  const shared = new Set([...seen].filter(([, imgs]) => imgs.size > 1).map(([k]) => k));
+  for (const L of o.leaves) {
+    const ls = [...lay.values()].filter(l => l.L === L);
+    if (ls.length < 2) continue;
+    for (const a of ls) {
       // the nearest layer above it that it lies against
-      const b = lay.filter(x => x.z > a.z + 1e-4 && over(a, x)).sort((x, y) => x.z - y.z)[0];
+      const b = ls.filter(x => x.z > a.z + 1e-4 && overlaps(a, x)).sort((x, y) => x.z - y.z)[0];
       if (!b) continue;
       const fa = a.up ? a.m.userData.front : a.m.userData.back, fb = b.up ? b.m.userData.back : b.m.userData.front;
       out.push({ kind: "fold", sheet: o.id, k: L.k, ma: a.m, mb: b.m, faceA: a.up ? 1 : -1, faceB: b.up ? -1 : 1,
@@ -1487,6 +2399,31 @@ function foldContacts(o) {
     }
   }
   return out;
+}
+/* A sheet's contacts inside its folds. Where Davis gave them, hers (each placed on the two panel faces that lie against
+   each other), and anything else the folding gives is still inferred; elsewhere all are worked out, and inferred. */
+function sheetContacts(o, opts) {
+  const rec = recordOf(o.id, opts), found = foldContacts(o);
+  if (!rec || rec.touch === "all") return found.map(c => ({ ...c, fold: rec ? "confirmed" : "inferred" }));
+  const lay = closedLay(o), out = [];
+  for (const [A, B] of rec.touch || []) {
+    const ca = facesNamed(o, A.replace(PART, "")), cb = facesNamed(o, B.replace(PART, ""));
+    let best = null;
+    for (const x of ca) for (const y of cb) {
+      const lx = lay.get(x.m), ly = lay.get(y.m);
+      if (x.m === y.m || lx.L !== ly.L || !overlaps(lx, ly)) continue;
+      const [lo, hi] = lx.z < ly.z ? [[lx, x], [ly, y]] : [[ly, y], [lx, x]];
+      if (!facesUp(lo[0], lo[1].face) || facesUp(hi[0], hi[1].face)) continue;   // they must look at each other
+      const d = hi[0].z - lo[0].z;
+      if (!best || d < best.d) best = { d, x, y, k: lx.L.k };
+    }
+    if (!best && ca.length && cb.length) best = { x: ca[0], y: cb[0], k: lay.get(ca[0].m).L.k };
+    if (best) out.push({ kind: "fold", sheet: o.id, k: best.k, ma: best.x.m, mb: best.y.m, faceA: best.x.face, faceB: best.y.face,
+                         a: short(A), b: short(B), fold: "confirmed" });
+  }
+  const face = (m, f) => `${o.panels.indexOf(m)}:${f}`, said = new Set(out.map(c => [face(c.ma, c.faceA), face(c.mb, c.faceB)].sort().join()));
+  for (const c of found) if (!said.has([face(c.ma, c.faceA), face(c.mb, c.faceB)].sort().join())) out.push({ ...c, fold: "inferred" });
+  return out.sort((a, b) => a.k - b.k);
 }
 /* Every contact of the order, front to back, each marked new if the current binding does not have it. */
 function contactsOf(order) {
@@ -1498,8 +2435,8 @@ function contactsOf(order) {
     if (!o.leaves.some(lf => lf.hinges.length)) continue;
     const was = bindingOf(en.id);
     const baseObj = was ? objFor({ ...en, opts: was.opts }, false) : null;
-    const baseSet = new Set(baseObj ? foldContacts(baseObj).map(c => pairKey(c.a, c.b)) : []);
-    for (const c of foldContacts(o)) {
+    const baseSet = new Set(baseObj ? sheetContacts(baseObj, was.opts).map(c => pairKey(c.a, c.b)) : []);
+    for (const c of sheetContacts(o, en.opts)) {
       const n = V.model.leaves.find(x => x.e === en && x.k === c.k).n;
       list.push({ ...c, pos: n + .5, isNew: !baseSet.has(pairKey(c.a, c.b)) });
     }
@@ -1518,10 +2455,17 @@ function outline(meshes) {
   });
   wake();
 }
-/* The panel meshes showing one page side of a leaf, and which face of each. */
-function meshesFor(side) {
+/* The panel meshes showing one page side of a leaf, and which face of each; with a face Davis named (`f`), the panel
+   that shows it to the facing page, the outermost on that side of the leaf. */
+function meshesFor(side, f) {
   if (!side) return [];
   const o = V.objs.get(side.sheet); if (!o) return [];
+  if (f?.name) {
+    const lay = closedLay(o), inside = side.face === "inside";
+    const hits = facesNamed(o, f.name).filter(({ m, face }) => facesUp(lay.get(m), face) === inside)
+      .sort((a, b) => (lay.get(b.m).z - lay.get(a.m).z) * (inside ? 1 : -1));
+    if (hits.length) return [[hits[0].m, hits[0].face]];
+  }
   const want = new Set(side.segs.map(x => x.page));
   const shown = side.shown?.page;
   const out = [];
@@ -1542,11 +2486,12 @@ function showContact(i) {
     if (V.mode !== "opening") { V.mode = "opening"; renderBar(); }
     setOpening(c.opening);
     preset(5);
-    outline([...meshesFor(c.pa), ...meshesFor(c.pb)]);
+    outline([...meshesFor(c.pa, c.fa), ...meshesFor(c.pb, c.fb)]);
   } else {
     selectSheet(V.model.all.findIndex(en => en.id === c.sheet));
-    enterHand(); V.hand.folded = false; V.hand.flat = true;
-    relayout(900); frameHand(); renderInspector();
+    const en = V.model.all[V.cur], entering = !V.hand.on, was = entering ? [0, 0] : V.hand.open;
+    enterHand(); V.hand.open = [0, 1].map(k => foldsOf(en, k)); V.hand.flat = true;
+    renderInspector(); relayHand(en, Math.max(...[0, 1].map(k => V.hand.open[k] - Math.min(was[k], V.hand.open[k]))), entering); frameHand();
     outline([[c.ma, c.faceA], [c.mb, c.faceB]]);
   }
   renderContact();
@@ -1563,6 +2508,12 @@ function setContactView(on) {
   else { outline([]); renderContact(); }
   pushHash();
 }
+/* "confirmed" or "inferred", for a contact that rests on which way a fold goes */
+const FOLD_TIP = {
+  confirmed: () => `As Lisa Fagin Davis gives it: ${(D.orders.sources[D.folds?.src] || {}).cite || "personal communication"}`,
+  inferred: () => "Rests on which way the folds go, which is worked out here, not documented",
+};
+const foldTag = (c, prefix = "") => c?.fold ? h("span", { class: c.fold, title: FOLD_TIP[c.fold]() }, prefix + c.fold) : "";
 function renderContact() {
   const el = $("#v3-contact"); if (!el) return;
   const C = V.contact;
@@ -1576,7 +2527,7 @@ function renderContact() {
     h("button", { "aria-label": "Next contact", title: "Next contact (→)", onclick: () => showContact(C.i + 1) }, "›"),
     h("span", { class: "n" }, c ? `${C.i + 1} of ${list.length}` : ""),
     c ? h("span", { class: "kind" }, c.kind === "facing" ? "facing pages" : `inside the fold of ${c.sheet}`) : "",
-    c?.kind === "fold" ? h("span", { class: "inferred", title: "Rests on the fold direction, which is inferred" }, "inferred") : "",
+    foldTag(c),
     c?.isNew ? h("span", { class: "new", title: "These faces do not touch in the current binding" }, "new") : "",
     h("label", { class: "only" }, h("input", { type: "checkbox", checked: C.newOnly || null,
       onchange: e => { C.newOnly = e.target.checked; C.i = 0; showContact(0); } }), " new only"),
@@ -1603,12 +2554,18 @@ function toFolios(id) { showFolios(id); }
 function renderInspector() {
   const el = $("#v3-insp");
   if (!el) return;
+  renderFoldBtn();
   const en = V.model?.all[V.cur];
   if (!V.inspect || !en) { el.hidden = true; el.innerHTML = ""; return; }
   const o = V.objs.get(en.id), { sides, names, v, sub, title } = info(en);
   const ev = (D.orders.evidence || {})[en.id] || [], src = D.orders.sources || {};
   const was = bindingOf(en.id), foldable = o.leaves.some(L => L.hinges.length);
-  const cite = k => src[k] ? h("a", { href: src[k].url, target: "_blank", rel: "noopener" }, src[k].cite) : k;
+  const cite = k => !src[k] ? k : src[k].url ? h("a", { href: src[k].url, target: "_blank", rel: "noopener" }, src[k].cite) : src[k].cite.replace(/\.$/, "");
+  // only the folds whose direction Davis gives are credited to her; any other fold goes in, as the viewer assumes
+  const rec = recordOf(en.id, en.opts), said = o.folds.filter(f => f.given), given = said.length > 0;
+  const ways = said.map(f => (f.crease ? `the crease in ${short(pageName(f.pages[0]))}` : f.pages.map(x => short(pageName(x))).join("–"))
+    + (f.way > 0 ? " in" : " out"));
+  const waysText = ways.length > 1 ? ways.slice(0, -1).join(", ") + " and " + ways.at(-1) : ways[0];
   const star = pg => { const b = Bookmarks.of(pg);
     return h("button", { class: `bm-star${b ? " on" : ""}`, title: b ? `Bookmarked as “${b.name}”: click to remove` : `Bookmark ${short(pg)}`,
       "aria-label": b ? `Remove the bookmark on ${short(pg)}` : `Bookmark ${short(pg)}`, onclick: () => Bookmarks.toggle(pg) }, b ? "★" : "☆"); };
@@ -1629,8 +2586,8 @@ function renderInspector() {
       : "Set aside: this order leaves it out of the book, so it lies on the table in front of its quire.") : "",
     h("div", { class: "fx-acts" },
       h("button", { onclick: () => act("turn") }, hd.on && hd.turned ? "Turn back" : "Turn over", " ", h("kbd", {}, "T")),
-      foldable ? h("button", { onclick: () => act("unfold") }, hd.on && !hd.folded ? "Fold up" : "Unfold", " ", h("kbd", {}, "U")) : "",
-      h("button", { onclick: () => act("flat") }, hd.on && hd.flat ? "Half-open" : "Open flat", " ", h("kbd", {}, "O")),
+      foldable ? h("button", { onclick: () => act("unfold") }, hd.on && anyOpen() ? "Fold up" : "Unfold", " ", h("kbd", {}, "U")) : "",
+      o.linked ? "" : h("button", { onclick: () => act("flat") }, hd.on && hd.flat ? "Half-open" : "Open flat", " ", h("kbd", {}, "O")),
       hd.on ? h("button", { onclick: () => putBack() }, "Put back ", h("kbd", {}, "Esc")) : "",
       h("button", { class: "primary", onclick: () => readSheet(en) }, "Read from here ", h("kbd", {}, "↵"))),
     h("div", { class: "links" }, "Same sheet in ",
@@ -1648,18 +2605,41 @@ function renderInspector() {
     ...touchesOf(en),
     v.is.length || v.hs.length || v.ls.length ? [h("h4", {}, "Section · hands · language"),
       h("div", { class: "hands" }, v.is.join(", "), v.hs.map(n => h("span", { class: "chip", style: { "--c": `var(--h${n})` } }, SCRIBES[n])), v.ls.map(x => LANG[x]).join(", "))] : "",
-    foldable || o.rows > 1 ? [h("h4", {}, "Folds ", h("span", { class: "inferred", title: "Not documented: worked out from the evidence" }, "inferred")),
-      o.rows > 1 ? h("p", { class: "small" }, "The top row folds down over the bottom row, and the sheet is sewn at its first crease in the lower half only (", cite("VN"), ").") : "",
-      foldable ? h("p", { class: "small" }, "Extra panels roll-fold onto the inside of the sheet, so folded you see the back of the second panel. voynich.nu infers this from where the folio numbers were written.") : "",
+    foldable || o.rows > 1 ? [h("h4", {}, "Folds ", foldTag({ fold: rec ? "confirmed" : "inferred" })),
+      // every fold, in the order it opens: fold or unfold each one (or click a flap of the sheet)
+      foldable ? h("div", { class: "fold-ctl" }, foldGroups(o).flatMap(([title, k, steps]) => [
+        h("div", { class: "lf" }, title),
+        ...steps.map(([i, info]) => {
+          const isOpen = hd.on && i < Math.min(hd.open[k], o.leaves[k].steps.length);
+          return h("div", { class: "fold-row" },
+            h("button", { onclick: () => toggleFold(k, i), "aria-pressed": isOpen ? "true" : "false",
+              title: isOpen ? "Fold it back (and the folds that close before it)" : "Open it (and the folds that open before it)" }, isOpen ? "Fold" : "Unfold"),
+            h("span", { class: "nm" }, info.label),
+            h("span", { class: `way${info.way < 0 ? " out" : ""}`, title: info.row ? "Folds down over the lower half, in one piece"
+              : info.way < 0 ? "The outside faces of the sheet come together" : "The inside faces of the sheet come together" }, info.row ? "down" : info.way < 0 ? "out" : "in"));
+        })]), h("div", { class: "small muted" }, "Or click a flap of the sheet to fold or unfold it.")) : "",
+      o.rows > 1 ? h("p", { class: "small" }, "The top half folds down over the lower half in one piece, and the right-hand column then folds in over the middle. The sheet is sewn at its first crease, in the lower half only (", cite("VN"), "). ",
+        h("a", { href: "https://collections.library.yale.edu/catalog/2002046?child_oid=1006229", target: "_blank", rel: "noopener" }, "Yale's photograph of it half open"),
+        " shows the top half lying folded down as one strip: 85r2, 86v4, 86v6.") : "",
+      // a fold "in" brings the inside faces of the sheet together, "out" the outside faces
+      foldable && given ? h("p", { class: "small" }, "Folded ", waysText, " (in: the inside faces of the sheet come together; out: the outside faces)",
+        rec ? [". These folds and the faces that touch are as Lisa Fagin Davis gives them: ", cite(D.folds.src), "."]
+          : [". Davis gives these folds for the sheet as it is bound today (", cite(D.folds.src), "); sewn differently here, which faces touch is worked out."],
+        o.folds.length > said.length ? " Its other folds go in, as the viewer assumes." : "") : "",
+      foldable && !given ? h("p", { class: "small" }, "Extra panels roll-fold onto the inside of the sheet, so folded you see the back of the second panel. voynich.nu infers this from where the folio numbers were written.") : "",
+      rec && !given ? h("p", { class: "small" }, "Lisa Fagin Davis confirms the faces that touch: ", cite(D.folds.src), ".") : "",
       o.creases.length ? h("p", { class: "small" }, o.creases.map(c => short(c.page)).join(", "), o.creases.length > 1 ? " are" : " is",
-        " wider than the leaf it folds onto, so it is drawn with one more crease (at ", o.creases.map(c => Math.round(c.at * 100) + "%").join(", "),
-        " of its width) to stay inside the book.") : ""] : "",
+        " wider than the leaf it folds onto, so it has one more crease, at ", o.creases.map(c => Math.round(c.at * 100) + "%").join(", "), " of its width",
+        rec?.creases ? ": where Yale's photograph shows it." : ", drawn where it would reach out of the book; where the crease really lies is not recorded.") : ""] : "",
     en.note ? [h("h4", {}, "In this order"), h("div", { class: "ev" }, en.note)] : "",
     ev.length ? [h("h4", {}, "Evidence"), ...ev.map(e => h("div", { class: "ev" }, e.text, src[e.src] ? h("span", { class: "src" }, cite(e.src)) : ""))] : ""];
   el.append(...parts.flat(2).filter(x => x !== "" && x != null));
 }
 
-/* The inspector's list of what this sheet's faces lay against in this order. */
+/* The inspector's list of what this sheet's faces lay against in this order. The pairs stand plain: how each is known
+   is on its tooltip, a pair new to this order gets a small dot, and anything worth a caveat is said once, under the
+   list, instead of a badge on every line. */
+const TOUCH_TIP = { confirmed: "It rests on a fold, as Lisa Fagin Davis gives it.", inferred: "It rests on a fold, worked out here, not confirmed." };
 function touchesOf(en) {
   if (en.unplaced) return [];
   const all = contactsOf(V.order);
@@ -1667,9 +2647,15 @@ function touchesOf(en) {
   const openings = new Set([L0.n, L0.n + 1, L1.n, L1.n + 1]);
   const mine = all.filter(c => c.kind === "facing" ? openings.has(c.opening) : c.sheet === en.id);
   const go = c => { const C = V.contact; C.list = all; C.on = true; C.newOnly = false; showContact(all.indexOf(c)); pushHash(); };
+  const tip = c => ["Show these two faces.", c.kind === "fold" ? "They meet inside the sheet's folds." : "", TOUCH_TIP[c.fold] || "",
+    c.isNew ? "New: they do not touch as the book is bound today." : ""].filter(Boolean).join(" ");
+  const anyNew = mine.some(c => c.isNew), guessed = mine.some(c => c.fold === "inferred");
   return [h("h4", {}, "Touches when closed"),
-    h("div", { class: "touch" }, mine.map(c => h("button", { class: "linkish", title: "Show these two faces", onclick: () => go(c) },
-      `${c.a} ↔ ${c.b}`, c.kind === "fold" ? h("span", { class: "inferred" }, "fold · inferred") : "", c.isNew ? h("span", { class: "new" }, "new") : "")))];
+    h("div", { class: "touch" }, mine.map(c => h("button", { class: "linkish", title: tip(c), onclick: () => go(c) },
+      `${c.a} ↔ ${c.b}`, c.isNew ? h("span", { class: "dot", "aria-label": "new in this order" }) : ""))),
+    anyNew || guessed ? h("p", { class: "touch-note small muted" },
+      anyNew ? [h("span", { class: "dot", "aria-hidden": "true" }), " New in this order."] : "",
+      anyNew && guessed ? " " : "", guessed ? "Pairs that rest on a fold are worked out here, not confirmed." : "") : ""];
 }
 function openInspector() { if (V.inspect) return; if (NARROW() && Arrange.on) Arrange.close(); V.inspect = true; relayout(520); renderInspector(); pushHash(); }
 function closeInspector() {
@@ -1682,42 +2668,146 @@ function enterHand() {
   const g = CAM.goal;
   Object.assign(V.hand, { on: true, yaw: g.yaw, pitch: g.pitch, cam: { target: g.target.clone(), yaw: g.yaw, pitch: g.pitch, dist: g.dist, fov: g.fov } });
 }
+/* A sheet that both moves between the block and the hand and folds or unfolds does one after the other, so its flaps
+   never swing through the leaves beside it: leaving the block it rises first, going back it folds up first. `part` is
+   the share of the time the move takes. */
+const RISE = 650;
+const handMorph = (id, part, rising) => tw => {
+  const hold = rising ? part : 1 - part;
+  for (const k of [0, 1]) {
+    const key = `${id}:${k}`, tr = tw.poses.get(key); if (!tr) continue;
+    const a = tr[0][1], b = tr[1][1];
+    tw.poses.set(key, rising ? [[0, a], [hold, { ...b, f: a.f }], [1, b, "even"]] : [[0, a], [hold, { ...a, f: b.f }, "even"], [1, b]]);
+  }
+  const sg = tw.sgs.get(id);
+  if (sg) tw.sgs.set(id, [[0, sg[0][1]], [hold, rising ? sg[1][1] : sg[0][1]], [1, sg[1][1]]]);
+};
+/* Lay the sheet in hand out again after `steps` of its folds changed. `entering`: it is only now leaving the block. */
+function relayHand(en, steps, entering, plain = 900) {
+  const ft = foldTime(steps);
+  if (entering && steps) relayout(RISE + ft, handMorph(en.id, RISE / (RISE + ft), true));
+  else if (steps) relayout(ft, evenFor([`${en.id}:0`, `${en.id}:1`]));
+  else relayout(plain);
+}
+/* A change of layout in which these leaves only fold or unfold: their folds take equal turns. */
+const evenFor = keys => tw => { for (const key of keys) { const tr = tw.poses.get(key); if (tr) tw.poses.set(key, [[0, tr[0][1]], [1, tr[1][1], "even"]]); } };
+/* The two leaves the book is open at, and whether U would unfold anything there. */
+const openingLeaves = () => V.mode === "opening" ? [V.model.leaves[V.opening - 1], V.model.leaves[V.opening]].filter(Boolean) : [];
+function openingFolds() {
+  const ls = openingLeaves();
+  return Math.max(0, ...ls.map(L => {
+    const o = V.objs.get(L.e.id);
+    if (o.linked && !(ls.length === 2 && ls[0].e === ls[1].e)) return 0;   // a sheet of two rows opens only at its own centre
+    return o.leaves[L.k].steps.length;
+  }));
+}
+/* U, or the Unfold button on the stage: the opening the book is open at, or the sheet picked. */
+function unfoldHere() {
+  if (V.mode === "opening" && !V.inspect) {
+    const steps = openingFolds();
+    if (!steps) { toast("Nothing folded in this opening"); return; }
+    V.unfoldOpening = !V.unfoldOpening;
+    relayout(foldTime(steps), evenFor(openingLeaves().map(L => L.key)));
+    if (V.preset === 5) preset(5); else frameOpening();
+    renderFoldBtn();
+  } else act("unfold");
+}
+/* The button over the foot of the stage that folds or unfolds what is in view. It is there only when there is something
+   to unfold, and draws the eye when you arrive at one. */
+function renderFoldBtn() {
+  const el = $("#v3-fold"); if (!el || !V.model) return;
+  const opening = V.mode === "opening" && !V.inspect, en = V.model.all[V.cur];
+  const can = !V.arrange && (opening ? openingFolds() > 0 : !!en && V.objs.get(en.id)?.leaves.some(L => L.steps.length));   // not over Rearrange's table
+  const isOpen = opening ? V.unfoldOpening : V.hand.on && anyOpen();
+  const key = can ? (opening ? `o${V.opening}` : `s${en.id}`) : "";
+  el.hidden = !can;
+  if (!can) { el._key = ""; return; }
+  const label = isOpen ? "Fold up" : "Unfold";
+  if (el._label !== label) { el._label = label; el.replaceChildren(h("span", { class: "ico", "aria-hidden": "true" }, isOpen ? "⇥⇤" : "⇤⇥"), label, " ", h("kbd", {}, "U")); }
+  el.title = isOpen ? "Fold it back up (U)" : opening ? "Unfold the foldout at this opening (U)" : "Unfold this sheet, fold by fold (U)";
+  if (el._key !== key) { el._key = key; el.classList.remove("arrive"); void el.offsetWidth; el.classList.add("arrive"); }   // a new foldout came into view
+}
 /* Turn over, unfold or open flat: the sheet rises clear of the block first. */
 function act(kind) {
   if (!V.model) return;
   if (!V.inspect) { V.inspect = true; }
+  const entering = !V.hand.on;
   enterHand();
   if (kind === "turn") V.hand.turned = !V.hand.turned;
-  if (kind === "unfold") V.hand.folded = !V.hand.folded;
+  let steps = 0;
+  if (kind === "unfold") {   // everything opens, one fold after another, or everything folds back up in reverse
+    const en = V.model.all[V.cur], was = V.hand.open.slice();
+    V.hand.open = anyOpen() ? [0, 0] : [0, 1].map(k => foldsOf(en, k));
+    steps = Math.max(...[0, 1].map(k => Math.abs(V.hand.open[k] - Math.min(was[k], foldsOf(en, k)))));
+  }
   if (kind === "flat") V.hand.flat = !V.hand.flat;
-  relayout(kind === "turn" ? 1000 : 900);
+  renderInspector();   // first: it takes its room from the stage, and the sheet is framed in what is left
+  relayHand(V.model.all[V.cur], steps, entering, kind === "turn" ? 1000 : 900);
   frameHand();
-  renderInspector(); tint();
+  tint();
+}
+/* The folds to list beside a sheet: [title, leaf, [[step, info]…]] for each leaf that has any; a sheet of two rows is one
+   list, since its folds open in one sequence. */
+function foldGroups(o) {
+  const real = L => L.steps.map((st, i) => [i, st.info]).filter(([, info]) => info);
+  if (!o.linked) return o.leaves.filter(L => L.steps.length).map(L => [L.k ? "2nd leaf" : "1st leaf", L.k, real(L)]);
+  // each stage once, named by whichever leaf folds in it
+  const n = o.leaves[0].steps.length;
+  return [["The whole sheet", 1, range(0, n).map(i => [i, o.leaves[1].steps[i].info || o.leaves[0].steps[i].info]).filter(([, info]) => info)]];
+}
+/* The folds of one leaf of a sheet, as steps in the order they open (L.steps), and how many of the sheet in hand's are open. */
+function foldsOf(en, k) { return (en && V.objs.get(en.id)?.leaves[k]?.steps.length) || 0; }
+function anyOpen() { const en = V.model?.all[V.cur]; return [0, 1].some(k => Math.min(V.hand.open[k], foldsOf(en, k)) > 0); }
+const foldTime = steps => 300 + 520 * steps;   // each fold takes its turn
+/* Fold or unfold one fold of the sheet in hand (step i of its leaf's L.steps). Opening it opens the folds that open
+   before it, so the rest of the strip comes out with it; closing it first closes those that close before it. A sheet of
+   two rows is one sequence for both its leaves. */
+function toggleFold(k, i) {
+  const en = V.model?.all[V.cur];
+  if (!en || i >= foldsOf(en, k)) return;
+  if (!V.inspect) V.inspect = true;
+  const entering = !V.hand.on;
+  enterHand();
+  const was = Math.min(V.hand.open[k], foldsOf(en, k)), next = i < was ? i : i + 1;
+  V.hand.open = V.objs.get(en.id).linked ? [next, next] : V.hand.open.map((x, j) => j === k ? next : Math.min(x, foldsOf(en, j)));
+  renderInspector();
+  relayHand(en, Math.abs(next - was), entering);
+  frameHand();
+  tint();
+}
+/* The fold a panel of the sheet in hand hangs from: { k, i } in its leaf's L.steps, or null for a panel at the spine. */
+function foldOf(mesh) {
+  const L = mesh?.userData.leaf;
+  if (!L?.steps) return null;
+  for (let o = mesh.parent; o && o !== L.group; o = o.parent) {
+    const hi = L.hinges.findIndex(hg => hg.inner === o);
+    if (hi >= 0) return { k: L.k, i: L.steps.findIndex(st => st.hs.includes(hi)) };
+  }
+  return null;
 }
 function putBack({ silent = false } = {}) {
   if (!V.hand.on) return;
-  const cam = V.hand.cam;
-  Object.assign(V.hand, { on: false, turned: false, folded: true, flat: false });
-  if (!silent) relayout(900);
+  const cam = V.hand.cam, en = V.model.all[V.cur];
+  const steps = Math.max(...[0, 1].map(k => Math.min(V.hand.open[k], foldsOf(en, k))));   // folds to close on the way
+  Object.assign(V.hand, { on: false, turned: false, open: [0, 0], flat: false });
+  if (!silent) { if (steps) { const ft = foldTime(steps); relayout(ft + RISE, handMorph(en.id, RISE / (ft + RISE), false)); } else relayout(900); }
   if (cam) setGoal(cam, 4.5);
   renderInspector(); tint();
 }
-/* Frame the sheet in hand, opened out as it will be. */
+/* Frame the sheet in hand as it will be, with whichever of its folds are open, in the middle of the view. */
 function frameHand() {
   const en = V.model.all[V.cur], o = V.objs.get(en.id), L = V.layout, g = L.sg.get(en.id);
   if (!g) return;
+  fitStage();   // the inspector may just have taken its room
   const m = L.place.matrix.clone().multiply(new THREE.Matrix4().compose(g.p, g.q, new THREE.Vector3(1, 1, 1)));
-  const pts = [];
-  for (const lf of o.leaves) {
-    const p = L.poses.get(`${en.id}:${lf.k}`), reach = p.f < .5 ? lf.full : lf.w, [dx, dz] = dirOf(p.a), top = p.f < .5 ? o.rows * H : H;
-    for (const y of [0, top]) pts.push(new THREE.Vector3(0, y, 0).applyMatrix4(m), new THREE.Vector3(dx * reach, y, dz * reach).applyMatrix4(m));
-  }
-  const c = new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3());
+  const pts = sheetCorners(o, en.id, L.poses).map(p => p.applyMatrix4(m));
   const yaw = V.hand.yaw, pitch = clamp(V.hand.pitch, 4, 40);
-  setGoal({ target: c, yaw: nearestYaw(yaw), pitch, fov: 32, dist: fitDist(pts, c, yaw, pitch, 1.18, 32) }, 4.5);
+  // with the touching-faces bar across the top of the stage, stand a little further back so it does not cover the sheet
+  setGoal({ ...fitView(pts, yaw, pitch, V.contact.on ? 1.34 : 1.18, 32), yaw: nearestYaw(yaw), pitch, fov: 32 }, 4.5);
   V.preset = null; renderViews();
 }
 function selectSheet(i) {
+  if (V.arrange) { setCur(i); Arrange.mark(curSheet(), true); return; }   // on the table (a bookmark): the sheet is selected there; no inspector
   if (V.mode === "opening") setMode("block", { view: false });
   if (V.hand.on) putBack({ silent: true });
   V.cur = clamp(i, 0, V.model.all.length - 1);
@@ -1735,6 +2825,7 @@ function stepSel(d) {
 function key(e) {
   const k = e.key;
   if (!V.model) return;
+  if (V.arrange && !["ArrowLeft", "ArrowRight", "Home", "End", "a", "A", "l", "L", "+", "=", "-", "_", "Escape"].includes(k)) return;   // the book's own keys rest (A puts it back together)
   if (e.altKey) {
     const big = e.shiftKey;
     if (k === "ArrowLeft") big ? panBy(60, 0) : orbitBy(-30, 0);
@@ -1756,10 +2847,7 @@ function key(e) {
   else if (k === "v" || k === "V") setOverlay(OVERLAY_KEYS[(OVERLAY_KEYS.indexOf(V.overlay) + (e.shiftKey ? -1 : 1) + OVERLAY_KEYS.length) % OVERLAY_KEYS.length]);
   else if (k === " ") { V.inspect ? closeInspector() : (V.mode === "opening" ? selectSheet(V.cur) : openInspector()); e.preventDefault(); }
   else if (k === "t" || k === "T") act("turn");
-  else if (k === "u" || k === "U") {
-    if (V.mode === "opening" && !V.inspect) { V.unfoldOpening = !V.unfoldOpening; relayout(800); if (V.preset === 5) preset(5); }
-    else act("unfold");
-  }
+  else if (k === "u" || k === "U") unfoldHere();
   else if (k === "o" || k === "O") act("flat");
   else if (k === "r" || k === "R") replay();
   else if (k === "Home") V.mode === "opening" ? setOpening(0) : setCur(0);
@@ -1773,6 +2861,8 @@ function key(e) {
   else if (k === "p" || k === "P") setPosture(V.posture === "stand" ? "lie" : "stand");
   else if (k === "m" || k === "M") setMode(V.mode === "block" ? "opening" : "block");
   else if (k === "Enter") { V.mode === "opening" && !V.inspect ? readOpening() : readSheet(V.model.all[V.cur]); e.preventDefault(); }
+  else if (k === "Escape" && V.arrange) { if (ARR.drag) { DRAG.on = false; dropSheet(true); } else Arrange.close(); }
+  else if (k === "l" || k === "L") setHideLost(!V.hideLost);
   else if (k === "Escape") {
     if (V.contact.on) setContactView(false);
     else if (V.hand.on) putBack();
@@ -1817,15 +2907,54 @@ export default {
   setHidden,
   showAllQuires,
   hiddenQuires,
+  keepHidden,
+  dropHidden,
   curSheet,
   focusSheet,
   setPanel,
+  setArrange,
+  setHideLost,
+  setSelection,
+  glyph,
+  frameTable(sel) {   // ⇧1: the whole table; ⇧2: the selection
+    if (!sel) return frameTable();
+    const pts = [];
+    for (const id of sel) { const c = V.layout?.centers.get(id); if (c) pts.push(c.clone().add(new THREE.Vector3(-H * .8, 0, -H * .6)), c.clone().add(new THREE.Vector3(H * .8, 30, H * .6))); }
+    if (pts.length) frameTable(false, pts);
+  },
+  cancelDrag() {   // Esc: sheets in hand go back; a box being drawn goes, with the selection as it was
+    if (ARR.drag) { DRAG.on = false; dropSheet(true); return true; }
+    if (DRAG.on && DRAG.mode === "marquee") { DRAG.on = false; stage.classList.remove("dragging"); $("#v3-marquee").hidden = true; Arrange.marqueeCancel(); return true; }
+    return false;
+  },
+  get dragging() { return !!ARR.drag || (DRAG.on && DRAG.moved && DRAG.mode === "marquee"); },
+  get hideLost() { return V.hideLost; },
+  get arranging() { return V.arrange; },
+  whereOf(id) { const en = V.model?.all.find(x => x.id === id); return en ? whereText(en) : ""; },
+  relayout() { relayout(REDUCED ? 0 : 200); },
   refresh,
   // for checking in the browser: (await import("./assets/view3d.js")).default.debug
   debug: {
     V, CUR, CAM, cost, preset, setSpread, setPosture, setMode, setOpening, setCur, setGoal, wake,
-    selectSheet, act, putBack, closeInspector, replay, setOverlay, setContactView, showContact, contactsOf,
+    selectSheet, act, putBack, closeInspector, replay, setOverlay, setContactView, showContact, contactsOf, closedLay, toggleFold, foldOf,
     seek(k) { if (!TW.on) return; TW.t0 = performance.now() - k * TW.dur; tweenStep(performance.now()); renderer.render(scene, camera); drawLabels(); },
     get renderer() { return renderer; },
+    get camera() { return camera; },
+    get tray() { return ARR.tray; },   // the set-aside pile's dashed place on the table
+    get selOutlines() { return ARR.ssel || []; },   // the gold outlines round selected sheets
+    pickAt(x, y) { return pick({ clientX: x, clientY: y })?.en.id ?? null; },
+    /* true while anything is still moving or about to: a tween, the camera on its way, a resize not yet fitted */
+    get busy() {
+      const g = CAM.goal, size = renderer.getSize(new THREE.Vector2());
+      return TW.on || !!resize.pending || size.x !== stage.clientWidth || size.y !== stage.clientHeight
+        || Math.abs(CAM.dist - g.dist) > g.dist * 1e-3 || CAM.target.distanceTo(g.target) > .05 || Math.abs(CAM.yaw - g.yaw) > .05 || Math.abs(CAM.pitch - g.pitch) > .05;
+    },
+    /* jump to the end of whatever is moving (the folds, the camera) and draw it: for checks that look at a still view.
+       k < 1 stops the folds that far through, with the camera already where it is going. */
+    settle(k = 1) {
+      if (TW.on) { TW.t0 = performance.now() - (k >= 1 ? TW.dur + 1 : k * TW.dur); tweenStep(performance.now()); }
+      const g = CAM.goal; CAM.yaw = g.yaw; CAM.pitch = g.pitch; CAM.dist = g.dist; CAM.fov = g.fov; CAM.target.copy(g.target);
+      placeCamera(); camera.updateMatrixWorld(true); renderer.render(scene, camera); drawLabels();
+    },
   },
 };

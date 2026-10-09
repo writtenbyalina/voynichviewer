@@ -73,6 +73,55 @@ test.describe("folded foldouts", () => {
   });
 });
 
+test.describe("the Unfold button over the pages", () => {
+  test("comes up when you turn to a foldout, says how much more there is, and folds it back again", async ({ page }) => {
+    await openReader(page, "30r");
+    const btn = page.locator("#rd-fold");
+    await expect(btn).toBeHidden();
+    await page.evaluate(() => Reader.go(67, 0));   // 67v1 | 68r1
+    await expect(btn).toBeVisible();
+    await expect(btn).toContainText("Unfold");
+    await expect(btn).toContainText("3 more panels");
+    await btn.click();
+    await expect.poll(() => unfolded(page)).toEqual([true, true]);
+    await expect(btn).toContainText("Fold up");
+    await btn.click();
+    await expect.poll(() => unfolded(page)).toEqual([false, false]);
+    await page.evaluate(() => Reader.go(40, 0));
+    await expect(btn).toBeHidden();
+  });
+
+  test("the strip marks the pages that unfold", async ({ page }) => {
+    await openReader(page);
+    const marked = await page.evaluate(() => [...document.querySelectorAll("#rd-strip .t.fold")].map(t => R.pages[+t.dataset.i]).map(p => p.sheet));
+    expect(new Set(marked)).toEqual(new Set(["67|68", "69|70", "71|72", "85|86", "87|90", "88|89", "94|95", "99|102", "100|101"]));
+  });
+});
+
+test.describe("an opened-out foldout", () => {
+  test("sits in the middle of the stage, and its fold tab is clear of the arrows at the sides", async ({ page }) => {
+    await openReader(page);
+    for (const at of ["72r1", "67v1", "68v1", "89r1", "102r1"]) {
+      await page.evaluate(n => Reader.go(Reader.find(n), 0), at);
+      await page.evaluate(() => Reader.toggleUnfold());
+      await expect.poll(() => unfolded(page)).not.toEqual([false, false]);
+      const room = await page.evaluate(() => {
+        const st = document.querySelector("#rd-stage").getBoundingClientRect();
+        const segs = [...document.querySelectorAll("#rd-zoomer .seg")].map(e => e.getBoundingClientRect());
+        const rc = sel => [...document.querySelectorAll(sel)].map(e => e.getBoundingClientRect());
+        const tabs = rc(".foldtab"), arrows = rc(".rd-nav");
+        return { left: Math.round(Math.min(...segs.map(r => r.left)) - st.left), right: Math.round(st.right - Math.max(...segs.map(r => r.right))),
+          covered: tabs.some(t => arrows.some(a => t.left < a.right && t.right > a.left && t.top < a.bottom && t.bottom > a.top)) };
+      });
+      expect(Math.abs(room.left - room.right), `${at}: as much room left as right ${JSON.stringify(room)}`).toBeLessThanOrEqual(3);
+      expect(room.left, `${at}: inside the stage`).toBeGreaterThan(0);
+      expect(room.covered, `${at}: an arrow lies over the fold tab`).toBe(false);
+      await page.evaluate(() => Reader.toggleUnfold());
+      await expect.poll(() => unfolded(page)).toEqual([false, false]);
+    }
+  });
+});
+
 test.describe("a page inside a fold", () => {
   const settled = page => page.evaluate(async () => { const t0 = performance.now(); while ((R.busy || R.queue.length) && performance.now() - t0 < 8000) await new Promise(r => setTimeout(r, 30)); });
 

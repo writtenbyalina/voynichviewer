@@ -13,6 +13,10 @@
    "cite": "Lisa Fagin Davis, \"The Materiality of the Voynich Manuscript\", Centre for Medieval Studies, University of Toronto (26 Sep 2025).",
    "url": "https://www.youtube.com/watch?v=nH28ltqYIyo"
   },
+  "LFD2026ninja": {
+   "cite": "Lisa Fagin Davis, comment on the Voynich Viewer thread, The Voynich Ninja forum, and her answers to follow-up questions (Oct 2026).",
+   "url": "https://www.voynich.ninja/thread-6154-post-92424.html#pid92424"
+  },
   "Davis2020": {
    "cite": "Lisa Fagin Davis, \"How Many Glyphs and How Many Scribes? Digital Paleography and the Voynich Manuscript\", Manuscript Studies 5:1 (2020).",
    "url": "https://repository.upenn.edu/mss_sims/vol5/iss1/6"
@@ -257,14 +261,14 @@
   },
   {
    "id": "davis",
-   "title": "Davis: complete proposed order",
-   "subtitle": "Every sheet read on its own (singulions), as the 2026 paper proposes for the whole book; quires 13 and 20 re-sequenced; quire 9 re-sewn",
+   "title": "Davis: proposed order",
+   "subtitle": "Every sheet read on its own (singulions), as the 2026 paper proposes; only quires 13 and 20 are re-sequenced, so elsewhere the sheets keep today's sequence; quire 9 re-sewn",
    "sources": [
     "LD2026",
     "LFD2025blog",
     "LFD2025talk"
    ],
-   "summary": "Everything Davis has proposed about the order, in one sequence. Layfield & Davis (2026) conclude that the entire manuscript \"was originally intended to be read as a series of sequential singulions\": single folded sheets, each read first leaf recto, first leaf verso, second leaf recto, second leaf verso. Their evidence is that the two halves of one sheet are more alike than pages that face each other in the binding (quire 1: 0.399 against 0.246). So here every sheet is read on its own, and 1v faces 8r, its other half. Where they recovered a sequence, it is used: quires 13 and 20 follow the highest average LSA facing score (table 14), Q13 0.461 → 0.517 (+12.1%), Q20 0.438 → 0.526 (+20%). Where they did not, the sheets keep their current sequence, outermost first. They left the botanical sheets in place because \"each page is a distinct botanical topic\", and did not test the pharmaceutical quires. From Davis's \"Voynich Codicology\" post (Jan 2025), quire 9 is sewn in its original fold between 67v2 and 67v1. That post's waterspout evidence for 78|81 is satisfied too, because every sheet's own centre is now an opening (78v | 81r). The lost bifolium 109|110 cannot be placed.",
+   "summary": "Everything Davis has proposed about the order, in one sequence. Layfield & Davis (2026) conclude that the entire manuscript \"was originally intended to be read as a series of sequential singulions\": single folded sheets, each read first leaf recto, first leaf verso, second leaf recto, second leaf verso. Their evidence is that the two halves of one sheet are more alike than pages that face each other in the binding (quire 1: 0.399 against 0.246). So here every sheet is read on its own, and 1v faces 8r, its other half. Where they recovered a sequence, it is used: quires 13 and 20 follow the highest average LSA facing score (table 14), Q13 0.461 → 0.517 (+12.1%), Q20 0.438 → 0.526 (+20%). A sequence of sheets is proposed only for quires 13 and 20. In every other quire, quires 1–8 included, the sheets keep today's sequence, outermost first: that sequence is not part of the proposal, and Davis has no results for quires 1–8 yet. They left the botanical sheets in place because \"each page is a distinct botanical topic\", and did not test the pharmaceutical quires. From Davis's \"Voynich Codicology\" post (Jan 2025), quire 9 is sewn in its original fold between 67v2 and 67v1. That post's waterspout evidence for 78|81 is satisfied too, because every sheet's own centre is now an opening (78v | 81r). The lost bifolium 109|110 cannot be placed.",
    "gatherings": [
     {
      "quire": 1,
@@ -275,7 +279,7 @@
       "3|6",
       "4|5"
      ],
-     "note": "Sheets kept in their current sequence; Davis read the botanical sheets as singulions but did not re-sequence them."
+     "note": "Today's sequence of sheets, not a proposal: Davis has not proposed one for quires 1–8, and has no results for them yet."
     },
     {
      "quire": 2,
@@ -286,7 +290,7 @@
       "11|14",
       "12|13"
      ],
-     "note": "Sheets kept in their current sequence."
+     "note": "Today's sequence of sheets, not a proposal: Davis has not proposed one for quires 1–8, and has no results for them yet."
     },
     {
      "quire": 3,
@@ -297,7 +301,7 @@
       "19|22",
       "20|21"
      ],
-     "note": "Sheets kept in their current sequence."
+     "note": "Today's sequence of sheets, not a proposal: Davis has not proposed one for quires 1–8, and has no results for them yet."
     },
     {
      "quire": 4,
@@ -308,7 +312,7 @@
       "27|30",
       "28|29"
      ],
-     "note": "Sheets kept in their current sequence. Scribes change sheet by sheet here (1, 2, 1, 1), which singulions explain."
+     "note": "Today's sequence of sheets, not a proposal: Davis has not proposed one for quires 1–8, and has no results for them yet. Scribes change sheet by sheet here (1, 2, 1, 1), which singulions explain."
     },
     {
      "quire": 5,
@@ -319,7 +323,7 @@
       "35|38",
       "36|37"
      ],
-     "note": "Sheets kept in their current sequence."
+     "note": "Today's sequence of sheets, not a proposal: Davis has not proposed one for quires 1–8, and has no results for them yet."
     },
     {
      "quire": 6,
@@ -330,7 +334,7 @@
       "43|46",
       "44|45"
      ],
-     "note": "Sheets kept in their current sequence."
+     "note": "Today's sequence of sheets, not a proposal: Davis has not proposed one for quires 1–8, and has no results for them yet."
     },
     {
      "quire": 7,
@@ -341,7 +345,7 @@
       "51|54",
       "52|53"
      ],
-     "note": "Sheets kept in their current sequence."
+     "note": "Today's sequence of sheets, not a proposal: Davis has not proposed one for quires 1–8, and has no results for them yet."
     },
     {
      "quire": 8,
@@ -353,7 +357,7 @@
       "60|63",
       "61|62"
      ],
-     "note": "Sheets kept in their current sequence; three of the five are lost."
+     "note": "Today's sequence of sheets, not a proposal: Davis has not proposed one for quires 1–8, and has no results for them yet. Three of the five sheets are lost."
     },
     {
      "quire": 9,
@@ -415,7 +419,7 @@
       "87|90",
       "88|89"
      ],
-     "note": "Sheets kept in their current sequence; the pharmaceutical quires were not tested."
+     "note": "Today's sequence of sheets, not a proposal: only quires 13 and 20 are re-sequenced. The 2026 paper left the plant sheet in place and did not test the recipe sheet."
     },
     {
      "quire": 16,
@@ -431,7 +435,7 @@
       "93|96",
       "94|95"
      ],
-     "note": "Sheets kept in their current sequence; the pharmaceutical quires were not tested."
+     "note": "Today's sequence of sheets, not a proposal: only quires 13 and 20 are re-sequenced. The 2026 paper left the plant sheets in place."
     },
     {
      "quire": 18,
@@ -447,7 +451,7 @@
       "99|102",
       "100|101"
      ],
-     "note": "Sheets kept in their current sequence; the pharmaceutical quires were not tested."
+     "note": "Today's sequence of sheets, not a proposal: only quires 13 and 20 are re-sequenced. The 2026 paper did not test the recipe quires."
     },
     {
      "quire": 20,
@@ -476,7 +480,7 @@
    },
    {
     "src": "VN",
-    "text": "Which way the panels fold is not recorded. Folio numbers were written while the foldouts were folded, which is why '68' sits on 68v2: folded, the centre opening shows 67r2 | 68v2."
+    "text": "Folio numbers were written while the foldouts were folded, which is why '68' sits on 68v2: folded, the centre opening shows 67r2 | 68v2."
    },
    {
     "src": "Hodgins2009",
