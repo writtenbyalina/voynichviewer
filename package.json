@@ -1,0 +1,16 @@
+{
+  "name": "voynichviewer",
+  "private": true,
+  "description": "Voynich Viewer is a static site with no build step. This file exists only to run its tests.",
+  "scripts": {
+    "test": "playwright test",
+    "test:fast": "playwright test tests/data.spec.js tests/site.spec.js",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report",
+    "legacy:snapshot": "node tests/legacy/capture.js",
+    "test:legacy": "playwright test tests/legacy-"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}

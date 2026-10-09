@@ -1,0 +1,58 @@
+{
+ "about": "How the foldouts fold, and which faces touch when the book is closed, as Lisa Fagin Davis described them in a comment on the Voynich Viewer thread on the Voynich Ninja forum (src, a key of orders.json's sources). Edit by hand. Keyed by sheet, and true only for the sheet folded as it is bound today: in an order that sews or turns it differently, 3D works its contacts out and marks them inferred. 'folds': every fold other than the spine, keyed 'a|b' by the picture ids of the two panels it joins, or by one panel's id for the extra crease inside that panel; 'in' brings the inside faces of the sheet together, 'out' the outside faces. A fold not listed folds in, as the viewer always assumed. 'touch': pairs of faces that lie against each other inside a folded leaf. 'shows': per leaf, the faces a folded leaf shows on its inside, so what the page facing it touches. Faces are named as the viewer names them; '(part)' where she says only part of a face touches, and on the two pieces of a panel the viewer creases in two. 'touch': 'all' says every contact the viewer works out for the sheet is right. A contact the record does not cover stays inferred. 'creases': where the extra crease in a panel lies, as a fraction of the panel's width from the fold it hangs from, measured on the Yale photographs she pointed to (5 Oct 2026). 'drawn': per leaf, its panels in hinge order with where each runs from and to (0 the spine, 100 the fore-edge), for the drawings on the Info page; schematic, not measured.",
+ "src": "LFD2026ninja",
+ "sheets": {
+  "67|68": {
+   "folds": {"f67v1|f67v2": "in", "f68r1|f68r2": "in", "f68r2|f68r3": "in", "f68r3": "out"},
+   "creases": {"f68r3": 0.63},
+   "touch": [["f67v1", "f67v2"], ["f68r1", "f68v3 (part)"], ["f68r1", "f68r3 (part)"], ["f68r2", "f68r3 (part)"], ["f68v3 (part)", "f68v3 (part)"]],
+   "shows": {"67": ["f67r2"], "68": ["f68v2"]},
+   "drawn": {"68": [["f68r1", 0, 100], ["f68r2", 100, 2], ["f68r3", 2, 100], ["f68r3", 100, 47]]}
+  },
+  "69|70": {
+   "folds": {"f70r1|f70r2-1": "in", "f70r2-1|f70r2-2": "in"},
+   "touch": [["f70r1 (part)", "f70r2 (1) (part)"], ["f70r1", "f70v2 (2)"], ["f70r2 (1) (part)", "f70r2 (2)"]],
+   "shows": {"70": ["f70v2 (1)"]},
+   "drawn": {"70": [["f70r1", 0, 100], ["f70r2 (1)", 100, 2], ["f70r2 (2)", 2, 58]]}
+  },
+  "71|72": {
+   "folds": {"f72r1|f72r2": "in", "f72r2|f72r3": "out", "f72r3": "in"},
+   "creases": {"f72r3": 0.66},
+   "touch": [["f72r1", "f72r2"], ["f72v2", "f72v3 (part)"], ["f72r3 (part)", "f72r3 (part)"]],
+   "shows": {"72": ["f72r1", "f72r3 (part)", "f72v3 (part)"]},
+   "drawn": {"72": [["f72r1", 0, 100], ["f72r2", 100, 20], ["f72r3", 20, 100], ["f72r3", 100, 58]]}
+  },
+  "85|86": {"touch": "all"},
+  "87|90": {
+   "folds": {"f90r1|f90r2": "in"},
+   "touch": [["f90r1", "f90r2"]],
+   "shows": {"90": ["f90v2"]}
+  },
+  "88|89": {
+   "folds": {"f89r1|f89r2": "in", "f89r2": "in"},
+   "creases": {"f89r2": 0.60},
+   "touch": [["f89r1 (part)", "f89r2 (part)"], ["f89r1", "f89v2 (part)"], ["f89r2 (part)", "f89r2 (part)"]],
+   "shows": {"89": ["f89r1 (part)", "f89v2 (part)"]},
+   "drawn": {"89": [["f89r1", 0, 100], ["f89r2", 100, 17], ["f89r2", 17, 72]]}
+  },
+  "94|95": {
+   "folds": {"f95r1|f95r2": "in"},
+   "touch": [["f95r1", "f95r2"]],
+   "shows": {"95": ["f95r1 (part)", "f95v2"]},
+   "drawn": {"95": [["f95r1", 0, 100], ["f95r2", 100, 14]]}
+  },
+  "100|101": {
+   "folds": {"f101r-1|f101r-2": "in"},
+   "touch": [["f101r (1)", "f101r (2)"]],
+   "shows": {"101": ["f101r (1) (part)", "f101v (2)"]},
+   "drawn": {"101": [["f101r (1)", 0, 100], ["f101r (2)", 100, 14]]}
+  },
+  "99|102": {
+   "folds": {"f102r1|f102r2": "in", "f102r2": "out"},
+   "creases": {"f102r2": 0.76},
+   "touch": [["f102r1", "f102r2 (part)"], ["f102v2 (part)", "f102v2 (part)"]],
+   "shows": {"102": ["f102r1 (part)", "f102r2 (part)", "f102v2 (part)"]},
+   "drawn": {"102": [["f102r1", 0, 100], ["f102r2", 100, 18], ["f102r2", 18, 44]]}
+  }
+ }
+}

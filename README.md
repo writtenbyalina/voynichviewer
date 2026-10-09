@@ -11,10 +11,14 @@ Site: [voynichviewer.com](https://voynichviewer.com).
 
 - **3D** (opens first): the book block in WebGL. Fan the sheets apart, pull one out, turn it over, unfold it, colour the edges by
   scribe, section, illustration, language or quire, and see which faces touched when the book was closed.
-  **Rearrange** (key A) puts the sheets in your own order: drag sheets, or whole gatherings, by their handle; start
-  new gatherings, set sheets aside, read a gathering as separate sheets, turn a sheet inside out or upside down, sew a
-  foldout at another fold. Only the sheet you move lifts in the animation. The eye next to a gathering hides it in 3D,
-  like a layer, without changing the order.
+  **Rearrange** (key A) takes the book apart on the table: each quire lies open as a pile (sheets tucked inside each
+  other stacked with the centre sheet on top; sheets read one by one fanned like cards). It works like a drawing
+  program: click, ⇧/⌘-click or drag a box to select; drag onto a pile or between piles (a new quire); ⌘G new quire or
+  merge, ⇧⌘G split, ⌘] / ⌘[ toward the centre / outward, ⌫ set aside, ⌘X / ⌘V; a quire's name selects, renames
+  (double-click) or moves it; right-click menus. A panel in a fixed place shows the sheet pointed at (its place in its
+  pile, both its sides) or where dragged sheets will land. On a phone it opens as a panel under the book instead.
+  **Hide lost sheets** (key L) leaves the lost sheets out of the 3D book. A quire can be hidden in 3D, like a layer,
+  without changing the order.
 - **Reader**: turn the pages two at a time, unfold the foldouts, zoom, jump to a folio. Zoomed in, a page is shown at
   full size (about 3,600 px tall), loaded from Yale's IIIF image server. The Reader loads these ahead as you read (the
   opening you are on, the next two and the one behind), so zooming in is sharp at once; not where zooming in gains
@@ -38,9 +42,10 @@ Site: [voynichviewer.com](https://voynichviewer.com).
 - **Crop tool**: re-cut any page from Yale's photograph (✂ Crop in the Reader, or in 3D). The photograph is loaded from
   Yale's IIIF image server and cut in the browser.
 
-The menu offers the current binding, "Davis: complete proposed order" (every sheet read on its own, quires 13 and 20
-re-ordered as in Layfield & Davis 2026, quire 9 re-sewn as in her 2025 post), and your own orders. Old links to the
-retired "Davis's blog (Jan 2025)" order open the complete proposed order.
+The menu offers the current binding, "Davis: proposed order" (every sheet read on its own, quires 13 and 20
+re-ordered as in Layfield & Davis 2026, quire 9 re-sewn as in her 2025 post; the other quires keep today's sequence of
+sheets, which is not part of the proposal), and your own orders. Old links to the
+retired "Davis's blog (Jan 2025)" order open Davis's proposed order.
 
 The 🐞 button (top right) shows how to report a bug or suggest a feature. The version (`APP_VERSION` in
 `assets/app.js`, and the badge in `index.html`) is 1.0.
@@ -67,13 +72,17 @@ python3 -m http.server 8000
 and open <http://localhost:8000>. (Opening `index.html` straight from disk does not work: browsers block `fetch` of
 local files.)
 
+To run the automatic checks (Node.js 20 or newer): `npm install`, `npx playwright install chromium` once, then
+`npm test`. GitHub runs the same checks on every pull request; see [tests/README.md](tests/README.md).
+
 ## Layout
 
 ```
 index.html              the page
 assets/app.js           the Reader, Info (with the Folio order tables), the order logic and the shared place (POS)
 assets/work.js          your work: crops (cut in the browser), your own orders, export and import
-assets/arrange.js       the Rearrange panel of the 3D view
+assets/arrange.js       Rearrange in 3D: the table's selection, bar, menus and keys (the table itself is drawn in
+                        view3d.js), the list beside it, and the panel under the book on phones
 assets/view3d.js        the 3D view (ES module, loaded when the 3D tab first opens)
 assets/text.js          the Reader's text panel, the word card and the interlinear (ES module, loaded when the text opens)
 assets/search.js        the Text tab: search, facets, the book strip, export (ES module)
@@ -103,21 +112,27 @@ tools/text/             the text pipeline: fetch.py (the pinned transcriptions),
                         test_text.py; the method is docs/TEXT.md section 3, the Reader's text docs/text/REDESIGN.md 8
 tools/font/             builds Voynich VV from Claston's font (build_font.py), with test_font.py
 docs/TEXT.md            the design of Text: sources, method, data, query language, screens, tests
+data/folds.json         which way each foldout's folds go and which faces touch when the book is closed, as Lisa
+                        Fagin Davis described them; 3D folds the sheets by it and marks those contacts confirmed
 tools/import_from_scout.py   refreshes data/codex.json and data/panels/ from a local Voynich Scout checkout
 tools/seams.py          measures those bands from data/panels/ and rewrites data/seams.json (run it after an import)
 CNAME                   the custom domain for GitHub Pages
+tests/                  the automatic checks (Playwright); what they cover and how to read a failure: tests/README.md
+.github/workflows/tests.yml   runs them on GitHub for every pull request and every push to main
 ```
 
 ## What's new: logging changes and fixes
 
 Every change people can see, and every bug fix, gets an entry in `data/changelog.json`, in the same commit as the
 change. Releases are newest first, each with its `version`, the `date` it went live (YYYY-MM-DD) and its `changes`,
-each with a `kind` (`new`, `improved` or `fixed`) and a sentence written for readers, not developers. The site reads
+each with a `kind` (`new`, `improved` or `fixed`) and a short line written for readers, not developers. Keep the list
+short: one line per change, a few words each, only what a visitor would notice; a release of fixes is usually one
+line. The site reads
 this file: the badge at the top left shows the latest version, clicking it opens the list, and someone who has been
 here before sees a dot on the badge until they have opened the newest notes.
 
-Versions: the second number goes up with each release (1.1, 1.2, …), the first with a redesign. Change the fallback
-version in `index.html` (`#cx-ver`) at the same time, for the moment before the list loads.
+Versions: the third number goes up with fixes (1.5.1), the second with new features (1.6), the first with a redesign.
+Change `APP_VERSION` in `assets/app.js` and the fallback in `index.html` (`#cx-ver`) at the same time.
 
 Credit people who report bugs by name only if they have said that is all right; otherwise "Reported by a reader".
 

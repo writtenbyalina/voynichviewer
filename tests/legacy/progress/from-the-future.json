@@ -1,0 +1,19 @@
+{
+  "app": "voynich-viewer",
+  "version": 7,
+  "exported": "2027-03-01T10:00:00.000Z",
+  "viewer": "3.4",
+  "settings": { "labels": false, "theme": "dark" },
+  "orders": [
+    {
+      "id": "my-legacyfut1",
+      "title": "Made by a later version",
+      "colour": "#c33",
+      "notes": ["a", "b"],
+      "gatherings": [ { "quire": 1, "type": "nested", "bifolia": ["1|8", "2|7", "3|6", "4|5"], "tags": ["x"], "future": { "deep": true } } ],
+      "unplaced": []
+    }
+  ],
+  "bookmarks": [ { "id": "bm-f1", "page": "f78v", "name": "With extra fields", "at": "2027-03-01T09:00:00.000Z", "tags": ["a"], "colour": "red" } ],
+  "crops": { "f1r": { "quad": [[40, 90], [2700, 100], [2690, 3700], [50, 3690]], "rotate": 90, "note": "from a later version", "cutout": { "points": [] } } }
+}

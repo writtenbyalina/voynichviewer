@@ -1,0 +1,7 @@
+{
+  "app": "voynich-viewer",
+  "version": 1,
+  "orders": [
+    { "title": "Just two sheets", "gatherings": [ { "quire": 1, "bifolia": ["1|8", "2|7"] } ] }
+  ]
+}

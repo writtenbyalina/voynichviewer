@@ -1,0 +1,16 @@
+{
+  "app": "voynich-viewer",
+  "version": 1,
+  "orders": [
+    {
+      "id": "my-legacyold1",
+      "title": "Made before some sheets were renamed",
+      "gatherings": [
+        { "quire": 1, "type": "nested", "bifolia": ["1|8", "2|7", "11|12", "3|6"] },
+        { "quire": 2, "type": "nested", "bifolia": ["999|1000"] },
+        { "quire": 3, "type": "nested", "bifolia": ["9|16", "9|16"] }
+      ],
+      "unplaced": ["4|5", "not a sheet"]
+    }
+  ]
+}

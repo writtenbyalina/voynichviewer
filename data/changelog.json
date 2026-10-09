@@ -1,25 +1,41 @@
 {
- "about": "What changed on the site, newest first. Shown under the version number (top left). Add an entry for every change people can see and every fix, in the same commit, with the date it went live. kind: new | improved | fixed. The second number of the version goes up with each release; the first with a redesign.",
+ "about": "What changed on the site, newest first. Shown under the version number (top left). Add an entry for every change people can see and every fix, in the same commit, with the date it went live. kind: new | improved | fixed. Keep it short: one line per change, a few words each, and only the points a visitor would notice; a release of fixes is usually one line. Versions: third number for fixes (1.5.1), second for new features (1.6), first for a redesign.",
  "releases": [
   {
    "version": "1.6",
    "date": "2026-10-10",
    "changes": [
-    {"kind": "new", "text": "Text in the Reader (T): the text of the pages beside them, René Zandbergen's reference transliteration RF1b. Point at a word on the page to see what it reads; click it to see it cut from the photograph, with every other place in the book it appears."},
-    {"kind": "new", "text": "Find, under the title of the text: a search of the whole book as you type, in Eva or with the glyph keys. Words that begin with what you type count (the exact word first; whole word and contains are a click away), each with its count; the word picked opens on its places. It stays until you clear it, and the address keeps it."},
-    {"kind": "improved", "text": "The text is shown as glyphs or in Eva, chosen from a dropdown. FSG and Currier are no longer offered."},
-    {"kind": "improved", "text": "The text's ? says in a few lines how to use it and where the text, the word positions and the photographs come from; Sources at the foot opens the same. The keyboard list under the ? at the top right keeps only the keys that matter."},
+    {"kind": "new", "text": "Text in the Reader (T): RF1b beside the pages. Point at a word to read it; click it for its crop and places."},
+    {"kind": "new", "text": "Find, under the text's title: the book searched as you type, in Eva or with the glyph keys."},
+    {"kind": "new", "text": "Text tab: search the book by word or pattern; narrow by section, scribe, language, quire or kind; export."},
+    {"kind": "improved", "text": "The text shows as glyphs or in Eva, from a dropdown. FSG and Currier are no longer offered."},
+    {"kind": "improved", "text": "The text's ? says how to use it and where it comes from; the keyboard list keeps only the keys that matter."},
     {"kind": "improved", "text": "“How the transcribers read it” and notes on words are gone from the word panel."},
-    {"kind": "improved", "text": "Text tab, Pages: a chip of its own beside Reading and Spaces, no longer inside More options; the set chosen can be edited or deleted from the same menu. New page set is one dialog instead of two prompts. Write pages and ranges (75r-84v, 1r) and see them read back as you type, with the count and anything that is not a page; or add a range from two menus, or a whole section, quire, scribe or language."},
-    {"kind": "fixed", "text": "Text tab: More options ran off the right of narrower windows and pushed the whole view sideways; it, the ?, the i and Export stayed open until clicked again. They stay inside the window, and a click elsewhere or Esc closes them."},
-    {"kind": "fixed", "text": "Text tab: clicking a page in the strip said “No results on …” when that page's results were further down than the list had got (past the first 150). The list now opens out to that page."},
-    {"kind": "fixed", "text": "Text tab, Reading: any transcriber: a word written twice in one line was counted and marked once. Both count now."},
-    {"kind": "fixed", "text": "Text tab: when nothing matched, an empty strip and empty filters were still drawn."},
-    {"kind": "fixed", "text": "Text tab: opening #text alone wrote a broken address (#text/…/#text)."},
-    {"kind": "fixed", "text": "Text tab: section names in the strip overlapped on a phone, being measured before the strip was laid out."},
-    {"kind": "fixed", "text": "Text tab: pointing at the strip while a search was still running threw an error."},
+    {"kind": "improved", "text": "Text tab, Pages: a chip beside Reading and Spaces; the set chosen can be edited or deleted from its menu."},
+    {"kind": "improved", "text": "New page set: one dialog. Pages and ranges read back as you type; add a range, section, quire or scribe."},
     {"kind": "improved", "text": "The Text button in the Reader's bar has an icon, like Bookmark and Grid beside it."},
-    {"kind": "fixed", "text": "On the round diagrams, a word's band of the ring now reaches the tops and tails of its own glyphs: 2,180 words on 25 pages, the zodiac and f57v most. An audit of every word's outline against the ink (docs/text/shapes_audit.md) found the bands a third too thin."}
+    {"kind": "fixed", "text": "Text tab: More options ran off narrow windows; popovers now stay inside and close on a click elsewhere or Esc."},
+    {"kind": "fixed", "text": "Text tab: a page clicked in the strip said “No results” when its results were past the first 150 listed."},
+    {"kind": "fixed", "text": "Text tab, any transcriber: a word written twice in one line was counted and marked once."},
+    {"kind": "fixed", "text": "Text tab: an empty strip and filters were drawn when nothing matched; #text alone wrote a broken address."},
+    {"kind": "fixed", "text": "Text tab: section names under the strip overlapped on a phone; pointing at it mid-search threw an error."},
+    {"kind": "fixed", "text": "Round diagrams: a word's band reaches the tops and tails of its glyphs (2,180 words on 25 pages)."}
+   ]
+  },
+  {
+   "version": "1.5.1",
+   "date": "2026-10-10",
+   "changes": [
+    {"kind": "fixed", "text": "Rearrange: a pile shows every sheet it holds, even while you move one."}
+   ]
+  },
+  {
+   "version": "1.5",
+   "date": "2026-10-05",
+   "changes": [
+    {"kind": "improved", "text": "Rearrange lays the book out on the table, a pile for each quire, to move sheets around."},
+    {"kind": "fixed", "text": "Updates to the foldouts and notes as per review by Lisa Fagin Davis."},
+    {"kind": "improved", "text": "The 3D book is smoother, with the paper curling round every fold."}
    ]
   },
   {
