@@ -51,6 +51,13 @@
    "what": "Zandbergen's reference transliteration RF1b, full Eva"
   },
   {
+   "name": "RF1b-er.txt",
+   "url": "https://www.voynich.nu/data/RF1b-er.txt",
+   "sha256": "eb857a1f353b18983fbc25b954e1bbce227a26d99cefabfda9206ff9b57644d2",
+   "bytes": 343891,
+   "what": "Zandbergen's reference transliteration RF1b, reduced (basic) Eva"
+  },
+  {
    "name": "LSI_ivtff_0d.txt",
    "url": "https://www.voynich.nu/data/beta/LSI_ivtff_0d.txt",
    "sha256": "3f3f2af18cde10efe75c582f49b07b651c3397022fcbfa5854fecc424c121afa",
@@ -128,11 +135,53 @@
    "what": "STA to reduced STA"
   },
   {
+   "name": "STA-Eva_def.bit",
+   "url": "https://www.voynich.nu/software/bitrans/STA-Eva_def.bit",
+   "sha256": "7f37853510144fb3e2dc3ee9458d634f41e6d95bc1fbf1c4b8f479a53a021f81",
+   "bytes": null,
+   "what": "STA to Extended Eva (both ways): the Eva of RF1b, as in Zandbergen's RF1b-e.txt"
+  },
+  {
+   "name": "STA-FSG_def.bit",
+   "url": "https://www.voynich.nu/software/bitrans/STA-FSG_def.bit",
+   "sha256": "f93ec41126ffba5dc979f4144584e163e185b88e607dd80d83b6fe49273bd2ce",
+   "bytes": null,
+   "what": "STA to the First Study Group's alphabet (FSG)"
+  },
+  {
+   "name": "STA-Curr_def.bit",
+   "url": "https://www.voynich.nu/software/bitrans/STA-Curr_def.bit",
+   "sha256": "f6de20d5ea8187664555ddbe8e58a1cf73c008bf0a8aa79b360f54e1881333c3",
+   "bytes": null,
+   "what": "STA to Currier's alphabet"
+  },
+  {
    "name": "voynichese_data.zip",
    "url": "https://www.voynichese.com/1/data/folio/voynichese_data.zip",
    "sha256": "402d99ca8191ae53a4f25912ee0af0a7e6b6d9a3714b2beaf86404a27d5b7ad5",
    "bytes": 715214,
    "what": "The Voynichese Project's word boxes (2014), XML, Apache License 2.0: used by boxes.py"
+  },
+  {
+   "name": "placa_tokens_f85v_86r.csv",
+   "url": "https://raw.githubusercontent.com/alessandroplaca-uro/voynich-spatial-data/7580dafa624cf23a63665f4819022003f8d128ef/rosettes/tokens_f85v_86r.csv",
+   "sha256": "ff7b779e9ff2468ca04c0e07d0bd9999110d554a962faad1d78fc99c5e7e712d",
+   "bytes": 50426,
+   "what": "Alessandro Placa's positioned words of the Rosettes foldout (voynich-spatial-data, CC BY 4.0): used by rosettes.py"
+  },
+  {
+   "name": "placa_polygons_f85v_86r.json",
+   "url": "https://raw.githubusercontent.com/alessandroplaca-uro/voynich-spatial-data/7580dafa624cf23a63665f4819022003f8d128ef/rosettes/polygons_f85v_86r.json",
+   "sha256": "b2eb3b46c2ca10ae66eed7c7e818dc030e6d44947473c3268dec6108b39e390a",
+   "bytes": 164632,
+   "what": "Alessandro Placa's region shapes of the Rosettes foldout (CC BY 4.0): the rings' centres, used by rosettes.py"
+  },
+  {
+   "name": "placa_poly_transforms_f85v_86r.csv",
+   "url": "https://raw.githubusercontent.com/alessandroplaca-uro/voynich-spatial-data/7580dafa624cf23a63665f4819022003f8d128ef/rosettes/poly_transforms_f85v_86r.csv",
+   "sha256": "6fdd34500eb8ad035d83b8a99dbf43806f8505d97e34595ca6a1cea84999ae54",
+   "bytes": 1923,
+   "what": "Alessandro Placa's regions of the Rosettes foldout and the rosette each belongs to (CC BY 4.0): used by rosettes.py"
   }
  ]
 }

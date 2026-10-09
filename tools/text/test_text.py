@@ -253,5 +253,89 @@ class Vote(unittest.TestCase):
         self.assertEqual(rows["@221;"], (0, "GC"))
 
 
+class ReaderText(unittest.TestCase):
+    """data/text/rf (tools/text/rf.py): RF1b, its alphabets and its words' shapes on the photographs."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = json.loads((DATA / "rf" / "text.json").read_text())
+        cls.alpha = json.loads((DATA / "rf" / "alpha.json").read_text())["schemes"]
+        cls.loci = {l[0]: l for _, ls in cls.text["pages"] for l in ls}
+
+    def write(self, sta_, scheme):
+        """the site's conversion (assets/text.js, writeAs): two-code rules first, then code by code"""
+        a = self.alpha[scheme]
+        out, i = "", 0
+        while i < len(sta_):
+            if sta_[i] in ".,-":
+                out += "." if sta_[i] == "-" else sta_[i]; i += 1; continue
+            if sta_[i:i + 4] in a["multi"]:
+                out += a["multi"][sta_[i:i + 4]]; i += 4; continue
+            out += a["codes"][sta_[i:i + 2]]; i += 2
+        return out
+
+    def test_every_locus_of_rf1b(self):
+        self.assertEqual(len(self.loci), 5385)
+        kinds = collections.Counter(l[1][0] for l in self.loci.values())
+        self.assertEqual((kinds["P"], kinds["L"], kinds["C"], kinds["R"]), (4130, 1029, 84, 142))
+
+    def test_eva_is_zandbergens_own_rf1b_eva(self):
+        """RF1b in STA, written in Eva by the site's table, is Zandbergen's RF1b-e.txt, line for line"""
+        eva = {}
+        for line in (sta.CACHE / "RF1b-e.txt").read_text(encoding="latin-1").splitlines():
+            m = re.match(r"<(f[^.>]+\.[^,>]+),[^>]+>\s+(.*)", line)
+            if m:
+                eva[m.group(1)] = re.sub(r"<@[^>]*>", "", m.group(2).strip()).replace("<->", ".")
+        bad = [k for k, l in self.loci.items() if self.write(l[3], "evx") != eva[k]]
+        self.assertEqual(bad, [])
+
+    def test_basic_eva_is_zandbergens_own_reduced_rf1b(self):
+        """the default Eva: each glyph by its nearest basic Eva letters, which is Zandbergen's RF1b-er.txt, line for line"""
+        er = {}
+        for line in (sta.CACHE / "RF1b-er.txt").read_text(encoding="latin-1").splitlines():
+            m = re.match(r"<(f[^.>]+\.[^,>]+),[^>]+>\s+(.*)", line)
+            if m:
+                er[m.group(1)] = re.sub(r"<@[^>]*>", "", m.group(2).strip()).replace("<->", ".")
+        bad = [k for k, l in self.loci.items() if self.write(l[3], "eva") != er[k]]
+        self.assertEqual(bad, [])
+
+    def test_known_words_in_each_alphabet(self):
+        l = self.loci["f10r.6"][3]                     # docs/TEXT.md 3.4 A: the five alphabets of one line
+        self.assertTrue(self.write(l, "eva").startswith("ycheor.cthy.chor.cthaiin"))
+        self.assertTrue(self.write(l, "fsg").startswith("GTCOR.HZG.TOR.HZAM"))
+        self.assertTrue(self.write(l, "cur").startswith("9SCOR.Q9.SOR.QAM"))
+
+    def test_every_glyph_is_written_in_every_alphabet(self):
+        used = {c for l in self.loci.values() for c in re.findall(r"[A-Z][0-9a-z%]", l[3])}
+        for k, a in self.alpha.items():
+            self.assertEqual(used - set(a["codes"]), set(), k)
+            self.assertTrue(all(a["codes"][c] for c in used), k)
+        self.assertEqual(self.alpha["evx"]["approx"], [])
+
+    def test_words_are_placed_and_rings_are_arcs(self):
+        n = arcs = turned = 0
+        for f in (DATA / "rf" / "shapes").glob("f*.json"):
+            for row in json.loads(f.read_text())["words"]:
+                n += 1
+                arcs += row[3] == "a"
+                turned += row[3] == "o"
+        self.assertGreater(n, 37000)
+        self.assertGreater(arcs, 1500)                  # the words of the rings follow them
+        self.assertGreater(turned, 800)
+        rows = json.loads((DATA / "rf" / "shapes" / "f57v.json").read_text())["words"]
+        ring = [r for r in rows if r[0] == 1]           # f57v.2, the outer ring
+        self.assertGreater(sum(r[3] == "a" for r in ring) / len(ring), 0.9)
+
+    def test_a_ring_word_reads_along_its_ring(self):
+        rows = json.loads((DATA / "rf" / "shapes" / "f57v.json").read_text())["words"]
+        for r in rows:
+            if r[3] != "a":
+                continue
+            a0, a1, ang = r[8], r[9], r[10]
+            # read clockwise (tops outward) or anticlockwise (tops inward): at right angles to the radius
+            off = ((ang - (a0 + a1) / 2) + 180) % 360 - 180
+            self.assertLess(abs(abs(off) - 90), 1.5, r)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

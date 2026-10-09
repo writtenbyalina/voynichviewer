@@ -17,10 +17,11 @@ test("the text sits below the pages; tapping a word on the photograph opens it",
   expect(text.y, "the text is below the pages").toBeGreaterThanOrEqual(stage.y + stage.height - 1);
   const tbtn = await page.locator("#rd-textbtn").boundingBox();
   expect(tbtn.x + tbtn.width, "the Text button is on screen").toBeLessThanOrEqual(page.viewportSize().width);
-  const b = await page.locator('#rd-zoomer .wb[data-k="f2r|3|0"]').boundingBox();
+  const b = await page.locator('#rd-zoomer .wb[data-k="f2r|3|1"]').boundingBox();
   await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
-  await expect(page.locator("#rd-text .tx-where")).toHaveText("2r · line 4 · word 1");
-  await expect(page.locator("#rd-text .tx-verdict")).toBeVisible();
+  await expect(page.locator("#rd-text .tx-where")).toHaveText("2r · line 4");
+  await expect(page.locator("#rd-text .tx-reading .lt")).toHaveText("chtoddy");
+  await expect(page.locator('#rd-text .tx-grow[aria-label="Take in the word after"]')).toBeVisible();   // no shift on a phone
   expect(await sideways(page)).toBeLessThanOrEqual(1);
 });
 

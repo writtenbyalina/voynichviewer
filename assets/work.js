@@ -851,11 +851,32 @@ const Bookmarks = {
 /* A saved search is the Text tab's address, named; a page set is a named list of pages that searches can keep to
    (Pages, or set:name in a query). Both are kept like bookmarks: in this browser twice over, and in the progress file. */
 const Saved = {
-  searches: [], sets: [],
+  searches: [], sets: [], places: [],
   load() {
-    const raw = store.get("text:searches", []), sets = store.get("text:sets", []);
+    const raw = store.get("text:searches", []), sets = store.get("text:sets", []), places = store.get("text:places", []);
     this.searches = (Array.isArray(raw) ? raw : []).map(x => this.cleanSearch(x)).filter(Boolean);
     this.sets = (Array.isArray(sets) ? sets : []).map(x => this.cleanSet(x)).filter(Boolean);
+    this.places = (Array.isArray(places) ? places : []).map(x => this.cleanPlace(x)).filter(Boolean);
+  },
+  /* a note on a place: the words' address in the Reader, what they read, and what you make of them */
+  cleanPlace(x) {
+    if (!x || typeof x !== "object" || typeof x.hash !== "string" || !/^#read\/[^/]*\/[^/]+\/text\?w=/.test(x.hash)) return null;
+    return { id: typeof x.id === "string" && x.id ? x.id : this.id("n-"), hash: x.hash.slice(0, 2000), label: String(x.label || "").trim().slice(0, 120),
+             note: String(x.note || "").trim().slice(0, 2000), created: x.created || new Date().toISOString() };
+  },
+  addPlace(hash, label, note) {
+    const x = this.cleanPlace({ hash, label, note });
+    if (!x || !x.note) return null;
+    this.places.push(x);
+    this.persist();
+    return x;
+  },
+  removePlace(id) { this.places = this.places.filter(x => x.id !== id); this.persist(); },
+  /* the notes on a place: the same words (w= and n=) on the same page */
+  placesAt(hash) {
+    const key = h => { const m = h.match(/^(#read\/[^/]*\/[^/]+)\/text\?(?:.*&)?w=([^&]+)(?:&n=(\d+))?/); return m ? `${m[1]}|${m[2]}|${m[3] || 1}` : null; };
+    const k = key(hash);
+    return k ? this.places.filter(x => key(x.hash) === k) : [];
   },
   id: p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
   cleanSearch(x) {
@@ -873,16 +894,19 @@ const Saved = {
   persist() {
     store.set("text:searches", this.searches);
     store.set("text:sets", this.sets);
+    store.set("text:places", this.places);
     IDB.put("work", "searches", this.searches).catch(() => {});
     IDB.put("work", "pagesets", this.sets).catch(() => {});
+    IDB.put("work", "places", this.places).catch(() => {});
     Work.changed();
     if (TextTab.mod) TextTab.mod.savedChanged();
   },
   async restore() {
-    let a = null, b = null;
-    try { [a, b] = await Promise.all([IDB.get("work", "searches"), IDB.get("work", "pagesets")]); } catch { /* no IndexedDB */ }
+    let a = null, b = null, c = null;
+    try { [a, b, c] = await Promise.all([IDB.get("work", "searches"), IDB.get("work", "pagesets"), IDB.get("work", "places")]); } catch { /* no IndexedDB */ }
     if (Array.isArray(a) && a.length && !store.get("text:searches", []).length) store.set("text:searches", a);
     if (Array.isArray(b) && b.length && !store.get("text:sets", []).length) store.set("text:sets", b);
+    if (Array.isArray(c) && c.length && !store.get("text:places", []).length) store.set("text:places", c);
     this.load();
   },
   addSearch(name, hash) {
@@ -948,7 +972,7 @@ const Work = {
         h("b", {}, "Export"), " a progress file to keep a copy, or to carry on in another browser; ", h("b", {}, "import"), " it there."),
       IDB.db ? "" : h("p", { class: "warn" }, "This browser is not letting the viewer store data (a private window?). Your work lasts until you close the page, so export it before you go."),
       h("div", { class: "work-acts" },
-        h("button", { class: "primary", onclick: () => this.exportFile(), disabled: !crops.length && !orders.length && !Bookmarks.list.length && !Saved.searches.length && !Saved.sets.length || null }, "⬇ Export progress file"),
+        h("button", { class: "primary", onclick: () => this.exportFile(), disabled: !crops.length && !orders.length && !Bookmarks.list.length && !Saved.searches.length && !Saved.sets.length && !Saved.places.length || null }, "⬇ Export progress file"),
         h("button", { onclick: () => file.click() }, "⬆ Import a progress file…"), file),
       h("h4", {}, `Your orders (${orders.length})`),
       orders.length ? h("ul", { class: "work-list" }, orders.map(o => h("li", {},
@@ -969,6 +993,13 @@ const Work = {
           h("button", { onclick: async () => { const t = await askText("Rename this search", { value: x.name, ok: "Rename" }); if (t) { x.name = t.slice(0, 80); Saved.persist(); } } }, "Rename"),
           h("button", { onclick: () => Saved.removeSearch(x.id) }, "Delete")))))
         : h("p", { class: "muted" }, "None yet. In the Text tab, search, then press Save."),
+      h("h4", {}, `Your notes on places (${Saved.places.length})`),
+      Saved.places.length ? h("ul", { class: "work-list" }, Saved.places.map(x => h("li", {},
+        h("a", { class: "linkish", href: x.hash, onclick: () => d.close() }, x.label || "a place"), " ", h("span", { class: "muted" }, x.note),
+        h("span", { class: "work-row-acts" },
+          h("button", { onclick: async () => { const t = await askText("The note", { value: x.note, ok: "Save" }); if (t) { x.note = t.slice(0, 2000); Saved.persist(); } } }, "Edit"),
+          h("button", { onclick: () => Saved.removePlace(x.id) }, "Delete")))))
+        : h("p", { class: "muted" }, "None yet. Choose a word in the Reader's text and press ✎ to note what you make of it."),
       h("h4", {}, `Your page sets (${Saved.sets.length})`),
       Saved.sets.length ? h("ul", { class: "work-list" }, Saved.sets.map(x => h("li", {},
         h("span", { class: "mono" }, `set:${x.name}`), h("span", { class: "muted" }, ` ${x.pages.length} page${x.pages.length === 1 ? "" : "s"}`),
@@ -983,13 +1014,14 @@ const Work = {
   },
 
   exportFile() {
-    // version 2 adds searches and page sets; a version-1 file still imports as it always did
-    const data = { app: "voynich-viewer", version: 2, exported: new Date().toISOString(),
+    // version 2 adds searches and page sets, version 3 notes on places; older files still import as they always did
+    const data = { app: "voynich-viewer", version: 3, exported: new Date().toISOString(),
       crops: Object.fromEntries([...Crops.mine].map(([k, r]) => [k, { quad: r.quad, rotate: r.rotate }])),
       orders: MyOrders.list.map(({ id, title, from, gatherings, unplaced, updated }) => ({ id, title, from, gatherings, unplaced, updated })),
       bookmarks: Bookmarks.list.map(({ id, page, name, at }) => ({ id, page, name, at })),
       searches: Saved.searches.map(({ id, name, hash, created }) => ({ id, name, hash, created })),
-      pagesets: Saved.sets.map(({ id, name, pages, created }) => ({ id, name, pages, created })), viewer: APP_VERSION };
+      pagesets: Saved.sets.map(({ id, name, pages, created }) => ({ id, name, pages, created })),
+      places: Saved.places.map(({ id, hash, label, note, created }) => ({ id, hash, label, note, created })), viewer: APP_VERSION };
     const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" })),
       download: `voynich-viewer-progress-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a); a.click(); a.remove();
@@ -1038,9 +1070,14 @@ const Work = {
       if (!x || Saved.setNamed(x.name)) continue;
       Saved.sets.push(x); nS++;
     }
+    for (const raw of Array.isArray(data.places) ? data.places : []) {   // version 3: notes on places
+      const x = Saved.cleanPlace(raw);
+      if (!x || !x.note || Saved.places.some(y => y.id === x.id)) continue;
+      Saved.places.push(x); nS++;
+    }
     if (nS) Saved.persist();
     const said = [`${nOrders} order${nOrders === 1 ? "" : "s"}`, `${keys.length} crop${keys.length === 1 ? "" : "s"}`, `${nBm} bookmark${nBm === 1 ? "" : "s"}`];
-    if (nS) said.push(`${nS} search${nS === 1 ? "" : "es"} and page set${nS === 1 ? "" : "s"}`);
+    if (nS) said.push(`${nS} search${nS === 1 ? "" : "es"}, page set${nS === 1 ? "" : "s"} and note${nS === 1 ? "" : "s"}`);
     toast(`Imported ${said.slice(0, -1).join(", ")} and ${said[said.length - 1]}`);
     this.render();
     if (keys.length) Crops.recut(keys);

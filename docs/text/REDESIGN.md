@@ -166,3 +166,134 @@ Alina approved the direction and asked for white instead of pink, with the outli
 `assets/text.js` (the words on the photographs, the page text, the word panel) and `assets/search.js` (the Text tab),
 with `tests/text.spec.js` and `tests/text.mobile.spec.js`. The Interlinear mode, the floating card, the reading switch
 and the marks menu are gone; the compare view, the transcribers' lines and the rarer settings are one step away.
+
+## 8. Round 3 (8 Oct 2026): simpler, RF1b, and the page you are on
+
+Alina's review of the built panel: the information on the right is too dense; use René Zandbergen's RF1b, which is in
+his STA alphabet and converts to Eva, FSG and Currier; let me take several words and see whether the run of words is
+anywhere else; "Elsewhere in this book" jumping to the Text tab takes me out of the page; the Rosettes show no
+highlights; "transcribers differ / all agree" on hover means nothing to me; words written round a circle should be
+outlined as arcs, and I should be able to turn the page to read them. What would I want on this screen, and what can be
+hidden?
+
+### 8.1 What she is doing on this screen, and what it needs
+
+| She is | She needs, at once | Was there | Now |
+|---|---|---|---|
+| Reading a word on the photograph | what it says, in the alphabet she thinks in | the reading, plus a vote, bars, a key, readings, credits | the reading, large, and the same word in every other alphabet as one row of chips (click one to read in it) |
+| Seeing the word itself | the word, sharp and the right way up | a crop, upright only if the word was | a crop turned upright whatever the writing does |
+| Checking a phrase | whether these words, in this order, are anywhere else | one word at a time | shift-click, drag across words in the text, or + word before / after; − last word |
+| Comparing places | the other places, side by side, without losing her own | a count, and a link out to the Text tab | each place as a picture cut from its page with its line round it; click one and the book turns there, with ‹ 1 of 21 › and Back |
+| Reading writing that turns | the page turned so it reads level | nothing | Turn upright (the page turns about the word and zooms to it), R / Shift+R a quarter, Alt-scroll freely, 0 back |
+| Reading the Rosettes | the text beside the sheet | the sheet in a dialog over the text | the sheet opens over the pages; the text panel stays and reads it |
+
+### 8.2 What goes
+
+The consensus is no longer the Reader's text, so everything that explained the vote goes from the Reader: the sentence
+on agreement, the bars and their key, the grouped readings with counts and names, "How each transcriber wrote this
+line", the orange dots, Compare with a transcriber, and "all 6 agree / transcribers differ" on hover. The hover says
+the word and how often it is in the book. The Text tab keeps the consensus and every transcriber as Readings (RF1b
+first), so the comparison is still one step away for whoever wants it.
+
+### 8.3 RF1b, and the alphabets
+
+`tools/text/rf.py` builds `data/text/rf/`: every locus of RF1b in STA, and for each alphabet what each STA code is
+written as, by Zandbergen's own bitrans tables (pinned in `inputs.json`). Tested line by line: **Eva** is his reduced
+Eva (`STA-Eva_Bint.bit`), identical to his `RF1b-er.txt` on all 5,385 lines; **Eva, full** is `STA-Eva_def.bit`,
+identical to `RF1b-e.txt`; **v101**, **FSG** and **Currier** reproduce the worked line f10r.6 of docs/TEXT.md 3.4.
+FSG and Currier have letters for the basic glyphs only: a glyph they cannot write is written by its nearest basic form,
+and the word panel says so. In Eva, a rare glyph basic Eva has no letter for is drawn as itself, in the glyph font.
+
+"Elsewhere" matches words as written in the alphabet on show, so the older, smaller alphabets find more. One thing to
+know: RF1b keeps Glen Claston's second form of *d* (STA Ba, 2,714 times) and his in-between *a/o* and *o/y* (Aa, Ab).
+Full Eva writes them by number (@152;, @221;, @222;) and treats them as different glyphs: *daiin* is a word 719 times
+in full Eva, 834 in Eva. That is why Eva, not full Eva, is the default.
+
+### 8.4 Shapes that follow the writing
+
+The word boxes (`data/text/boxes`, voynichese.com's, fitted to Yale's photographs) are tied to the consensus words;
+rf.py carries them to RF1b's words through a glyph alignment (a box shared out where RF1b splits a word, joined where it
+joins two), then gives each word a shape from its line: for a ring (IVTFF C), a circle is fitted to the ring's measured
+boxes and each word is the band of the ring its box holds (the radius fitted per word, as rings wander), and words
+without a box are placed along the ring between their neighbours by glyph count, dashed; for a radius (R, and f68v3's
+spiral arms), each word is a box turned the way its line runs there; for a paragraph or label line that slants by more
+than 8°, a box turned to the line. Every word also gets its reading angle, so turning the page by minus that angle sets
+it upright (a ring's words read clockwise with their tops out, or anticlockwise with them in, as their order says).
+Of 37,980 words on the pages with boxes, 37,811 have a shape: 1,941 round a ring, 1,229 turned.
+
+### 8.5 Still to do
+
+- **The Rosettes and f116v have no word positions.** The text panel says so. Zandbergen has boxes for every RF1 word
+  (unpublished); asking him for them would place every word of RF1b, the Rosettes included, exactly. Alina's call.
+- A ring running onto the next page's panel (f72r2 onto f72r1) has too few words there to fit its circle: those words
+  are upright boxes.
+- Labels written at an angle with only one word (most zodiac labels) keep upright boxes: one box says nothing about its
+  angle. The page can still be turned by hand.
+
+## 9. Round 4 (8 Oct 2026): research first; never take the page away
+
+Alina's review of round 3: the Rosettes text was still unclickable; the alphabet tags under the glyph meant nothing to her
+("stick to Eva, FSG and Currier"); it was easy to lose your place; the tool should answer what researchers ask (on a
+zodiac page: which pages have these words, in any order? which words go round in the same pattern?); and the product
+thinking had not been done. She asked for research into voynichologists' pain points, how other fields show such data,
+and visual inspiration. The research is ~/voynich/reports/Voynich text and glyph research needs.md (notes in
+~/voynich/research_notes/Voynich text and glyph research needs/: forum pain points, scholarly methods, Voynich tools,
+labels and the zodiac, orientation in reading tools, tools for other scripts, sequence visualisation in biology and
+music, visual references).
+
+### 9.1 What the research says, in one line each
+
+- Researchers work in one loop: find every instance, look at each on the photograph, judge it, then count. Every public
+  tool breaks the loop; Voynich Viewer already has current text (RF1b) tied to the photographs.
+- Orientation breaks at the jump from a hit to its page. Fixed overviews, one-way coupling, cheap returns (Back), no
+  unrequested zoom (Cockburn et al.; NN/g); peek beside rather than replace.
+- The concordance aligned on the word, with real image crops, is the oldest and most useful display for undeciphered
+  scripts (Indus, SigLA, TLA, DigiPal).
+- "Which pages share these words, in any order" is a set question; "which words repeat round the rings" is an order
+  question. Biology keeps the two apart (content vs synteny). Linear beats radial for reading (Waldner et al. 2019).
+- 80% of zodiac labels occur once: exact matching finds little; near spellings are what recur.
+- Beauty from restraint: the photograph the only saturated colour, real crops as the ornament, one meaning per colour.
+
+### 9.2 What changed
+
+| Before | Now |
+|---|---|
+| Clicking a word zoomed the page up to 4× | Choosing a word never moves the page (it is only panned into sight if zoomed in and out of view); zoom and turn are asked for |
+| Eva, full Eva, v101, FSG, Currier, and chips of every alphabet under the word | Glyphs · Eva · FSG · Currier, one quiet switch; under the word only its glyphs and its letters |
+| "Elsewhere": a list; a click turned the book there | Other places as a grid of crops (book order, or sorted by the word before or after); a click opens a peek beside the page (the line cut from the photograph, where it is on its page); N / Shift+N step; Open page commits, with a Back chip, and the browser's Back works |
+| A strip of ticks inside the panel | The Reader's own page strip is the compass: every page in a fixed place, the words' pages lit, visited pages dotted, a preview on hover |
+| Phrases only | ⌘/Ctrl-click collects words into a set: pages holding all or most of them, with how many chance would give; "Pages that share these words" for a whole page (or its labels, or rings), rare words weighted; "one glyph off" for near spellings |
+| Rings as text only | Unroll the ring: its words cut upright in a line, arcs joining repeats (a run as one thick arc), and other lines sharing a run of its words in order (three words, or two uncommon ones, so chance runs are left out) |
+| "Where it sits", near spellings: absent | Behind named doors: first / last / inside a line, kind of text, section, Currier A/B (a click narrows the places); words one glyph off (a click shows their places) |
+| Rosettes: no positions | 507 of its 543 words placed, from Alessandro Placa's voynich-spatial-data (CC BY 4.0), carried to Yale's photograph and to RF1b (tools/text/rosettes.py) |
+
+### 9.3 The Rosettes' positions
+
+Placa placed all 539 of his words by hand on a 2412 × 2375 px Beinecke scan; his text is ZL3b. `tools/text/rosettes.py`
+maps his scan onto Yale's photograph 1006231 (the six panels are crops of it): an affine fit to the nine rosettes' ring
+centres (residuals 4–37 px of 7925), refined so his boxes cover the most ink in the site's panel images, then a small
+shift per region where that clearly covers more ink (never one at the limit of the search, which meant it had found a
+drawing). Each RF1b locus is then matched to the run of his words that spells it best (local alignment, one-glyph
+tolerance), near where ZL's Petersen codes and the Landini–Stolfi interlinear say it is (`rosettes_hints.json`), with
+words he writes joined or split handled after. Ring words become bands of their ring; the rest turned boxes.
+
+### 9.4 Still open
+
+- Labels written at an angle with a single word keep upright boxes; the page can be turned by hand.
+- 36 Rosettes words are not placed (seven labels with no close match in Placa's text, and parts of a few rings).
+- Not yet built from the research: the full concordance (sorting and grouping by scribe), the ring-against-ring view,
+  an export of the places with their loci, and a "suggest a reading" link.
+
+### 9.5 The devices, each from one reference (Alina: "more granular with the inspo")
+
+The visual references are in the research notes (visual_inspiration.md). Rather than averaging them into a mood, each
+device below takes one reference's specific mechanism.
+
+| Device | Taken from | What exactly | Where |
+|---|---|---|---|
+| The word across the book | UCLAB's VIKUS Viewer, "Past Visions" (1,492 drawings as cream stacks over a charcoal ground, years set under a hairline baseline, a faint reflection below) | One column per page in the order chosen at the top, a brick per place; the busiest page's stack reaches the top; quires set under the line in small caps; `-webkit-box-reflect` gives the reflection. Scroll zooms; at about 15 px a column the bricks become the word cut from Yale's photograph | the "Across the book" figure in the word panel, and the overlay it opens |
+| Arcs from where you are | Chris Harrison's Bible cross-references (arcs over a baseline of chapters) and Culturegraphy's fans | Hairline gold arcs fall from the page you are on to every page the word is on, under the baseline, drawn in (stroke-dashoffset) as the stacks rise | the same overlay |
+| The loupe | VIKUS's zoom from the histogram to the item | Pointing at a stack dims the rest and lifts its places, cut from the photograph, with their line numbers | the same overlay |
+| Ghost pages | basil.js "Frequency mapping" (pages blanked but for one word, which keeps its place) | Each page that shares the words as a parchment sheet: every other word a faint hairline along its line, the shared words printed in Voynich VV at their own place and angle, larger than life, with a paper halo | "Pages that share these words" and word sets |
+| Glowing marks on the strip | Nadieh Bremer, "Royal Constellations" (warm points of light on navy) | The strip's lit pages glow, brighter with more places | the page strip |
+| Type | Cipher Museum, Verso, Kemet Eternal (high-contrast serif with small caps on near-black, one gold accent) | Newsreader (SIL OFL, served from the site) for words about the words: italic titles, all-small-caps labels at 0.12em; monospace stays for Eva and loci | the panel, the overlay, the ghost pages |

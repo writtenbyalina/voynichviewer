@@ -20,10 +20,13 @@ Site: [voynichviewer.com](https://voynichviewer.com).
   opening you are on, the next two and the one behind), so zooming in is sharp at once; not where zooming in gains
   little, as on many phones, nor when the browser asks to save data. **▦ Grid** (key O) shows every page at once,
   quire by quire, with buttons for each section and for your bookmarks.
-- **Text** in the Reader (key T): the text of the pages beside them, the consensus of up to twelve independent
-  transcriptions voted glyph by glyph, with every reading kept. Marks show where the vote is split; any word opens a
-  card with each transcriber's reading; the panel can show one transcriber's reading instead, every transcriber line
-  by line (Interlinear, key I), or the manuscript's own glyphs (Voynich VV, Glen Claston's font, finished here).
+- **Text** in the Reader (key T): the text of the pages beside them, RF1b, René Zandbergen's reference
+  transliteration, shown as glyphs or written in Eva, FSG or Currier by his own tables. Point at a word on the
+  photograph to see what it reads; click it and the page stays put while the panel shows it cut upright from Yale's
+  photograph, with its other places as crops that open beside the page (N steps, Open page goes, Back returns). The
+  strip under the pages marks where the words are and where you have been. ⌘-click collects words to find the pages
+  that hold them in any order; "Pages that share these words" does it for a page; a ring's number unrolls the ring with
+  its repeats joined. Words round a circle are outlined as part of the ring, and the page turns to read them on request.
 - **Text tab** (key /): search the whole book's text with a small query language (whole words, `*` and `?`, joins
   within and across words, repeated words, regular expressions, filters such as `scribe:2`), narrow the results by
   scribe, section, language, quire and kind of text, see the hits page by page in any order, open a result in the
@@ -50,8 +53,8 @@ another one (the page images are cut again from Yale's photographs on import).
 
 3D and the Reader follow the same place: the page you are on in the Reader is the sheet picked out in 3D, and the sheet
 or opening you pick in 3D is where the Reader opens. Every view has its own URL (`#read/<order>/<page>`, `#three/<order>/<view>`), so a
-view can be bookmarked or shared. The Reader's text panel adds `/text` (`#read/beinecke/1r/text?r=GC` for Claston's
-reading), and a search is `#text/<order>/search?q=qok*&steps=scribe:2`.
+view can be bookmarked or shared. The Reader's text panel adds `/text` (`#read/beinecke/1r/text?w=f1r.15.8&n=2` for the
+two words from the eighth of f1r.15, `?s=daiin+shol` a set, `?like=f71r.L` pages like 71r's labels, `?ring=f57v.3`), and a search is `#text/<order>/search?q=qok*&steps=scribe:2`.
 
 ## Run it locally
 
@@ -89,12 +92,15 @@ data/panels/            two JPEGs per panel face: _l (1400 px tall) and _s (300 
                         page at full size from Yale instead
 data/seams.json         where the paper starts on a foldout's hinge panel: its photograph shows the stacked edges of the
                         book on the side the flaps hang, and the unfolded Reader lets the flap overlap them
-data/text/               the text (built by tools/text/build.py): pages/<page>.json (every line's consensus, its
+data/text/rf/            the Reader's text (built by tools/text/rf.py): text.json (RF1b in STA, every line), alpha.json
+                        (what each glyph is written as in each alphabet), shapes/<page>.json (where each word is on the
+                        photographs, and its shape: a box, a turned box, or a band of a ring)
+data/text/               Search's data (built by tools/text/build.py): pages/<page>.json (every line's consensus, its
                         split votes and gaps, and each transcriber's own line), index.json (every line's consensus, for
                         search), w/<code>.json (one transcriber's lines), meta.json (credits, method, page list),
                         glyphs.json (which font character draws each glyph)
-tools/text/             the text pipeline: fetch.py (the pinned transcriptions), build.py, report.py, test_text.py;
-                        the method is docs/TEXT.md section 3
+tools/text/             the text pipeline: fetch.py (the pinned transcriptions), build.py, boxes.py, rf.py, rosettes.py, report.py,
+                        test_text.py; the method is docs/TEXT.md section 3, the Reader's text docs/text/REDESIGN.md 8
 tools/font/             builds Voynich VV from Claston's font (build_font.py), with test_font.py
 docs/TEXT.md            the design of Text: sources, method, data, query language, screens, tests
 tools/import_from_scout.py   refreshes data/codex.json and data/panels/ from a local Voynich Scout checkout

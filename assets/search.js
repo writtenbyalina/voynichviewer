@@ -1,12 +1,13 @@
 /* The Text tab: search the text of the whole book (docs/TEXT.md 6.4). Loaded on first use (TextTab in app.js); uses
    app.js's helpers and text.js's data. The query language is query.js; the search itself runs in search-worker.js.
 
-   The address holds the whole search: #text/beinecke/search?q=qok*&in=cons&sp=either&eq=eva&near=0&steps=scribe:2
-   (defaults left out), so a search can be linked, saved and come back as it was. */
+   The address holds the whole search: #text/beinecke/search?q=qok*&in=RF&sp=either&eq=eva&near=0&steps=scribe:2
+   (defaults left out), so a search can be linked, saved and come back as it was. It reads RF1b, the Reader's text, unless
+   asked for the consensus (in=cons), any transcriber (all) or one of them. */
 import { parse, describe, QueryError, CLASSES, QUALIFIERS } from "./query.js";
 import { Data, SHORT, load } from "./text.js";
 
-const DEFAULTS = { q: "", in: "cons", sp: "either", eq: "eva", near: "0", set: "", steps: "", sort: "book", cmp: "" };
+const DEFAULTS = { q: "", in: "RF", sp: "either", eq: "eva", near: "0", set: "", steps: "", sort: "book", cmp: "" };
 const FACETS = [
   { key: "scribe", title: "Scribe (Davis)", label: v => v === "–" ? "none given" : `Scribe ${v}` },
   { key: "section", title: "Section", label: v => secName(v) },
@@ -15,7 +16,7 @@ const FACETS = [
   { key: "quire", title: "Quire", label: v => qWord(isNaN(+v) ? v : +v) },
 ];
 const SAY_SP = { either: "uncertain spaces either way", space: "uncertain spaces as spaces", none: "spaces ignored" };
-const SAY_IN = code => code === "cons" ? "the consensus" : code === "all" ? "any transcriber" : SHORT[code];
+const SAY_IN = code => code === "cons" ? "the consensus" : code === "all" ? "any transcriber" : code === "RF" ? "RF1b, the Reader's text" : SHORT[code];
 const PAGE_SIZE = 150;
 
 /* ---- what is known of every page and line, for the filters, the facets and the book strip ---- */
@@ -122,7 +123,7 @@ const T = {
             h("details", { class: "sx-help" }, h("summary", { title: "How to search", "aria-label": "How to search" }, "?"), this.helpCard())),
           h("button", { class: "primary", type: "submit" }, "Search")),
         h("div", { class: "sx-opts" },
-          sel("in", "Reading:", [["cons", "the consensus"], ["all", "any transcriber"]]),
+          sel("in", "Reading:", [["RF", "RF1b, the Reader's text"], ["cons", "the consensus"], ["all", "any transcriber"]]),
           sel("sp", "Spaces:", [["either", "uncertain either way"], ["space", "uncertain as spaces"], ["none", "ignored"]]),
           h("details", { class: "sx-more-opts" }, h("summary", {}, "More options"),
             h("div", { class: "sx-more-m" },
@@ -232,9 +233,9 @@ const T = {
     if (gen !== this.gen) return;
     // the voters, for "any transcriber" and for the reading menu
     const rd = $(".sx-opts select[data-k=in]");   // the transcribers, once their names are loaded
-    if (rd.options.length < 3) {
+    if (rd.options.length < 4) {
       rd.append(h("optgroup", { label: "One transcriber" }, Data.meta.voters.map(v => h("option", { value: v.code }, SHORT[v.code]))),
-        h("optgroup", { label: "For comparison" }, Data.meta.references.map(v => h("option", { value: v.code }, SHORT[v.code]))));
+        h("optgroup", { label: "For comparison" }, Data.meta.references.filter(v => v.code !== "RF").map(v => h("option", { value: v.code }, SHORT[v.code]))));
       rd.value = st.in;
     }
     const who = st.in === "all" ? Data.meta.voters.map(v => v.code) : [st.in];
@@ -250,7 +251,7 @@ const T = {
     this.res = { p, hits: this.collect(r.hits, lines, st.in === "all"), lines, near: r.near, ranges: null };
     this.draw();
     // the same search on the three fullest transcriptions, for the range of every count
-    if (st.in === "cons") {
+    if (st.in === "cons" || st.in === "RF") {
       const rr = await Worker_.run({ q, opts, who: ["ZL", "GC", "IT"] });
       if (gen !== this.gen || rr.error) return;
       const per = {};
@@ -291,7 +292,7 @@ const T = {
 
   /* ---- drawing ---- */
   empty() {
-    $("#sx-echo").replaceChildren("Search the whole book's text: the consensus of its transcriptions, or any one of them.");
+    $("#sx-echo").replaceChildren("Search the whole book's text: RF1b, as the Reader shows it, or the consensus of the transcriptions, or any one of them.");
     $("#sx-steps").replaceChildren();
     $("#sx-strip").replaceChildren();
     $("#sx-facets").replaceChildren();
@@ -305,7 +306,7 @@ const T = {
         h("b", {}, "[kt]"), " either glyph. Join parts with ", h("b", {}, "-"), " (no break), ", h("b", {}, "_"), " (a word break) or ", h("b", {}, "~"), " (either). ",
         h("b", {}, "/…/"), " is a regular expression. Filters: ", Object.keys(QUALIFIERS).filter((k, i, a) => a.indexOf(k) === i && k !== "hand" && k !== "language" && k !== "pages").map(k => k + ":").join(" "), "."),
       Saved.searches.length ? [h("h3", {}, "Your searches"), h("ul", { class: "sx-ex" }, Saved.searches.map(x => h("li", {}, h("a", { class: "sx-chip sx-saved", href: x.hash }, x.name))))] : "",
-      h("p", { class: "muted" }, "The text is the consensus of up to twelve transcriptions, voted glyph by glyph (", h("a", { href: "#info/beinecke/text" }, "how"), ").")));
+      h("p", { class: "muted" }, "The text is RF1b, René Zandbergen's reference transliteration, as in the Reader; Reading: also offers the consensus of up to twelve transcriptions and each of them (", h("a", { href: "#info/beinecke/consensus" }, "about the text"), ").")));
   },
   fail(msg) {
     $("#sx-echo").replaceChildren(h("span", { class: "sx-err" }, msg));
@@ -554,7 +555,7 @@ const T = {
     const data = new Map(await Promise.all(pages.map(async p => [p, await load(`pages/${encodeURIComponent(p)}.json`)])));
     const own = this.st.in !== "cons" && this.st.in !== "all";
     const out = ["#=IVTFF Eva- 2.0 M 5", `# Lines of the Voynich Manuscript found by the search “${this.st.q}” in Voynich Viewer, ${new Date().toISOString().slice(0, 10)}.`,
-      own ? `# Text: ${Data.names.get(this.st.in)}'s reading, in basic Eva.` : `# Text: the consensus of independent transcriptions (method ${Data.meta.method}, docs/TEXT.md in the viewer's code).`,
+      this.st.in === "RF" ? "# Text: RF1b, René Zandbergen's reference transliteration, in basic Eva (rare glyphs as @nnn;)." : own ? `# Text: ${Data.names.get(this.st.in)}'s reading, in basic Eva.` : `# Text: the consensus of independent transcriptions (method ${Data.meta.method}, docs/TEXT.md in the viewer's code).`,
       `# ${Data.meta.credit}`, "#"];
     let cur = null;
     for (const i of ids) {
