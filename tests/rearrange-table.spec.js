@@ -464,16 +464,31 @@ test("the list of shortcuts fits in the window, every line of it", async ({ page
 });
 
 test("quire names show their counts where there is room beside them, and never run into each other", async ({ page }) => {
-  const names = () => page.evaluate(() => [...document.querySelectorAll(".v3-pile")].map(e => {
-    const r = e.getBoundingClientRect(), n = e.querySelector(".pl-n");
-    return { key: e.dataset.key, l: r.left, r: r.right, t: r.top, b: r.bottom, count: !!n && getComputedStyle(n).display !== "none" };
-  }));
+  // what each name shows, how wide it is in full, and its share of its row: halfway to the names beside it (or to the edge)
+  const names = () => page.evaluate(() => {
+    const L = View3D.mod.debug.V.layout, st = document.querySelector("#v3-stage").getBoundingClientRect();
+    const all = [...document.querySelectorAll(".v3-pile")].map(e => {
+      const r = e.getBoundingClientRect(), n = e.querySelector(".pl-n");
+      return { key: e.dataset.key, row: L.piles.find(p => p.key === e.dataset.key).row, cx: r.left + r.width / 2, l: r.left, r: r.right, t: r.top, b: r.bottom,
+               full: e._fullW, count: !!n && getComputedStyle(n).display !== "none" };
+    });
+    for (const a of all) {
+      const xs = all.filter(b => b.row === a.row).map(b => b.cx).sort((x, y) => x - y), i = xs.indexOf(a.cx);
+      a.share = 2 * Math.min(i > 0 ? (a.cx - xs[i - 1]) / 2 : a.cx - st.left, i < xs.length - 1 ? (xs[i + 1] - a.cx) / 2 : st.right - a.cx) - 6;
+    }
+    return all;
+  });
   const overlaps = list => list.flatMap((a, i) => list.slice(i + 1).filter(b => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1).map(b => `${a.key}/${b.key}`));
+  // a name is cut short only when the whole of it would not fit its share (in any font: the tests' machines differ)
+  const cutForNothing = list => list.filter(x => !x.count && x.full <= x.share).map(x => `${x.key}: ${Math.round(x.full)}px in ${Math.round(x.share)}px`);
   await openTable(page);
   let now = await names();
-  expect(now.filter(x => !x.count).map(x => x.key), "at this size every name has room for its count").toEqual([]);
   expect(overlaps(now)).toEqual([]);
+  expect(cutForNothing(now), "names cut short with room to spare").toEqual([]);
   await expect(caption(page, "16"), "a quire of lost sheets says so once").toContainText(/Q16\s*1 lost/);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expect.poll(async () => (await names()).filter(x => !x.count).map(x => x.key), "a big window: every name whole").toEqual([]);
   await page.setViewportSize({ width: 900, height: 800 });
   await expect.poll(async () => overlaps(await names()), "a small window: shorter names, none on top of another").toEqual([]);
+  expect(cutForNothing(await names())).toEqual([]);
 });
