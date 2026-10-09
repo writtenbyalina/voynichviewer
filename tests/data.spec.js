@@ -164,12 +164,14 @@ test.describe("reading orders (orders.json)", () => {
 
 test.describe("what's new (changelog.json)", () => {
   const vnum = v => v.split(".").map(Number);
-  const newer = (a, b) => { const [x, y] = [vnum(a), vnum(b)]; return x[0] !== y[0] ? x[0] > y[0] : x[1] > y[1]; };
+  const newer = (a, b) => { const [x, y] = [vnum(a), vnum(b)]; for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 
   test("releases are newest first, with real versions and dates", () => {
     const { releases } = changelog;
     releases.forEach((r, i) => {
-      expect(r.version, `release ${i}: version`).toMatch(/^\d+\.\d+$/);
+      expect(r.version, `release ${i}: version`).toMatch(/^\d+\.\d+(\.\d+)?$/);
+      // from 1.5.1 on, each change is one short line (older notes were written before that rule)
+      if (r.date >= "2026-10-10") for (const c of r.changes) expect(c.text.length, `release ${r.version}: "${c.text}" is more than a line`).toBeLessThanOrEqual(110);
       expect(r.date, `release ${r.version}: date`).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(new Date(r.date + "T00:00:00Z").toISOString().slice(0, 10), `release ${r.version}: ${r.date} is not a real date`).toBe(r.date);
       if (i > 0) {
