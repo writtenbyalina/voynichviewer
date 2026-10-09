@@ -271,6 +271,8 @@ dialog.sx-setdlg input { margin-bottom: 10px; font-size: 15px; }
 .sx-set-bad { color: #a3280f; }
 .sx-set-add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; margin-top: 6px; }
 .sx-set-add select { min-height: 32px; max-width: 160px; color: var(--ink); }
+dialog.sx-setdlg .ask-acts .sp { flex: 1; }
+dialog.sx-setdlg .ask-acts .sx-set-del { margin-right: auto; color: #b42318; border-color: #e3b4ae; }
 .sx-set-add button { min-height: 32px; font-size: 13px; }
 
 /* ---------- Folio order (Davis-style quire tables) ---------- */

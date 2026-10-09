@@ -130,11 +130,11 @@ const T = {
         h("div", { class: "sx-opts" },
           sel("in", "Reading:", [["RF", "RF1b, the Reader's text"], ["cons", "the consensus"], ["all", "any transcriber"]]),
           sel("sp", "Spaces:", [["either", "uncertain either way"], ["space", "uncertain as spaces"], ["none", "ignored"]]),
+          sel("set", "Pages:", [["", "the whole book"]]),   // the whole book, your page sets, and New / Edit / Delete (fillSets)
           h("details", { class: "sx-more-opts sx-pop" }, h("summary", {}, "More options"),
             h("div", { class: "sx-more-m sx-pop-m" },
               sel("eq", "Match", [["eva", "exact Eva"], ["family", "same STA family (a o y, r s, k t…)"]], false),
-              sel("near", "Near", [["0", "off"], ["1", "words 1 edit away"], ["2", "words 2 edits away"]], false),
-              sel("set", "Pages", [["", "the whole book"]], false)))),
+              sel("near", "Near", [["0", "off"], ["1", "words 1 edit away"], ["2", "words 2 edits away"]], false)))),
         h("div", { class: "sx-pal", id: "sx-pal", hidden: true }),
         h("p", { class: "sx-echo", id: "sx-echo", "aria-live": "polite" }),
         h("div", { class: "sx-steps", id: "sx-steps" })),
@@ -178,9 +178,10 @@ const T = {
   syncControls() {
     this.fillSets();
     for (const s of $$(".sx-opts select", $("#v-text"))) s.value = this.st[s.dataset.k];
-    $(".sx-more-opts").classList.toggle("on", ["eq", "near", "set"].some(k => this.st[k] !== DEFAULTS[k]));
+    $(".sx-more-opts").classList.toggle("on", ["eq", "near"].some(k => this.st[k] !== DEFAULTS[k]));
+    $(".sx-opts select[data-k=set]")?.closest(".sx-chip-s")?.classList.toggle("on", !!this.st.set);
   },
-  /* the Pages menu: the whole book, your page sets (Your work), and a new one */
+  /* the Pages menu: the whole book, your page sets (Your work), a new one, and the chosen one to edit or delete */
   fillSets() {
     const sel = $(".sx-opts select[data-k=set]");
     if (!sel) return;
@@ -190,16 +191,22 @@ const T = {
       ...Saved.sets.map(x => h("option", { value: x.name }, `set:${x.name} (${x.pages.length} page${x.pages.length === 1 ? "" : "s"})`)),
       want && !cur ? h("option", { value: want }, `set:${want} (not in this browser)`) : "",
       h("option", { value: "+new" }, "New page set…"),
-      cur ? h("option", { value: "+edit" }, `Edit set:${cur.name}…`) : "");
+      ...(cur ? [h("option", { value: "+edit" }, `Edit set:${cur.name}…`), h("option", { value: "+delete" }, `Delete set:${cur.name}…`)] : []));
     sel.value = want;
     sel.onchange = async e => {
       const v = e.target.value;
-      if (v !== "+new" && v !== "+edit") { this.st.set = v; this.go(); return; }
+      if (!v.startsWith("+")) { this.st.set = v; this.go(); return; }
       e.target.value = this.st.set;
-      $(".sx-more-opts").open = false;
+      if (v === "+delete") { if (await this.deleteSet(cur)) { this.st.set = ""; this.go(); } return; }
       const x = await this.newSet(v === "+edit" ? Saved.setNamed(this.st.set) : null);
       if (x) { this.st.set = x.name; this.go(); }
     };
+  },
+  async deleteSet(x) {
+    if (!x || !await askYes(`Delete the page set “${x.name}”?`, `Its ${x.pages.length} page${x.pages.length === 1 ? "" : "s"} stay in the book; searches that use set:${x.name} will search the whole book.`, "Delete", true)) return false;
+    Saved.removeSet(x.id);
+    toast(`Deleted the page set set:${x.name}`);
+    return true;
   },
   /* A page set, made in one dialog: a name, the pages written as pages and ranges, and buttons that add a whole
      section, quire, scribe or language, or a range picked from two menus. What is written is read back as you type:
@@ -272,7 +279,9 @@ const T = {
           h("button", { type: "button", onclick: () => add(ranges(bound.slice(Math.min(pos.get(from.value), pos.get(to.value)), Math.max(pos.get(from.value), pos.get(to.value)) + 1))) }, "Add")),
         h("div", { class: "sx-set-add" },
           h("span", { class: "muted" }, "Add all of a:"), ...picks.map(([title, list]) => pickSel(title, list))),
-        h("div", { class: "ask-acts" }, h("button", { onclick: () => done(null) }, "Cancel"), ok));
+        h("div", { class: "ask-acts" },
+          edit ? h("button", { class: "danger sx-set-del", onclick: async () => { d.close(); if (await this.deleteSet(edit)) { this.st.set = ""; this.go(); resolve(null); } else { d.showModal(); } } }, "Delete") : "",
+          h("span", { class: "sp" }), h("button", { onclick: () => done(null) }, "Cancel"), ok));
       d.addEventListener("cancel", e => { e.preventDefault(); done(null); });
       name.addEventListener("input", tell);
       box.addEventListener("input", tell);

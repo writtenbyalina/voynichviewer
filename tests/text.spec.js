@@ -536,14 +536,15 @@ test.describe("the Text tab", () => {
     await expect(page.locator(".sx-pg[data-page=f26r] .sx-line", { hasText: "daiin shedy" }).locator("em")).toHaveCount(2);
   });
 
-  test("a page set is made in one dialog: pages and ranges read back as you type, a section or a range added from menus, then edited", async ({ page }) => {
+  test("Pages is a chip of its own; a page set is made in one dialog: pages and ranges read back as you type, a section or a range added from menus, then edited and deleted", async ({ page }) => {
     await openSite(page, "#text/beinecke/search?q=qokeedy");
     await results(page);
-    await page.locator(".sx-more-opts > summary").click();
-    await page.locator(".sx-opts select[data-k=set]").selectOption("+new");
+    const pages = page.locator(".sx-opts > .sx-chip-s select[data-k=set]");   // beside Reading and Spaces, not inside More options
+    await expect(pages).toBeVisible();
+    await expect(page.locator(".sx-more-m select[data-k=set]")).toHaveCount(0);
+    await pages.selectOption("+new");
     const d = page.locator("dialog.sx-setdlg");
     await expect(d).toBeVisible();
-    await expect(page.locator(".sx-more-opts")).not.toHaveAttribute("open", "");
     await expect.poll(() => page.evaluate(() => location.hash)).not.toContain("set=");
     await expect(d.locator(".ask-acts .primary")).toBeDisabled();
     await d.locator("input").fill("bath");
@@ -561,12 +562,19 @@ test.describe("the Text tab", () => {
     await expect(page.locator("#sx-echo")).toContainText("on the pages of set:bath");
     await expect.poll(() => page.evaluate(() => location.hash)).toContain("set=bath");
     await expect(page.locator(".sx-opts select[data-k=set] option", { hasText: "Edit set:bath" })).toHaveCount(1);
-    await page.locator(".sx-more-opts > summary").click();
-    await page.locator(".sx-opts select[data-k=set]").selectOption("+edit");
+    await pages.selectOption("+edit");
     await expect(d.locator("textarea")).toHaveValue("1r 2v-3r 75r-84v 103r-104v");
     await d.locator("textarea").fill("75r-84v");
     await d.locator(".ask-acts .primary").click();
     await expect(page.locator(".sx-opts select[data-k=set] option", { hasText: "set:bath (20 pages)" })).toHaveCount(1);
+    await expect(page.locator("#sx-echo")).toContainText("qokeedy appears 155 times on 19 of 227 pages, on the pages of set:bath");
+    // deleted from the menu, after a question; the search goes back to the whole book
+    await pages.selectOption("+delete");
+    await expect(page.locator("dialog.ask h3")).toHaveText("Delete the page set “bath”?");
+    await page.locator("dialog.ask .ask-acts button", { hasText: "Delete" }).click();
+    await expect(page.locator("#sx-echo")).toContainText("qokeedy appears 306 times on 56 of 227 pages.");
+    await expect(page.locator(".sx-opts select[data-k=set] option", { hasText: "set:bath" })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => location.hash)).not.toContain("set=");
   });
 
   test("#text alone opens the search with a whole address", async ({ page }) => {
