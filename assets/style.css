@@ -667,7 +667,7 @@ svg.glyph { display: block; flex: none; overflow: visible; }
 .v3-marquee[hidden] { display: none; }
 .v3-stage.panning, .v3-stage.panning canvas { cursor: grab !important; }
 .v3-pile.sel { border-color: #f3c35c; box-shadow: 0 0 0 1px #f3c35c; }
-.v3-pile.tight .pl-ics, .v3-pile.tight .pl-n { display: none; }   /* too narrow a pile for its whole name */
+.v3-pile.mid .pl-ics, .v3-pile.tight .pl-ics, .v3-pile.tight .pl-n { display: none; }   /* not room enough for its whole name (view3d.js placePiles) */
 .v3-pile .pl-name { width: 7em; font: 600 12.5px -apple-system, system-ui, sans-serif; padding: 0 4px; border-radius: 4px; border: 1px solid #f3c35c; background: #1f1a16; color: var(--table-ink); }
 .v3-arr-acts .aa-what { display: inline-flex; align-items: center; gap: 7px; }
 .v3-arr-acts .aa-what b { font: 600 13px ui-monospace, Menlo, monospace; color: #f3c35c; }

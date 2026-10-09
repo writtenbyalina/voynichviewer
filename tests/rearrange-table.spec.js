@@ -462,3 +462,18 @@ test("the list of shortcuts fits in the window, every line of it", async ({ page
   expect(r.y + r.height).toBeLessThanOrEqual(page.viewportSize().height);
   await expect(m.locator(".ar-row").last()).toBeInViewport({ ratio: 1 });
 });
+
+test("quire names show their counts where there is room beside them, and never run into each other", async ({ page }) => {
+  const names = () => page.evaluate(() => [...document.querySelectorAll(".v3-pile")].map(e => {
+    const r = e.getBoundingClientRect(), n = e.querySelector(".pl-n");
+    return { key: e.dataset.key, l: r.left, r: r.right, t: r.top, b: r.bottom, count: !!n && getComputedStyle(n).display !== "none" };
+  }));
+  const overlaps = list => list.flatMap((a, i) => list.slice(i + 1).filter(b => a.l < b.r - 1 && b.l < a.r - 1 && a.t < b.b - 1 && b.t < a.b - 1).map(b => `${a.key}/${b.key}`));
+  await openTable(page);
+  let now = await names();
+  expect(now.filter(x => !x.count).map(x => x.key), "at this size every name has room for its count").toEqual([]);
+  expect(overlaps(now)).toEqual([]);
+  await expect(caption(page, "16"), "a quire of lost sheets says so once").toContainText(/Q16\s*1 lost/);
+  await page.setViewportSize({ width: 900, height: 800 });
+  await expect.poll(async () => overlaps(await names()), "a small window: shorter names, none on top of another").toEqual([]);
+});

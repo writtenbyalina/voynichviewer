@@ -1485,19 +1485,35 @@ function placePiles() {
   }
   host.classList.toggle("moving", TW.on && !!(TW.long || TW.replan));   // the names come once the sheets have landed
   const t = ARR.drag && ARR.gap;   // where dragged sheets would go
+  // each name may be as wide as its share of its row: halfway to the names beside it (to the edge, at either end)
+  const at = new Map(piles.map(p => [p.key, project(p.label, scene)]));
+  const share = new Map();
+  for (const row of rowsOf(piles)) {
+    const xs = row.map(p => at.get(p.key)?.[0]).filter(x => x != null).sort((x, y) => x - y);
+    for (const p of row) {
+      const x = at.get(p.key)?.[0]; if (x == null) continue;
+      const i = xs.indexOf(x), l = i > 0 ? (x - xs[i - 1]) / 2 : x, r = i < xs.length - 1 ? (xs[i + 1] - x) / 2 : stage.clientWidth - x;
+      share.set(p.key, 2 * Math.min(l, r) - 6);
+    }
+  }
   for (const el of host.children) {
     const p = piles.find(x => x.key === el.dataset.key); if (!p) continue;
     el.classList.toggle("target", !!t && t.kind === "into" && t.key === p.key);
     const on = V.selQ.has(p.key);
     if (el.classList.contains("sel") !== on) { el.classList.toggle("sel", on); el.setAttribute("aria-pressed", String(on)); }
-    const xy = project(p.label, scene);
+    const xy = at.get(p.key);
     if (!xy) { el.style.display = "none"; continue; }
     el.style.display = "";
     el.style.transform = `translate(${Math.round(xy[0])}px, ${Math.round(xy[1])}px) translate(-50%, 0)`;
-    // a name wider than its pile (a small window) shows only the quire; the rest is in its tooltip
-    const a = project(new THREE.Vector3(p.x0 - GX * .45, 0, p.z1), scene), b = project(new THREE.Vector3(p.x0 + p.w + GX * .45, 0, p.z1), scene);
-    if (!el.classList.contains("tight") || el._fullW == null) el._fullW = el.offsetWidth;
-    if (a && b) el.classList.toggle("tight", el._fullW > b[0] - a[0] - 4);
+    // a name that doesn't fit its share leaves out the sections' icons, then (a small window) the count: only the quire
+    // shows; the rest is always in its tooltip
+    if (!el._fullW && !el.classList.contains("target")) {
+      el.classList.remove("mid", "tight");
+      el._fullW = el.offsetWidth; el._icW = (el.querySelector(".pl-ics")?.offsetWidth || 0) + 5;
+    }
+    const room = share.get(p.key) ?? Infinity;
+    el.classList.toggle("mid", el._fullW > room && el._fullW - el._icW <= room);
+    el.classList.toggle("tight", el._fullW - el._icW > room);
   }
   const flatGold = (fill, line) => {   // a gold mark lying on the table: a wash and/or an outline
     const g = new THREE.Group();
