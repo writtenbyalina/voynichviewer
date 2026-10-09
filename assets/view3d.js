@@ -514,6 +514,7 @@ function finishSwaps() {
 function relayout(dur = 650, morph = null) {
   if (!V.model) return;
   if (TW.on) finishSwaps();
+  if (TW.camAt) camHome();   // a camera move waiting for its moment: now
   const keys = ARR.plan?.keys;
   const L = V.layout = computeLayout();
   const replan = V.arrange && keys && ARR.plan?.keys !== keys;
@@ -539,6 +540,7 @@ function tweenStep(now) {
   CUR.poses = poses; CUR.sg = sg;
   Object.assign(CUR, at(TW.g, k, mixG));
   if (ARR.grow) for (const id of ARR.grow) V.objs.get(id)?.group.scale.setScalar(.5 + .5 * ease(k));   // sheets let go, growing as they land
+  if (TW.camAt && k >= TW.camAt.k) camHome();
   for (const sw of TW.swaps) { sw.hide.group.visible = k < sw.k && !hiddenObj(sw.hide); sw.show.group.visible = k >= sw.k && !hiddenObj(sw.show); }
   applyAll();
   if (k >= 1) {
@@ -835,6 +837,7 @@ function resize() {
     resize.pending = false;
     if (!V.layout) return;
     if (V.arrange) frameTable();   // Rearrange's table: fitted to the stage again (even while a sheet is moving: it frames the plan)
+    else if (TW.camAt) { /* leaving the table: the camera goes home with the book (setArrange), fitted then */ }
     else if (V.hand.on) frameHand(); else if (V.preset) preset(V.preset, { instant: REDUCED });
   }, 120);
   wake();
@@ -1344,13 +1347,14 @@ function arrangeLayout(base) {
       const cx = p.fan ? p.fx + j * p.step : p.x0 + p.w / 2;
       const y = 1 + (p.fan ? j * 1.6 : j * p.up), z = p.fan ? p.z1 : p.z1 - j * p.fwd;
       if (id == null) return;
-      // selected sheets are drawn a little out of their pile, toward you (the main one more); the one pointed at, less
-      const pull = V.sel.has(id) ? H * (id === V.selMain ? .16 : .1) : id === V.hover?.id ? H * .07 : 0;
+      // selected sheets are drawn a little out of their pile (the main one more); the one pointed at, less. Out of a stack
+      // toward you; a card out of a fan away from you, up into the room kept behind it, clear of the name in front
+      const pull = (V.sel.has(id) ? H * (id === V.selMain ? .16 : .1) : id === V.hover?.id ? H * .07 : 0) * (p.fan ? -1 : 1);
       put(byId.get(id), cx, y + (pull ? .6 : 0), z + pull);
       centers.set(id, new THREE.Vector3(cx, y, z + pull - H / 2));
       // a point on the part of it that shows: the strip in front of the sheet above, or (a fan) its own uncovered side
       const top = j === p.slots.length - 1;
-      picks.set(id, new THREE.Vector3(p.fan && !top ? cx - p.sw / 2 + Math.max(4, p.step / 2) : cx, y, top ? z + pull - H / 2 : p.fan ? z - H / 2 : z + pull - Math.min(p.fwd, H) / 2));
+      picks.set(id, new THREE.Vector3(p.fan && !top ? cx - p.sw / 2 + Math.max(4, p.step / 2) : cx, y, top ? z + pull - H / 2 : p.fan ? z + pull - H / 2 : z + pull - Math.min(p.fwd, H) / 2));
     });
     // where a dragged sheet would land, slot by slot, measured without the room made for it (so the room doesn't move them)
     for (let j = 0; j <= p.ids.length; j++) {
@@ -1393,23 +1397,46 @@ function shade(dt) {
   return ARR.dk !== ARR.goal;
 }
 
-/* Taking the book apart, and putting it back, one sheet after another in reading order: each rises straight up out of
-   its place in the book, then travels and lays itself open on its pile, its leaves opening on the way (and the same
-   backwards: up off its pile, across, and down into the book, closing as it goes). */
+/* Taking the book apart, and putting it back, one sheet after another in reading order. The book stands in the middle of
+   the table, where piles will lie, so it first glides to the far side of the table, behind the first row; then each
+   sheet rises straight up out of it, arcs over everything, and comes straight down onto its pile, its leaves opening on
+   the way. Putting it back is the same backwards: each sheet arcs from its pile into the book at the far side, closing as
+   it goes, and once they are all in, the book glides home. Nothing passes through anything. */
+const TABLE_MS = 2000;
 function tableMorph(tw, L) {
-  const all = V.model.all, n = Math.max(1, all.length - 1);
-  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion().setFromRotationMatrix(L.place.matrix).invert());   // the room's up, in the book's frame
+  const all = V.model.all, n = Math.max(1, all.length - 1), coming = V.arrange;
+  const inv = new THREE.Quaternion().setFromRotationMatrix(L.place.matrix).invert();
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(inv);   // the room's up, in the book's frame
+  if (coming) {   // where the book goes first (in the book's frame): kept for putting it back
+    const box = new THREE.Box3();
+    book.updateMatrixWorld(true);
+    for (const en of all) { const o = V.objs.get(en.id); if (o?.group.visible) box.expandByObject(o.group); }
+    const back = Math.min(...L.piles.filter(p => p.row === 0).map(p => p.z0)), f = L.frame;
+    ARR.away = box.isEmpty() ? new THREE.Vector3()
+      : new THREE.Vector3((f.min.x + f.max.x) / 2 - (box.min.x + box.max.x) / 2, 0, Math.min(0, back - H * .2 - box.max.z)).applyQuaternion(inv);
+  }
+  const D = ARR.away || new THREE.Vector3(), GLIDE = .14, FLY = .56, SPREAD = .3, HIGH = H * 2.1;
+  const away = s => ({ p: s.p.clone().add(D), q: s.q.clone() });
+  // from one place to the other on a curve that leaves straight up and lands straight down, eased along its length
+  const arc = (from, to, t0, t1) => {
+    const P1 = from.p.clone().addScaledVector(up, HIGH), P2 = to.p.clone().addScaledVector(up, HIGH), out = [];
+    for (let j = 1; j <= 10; j++) {
+      const u = ease(j / 10), v = 1 - u;
+      const p = from.p.clone().multiplyScalar(v * v * v).addScaledVector(P1, 3 * v * v * u).addScaledVector(P2, 3 * v * u * u).addScaledVector(to.p, u * u * u);
+      out.push([t0 + (t1 - t0) * j / 10, { p, q: from.q.clone().slerp(to.q, ease(clamp((u - .1) / .7))) }, "even"]);
+    }
+    return out;
+  };
   all.forEach((en, i) => {
     const sgt = tw.sgs.get(en.id); if (!sgt) return;
-    const a = sgt[0][1], b = sgt.at(-1)[1], st = .34 * i / n, w = .66;
-    const book = V.arrange ? a : b;   // where the sheet is in the book
-    const over = { p: book.p.clone().addScaledVector(up, H * 1.15), q: book.q.clone() };   // clear of the book, above its place
-    const k = V.arrange ? .4 : .6;
-    tw.sgs.set(en.id, [[0, a], [st, a], [st + w * k, over], [st + w, b], [1, b]]);
-    for (const key of [`${en.id}:0`, `${en.id}:1`]) {
+    const a = sgt[0][1], b = sgt.at(-1)[1], st = (coming ? GLIDE : 0) + SPREAD * i / n;
+    tw.sgs.set(en.id, coming
+      ? [[0, a], [GLIDE, away(a)], [st, away(a)], ...arc(away(a), b, st, st + FLY), [1, b]]
+      : [[0, a], [st, a], ...arc(a, away(b), st, st + FLY), [1 - GLIDE, away(b)], [1, b]]);
+    for (const key of [`${en.id}:0`, `${en.id}:1`]) {   // the leaves open in the air, and close in the air
       const tr = tw.poses.get(key); if (!tr) continue;
       const pa = tr[0][1], pb = tr.at(-1)[1];
-      tw.poses.set(key, V.arrange ? [[0, pa], [st + w * k, pa], [st + w, pb], [1, pb]] : [[0, pa], [st, pa], [st + w * k, pb], [1, pb]]);
+      tw.poses.set(key, coming ? [[0, pa], [st + FLY * .25, pa], [st + FLY * .8, pb], [1, pb]] : [[0, pa], [st + FLY * .15, pa], [st + FLY * .7, pb], [1, pb]]);
     }
   });
 }
@@ -1448,8 +1475,8 @@ function keepFramed() {
 
 function setArrange(on) {
   if (!V.model || on === V.arrange) return;
-  clearTimeout(ARR.camT);
   if (on) {
+    if (TW.camAt) TW.camAt = null;   // back onto the table before the camera went home: it stays on the table
     if (V.hand.on) putBack({ silent: true });
     if (V.inspect) { V.inspect = false; renderInspector(); pushHash(); }
     if (V.contact.on) setContactView(false);
@@ -1461,16 +1488,22 @@ function setArrange(on) {
   if (on) ARR.plan = null; else { V.sel = new Set(); V.selQ = new Set(); V.selMain = null; }
   $("#v-three").classList.toggle("table", on);
   tip(null);
-  relayout(REDUCED ? 0 : 1500, tableMorph);
+  relayout(REDUCED ? 0 : TABLE_MS, tableMorph);
   TW.long = true;   // a hover doesn't cut this move short (see wire)
   if (on) frameTable();
-  else if (ARR.cam) {   // the camera holds the table while the sheets lift off, then follows them in: it arrives as the book comes together
-    const cam = ARR.cam;
-    clearTimeout(ARR.camT);
-    ARR.camT = setTimeout(() => { if (!V.arrange) setGoal(cam, 2.4); }, REDUCED ? 0 : 450);
-    V.preset = cam.preset; renderViews();
+  else if (ARR.cam) {   // the camera holds the table while the book comes together at its far side, then goes home with it
+    TW.camAt = { k: .7, cam: ARR.cam };   // (tweenStep: on the movement's own clock)
+    if (!TW.on || !TW.dur) camHome();
+    V.preset = ARR.cam.preset; renderViews();
   }
   ARR.sig = ""; placePiles(); hud(null); tint(); wake();
+}
+
+/* Off the table: the camera back to where it was, a named view fitted to the stage as it is now. */
+function camHome() {
+  const c = TW.camAt?.cam; TW.camAt = null;
+  if (!c || V.arrange) return;
+  if (c.preset) preset(c.preset, { instant: REDUCED }); else setGoal(c, 3);
 }
 
 /* The selection, from arrange.js: sheets (the main one is the current sheet) or whole quires. */
