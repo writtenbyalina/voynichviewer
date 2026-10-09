@@ -8,15 +8,27 @@ The site itself has no build step and these tests change nothing about it. `pack
 ## What GitHub does with them
 
 GitHub calls this **GitHub Actions**. The file [`.github/workflows/tests.yml`](../.github/workflows/tests.yml) tells GitHub
-to start a fresh computer, install the tests, run them, and mark the commit with a green tick or a red cross. Two jobs:
+to start fresh computers, install the tests, run them, and mark the commit with a green tick or a red cross. The checks:
 
-| Job | Takes | Checks |
+| Check | Takes | Checks |
 | --- | --- | --- |
 | **Data and files** | seconds | the JSON files, every page picture, `index.html`, that every script parses |
-| **Site in a browser** | a few minutes | the site in Chromium, on a desktop and on a phone (a screen-sized window with touch) |
+| **Browser, part 1 of 4** … **part 4 of 4** | about ten minutes each, side by side | the site in Chromium, on a desktop and on a phone (a screen-sized window with touch); the tests are split over four computers because the 3D view is drawn in software there, which is slow |
+| **Site in a browser** | a minute, after the four parts | puts the four parts' results into one report, and is red if any part was |
 
-If a run fails, open it under the repository's **Actions** tab. The browser job keeps a report (screenshots, and a
-step-by-step recording of what the page did) as a download called `playwright-report`.
+If a run fails, open it under the repository's **Actions** tab. **Site in a browser** keeps one report for all four parts
+(screenshots, and a step-by-step recording of what the page did) as a download called `playwright-report`: unzip it and
+open `index.html`.
+
+### Running them by hand, or hunting a test that fails only sometimes
+
+**Actions → Tests → Run workflow** runs them on any branch. It asks two things, both optional:
+
+- **Only the tests whose name contains**: a word from the test's name or its file's, e.g. `rearrange` for every Rearrange test (it is case-sensitive). Empty runs everything.
+- **Run each test this many times**: e.g. `10`, with no second tries. A test that fails only now and then fails here
+  at least once, with its report. (A test that fails only sometimes has nearly always been a real bug, not a bad test.)
+
+The same on your own computer: `npx playwright test -g "rearrange" --repeat-each 10 --retries 0`.
 
 ### Making the tests stop a bad deploy
 
@@ -25,7 +37,8 @@ Running the tests does not by itself stop anything from going live. The site is 
 
 1. Do your work on a branch and open a pull request into `main`. The tests run on it.
 2. In the repository's **Settings → Branches → Add branch ruleset** (or *branch protection rule*) for `main`, tick
-   **Require status checks to pass** and add **Data and files** and **Site in a browser**.
+   **Require status checks to pass** and add **Data and files** and **Site in a browser** (not the four parts: **Site in a
+   browser** is red whenever one of them is).
    Tick **Require a pull request before merging** too.
 
 Now `main` (and so the live site) only ever receives work that passed. (The check names appear in the list after the
@@ -38,7 +51,7 @@ You need Node.js (version 20 or newer) and Python 3, which you have if you can r
 ```bash
 npm install                      # once: fetches the test tool
 npx playwright install chromium  # once: fetches the browser the tests drive
-npm test                         # everything, about two minutes
+npm test                         # everything, about six minutes
 npm run test:fast                # only the data and file checks, a few seconds
 ```
 
@@ -70,6 +83,10 @@ Clarity are blocked on purpose, so the tests never depend on them and never send
 | `info.spec.js` | every Info section and its contents list; the Folio order tables; every link inside Info; external links open safely |
 | `a11y.spec.js` | every control has a name and every picture has alt text; dialogs take focus and close with Escape; Tab reaches the header |
 | `legacy-*.spec.js` | **Old data, new code**: what people already saved (bookmarks, their own orders, re-cut pages, settings) and the progress files they exported, from every released version, against the current site; whether the saved format changed; whether your own data changing (panels, sheets, pictures) would strand their work. See `tests/legacy/README.md`. Run on their own with `npm run test:legacy` |
+| `rearrange-table.spec.js` | **Rearrange on the table**: the panel that shows what is under the pointer; selecting (click, ⇧/⌘-click, a box); ⌘G, ⇧⌘G, ⌘] / ⌘[, ⌫, ⌘X / ⌘V; a sheet dragged into a stack lands exactly where the panel shows, and nothing else on the table moves; new quires from the gaps; a quire's name (select, rename, menu, drag); right-click menus; keys; the first move's copy and its Undo; hiding quires and lost sheets; the list beside the table; A, Done and Esc; a move that changes nothing makes no copy |
+| `rearrange-progress.spec.js` | an order made on the table, with every kind of change, goes out in a progress file and comes back exactly; copies keep the order they came from; importing over the open order |
+| `three-folds.spec.js`, `davis-order.spec.js` | the foldouts fold as Davis describes them (`data/folds.json`), the faces that touch in the closed book; her proposed order re-sequences only quires 13 and 20, and says so |
+| `reader-foldouts.spec.js`, `reader-turns.spec.js` | a folded foldout is one leaf in the Reader; every move turns a leaf, with the animation on |
 | `mobile.spec.js` | on a phone: no sideways scrolling, controls on screen and tappable, the Reader, 3D, cookie strip and Info all fit |
 
 Several tests are named **"1.1 fix: …"**. They guard bugs `data/changelog.json` lists as fixed, so a fix cannot quietly
