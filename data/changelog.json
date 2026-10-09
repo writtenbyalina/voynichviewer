@@ -9,7 +9,8 @@
     {"kind": "new", "text": "Find, under the title of the text: a search of the whole book as you type, in Eva or with the glyph keys. Words that begin with what you type count (the exact word first; whole word and contains are a click away), each with its count; the word picked opens on its places. It stays until you clear it, and the address keeps it."},
     {"kind": "improved", "text": "The text is shown as glyphs or in Eva, chosen from a dropdown. FSG and Currier are no longer offered."},
     {"kind": "improved", "text": "The text's ? says in a few lines how to use it and where the text, the word positions and the photographs come from; Sources at the foot opens the same. The keyboard list under the ? at the top right keeps only the keys that matter."},
-    {"kind": "improved", "text": "“How the transcribers read it” and notes on words are gone from the word panel."}
+    {"kind": "improved", "text": "“How the transcribers read it” and notes on words are gone from the word panel."},
+    {"kind": "improved", "text": "The Text button in the Reader's bar has an icon, like Bookmark and Grid beside it."}
    ]
   },
   {

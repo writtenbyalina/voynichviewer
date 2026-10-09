@@ -24,6 +24,13 @@ const h = (tag, attrs = {}, ...kids) => {
   return el;
 };
 const range = (a, b) => Array.from({ length: Math.max(0, b - a) }, (_, i) => a + i);
+/* three lines of writing: the icon of the Text button */
+function textIcon() {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  el.setAttribute("viewBox", "0 0 16 16"); el.setAttribute("width", "15"); el.setAttribute("height", "15"); el.setAttribute("aria-hidden", "true"); el.classList.add("ico-text");
+  el.innerHTML = '<path d="M2.5 4h11M2.5 8h11M2.5 12h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>';
+  return el;
+}
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const store = {
   get(k, d) { try { const v = localStorage.getItem("vv:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -390,7 +397,7 @@ const Reader = {
           h("button", { id: "rd-ghosts", class: S.ghosts ? "on" : "", title: "Show lost leaves as blank pages", onclick: e => { S.ghosts = !S.ghosts; store.set("ghosts", S.ghosts); e.target.classList.toggle("on", S.ghosts); Reader.open(R.order, Reader.nearestKept()); } }, "Lost leaves"),
           h("button", { title: "Go to a folio (G)", onclick: () => Reader.ask() }, "Go to…"),
           h("button", { id: "rd-textbtn", title: "Read the text: point at any word on the page (T)", "aria-pressed": "false",
-            "aria-controls": "rd-text", onclick: () => TextUI.toggle() }, "Text"),
+            "aria-controls": "rd-text", onclick: () => TextUI.toggle() }, textIcon(), "Text"),
           h("button", { id: "rd-bm", title: "Bookmark a page of this opening (B)", onclick: () => Bookmarks.here() }, "☆", h("span", { class: "txt" }, " Bookmark")),
           h("button", { id: "rd-gridbtn", title: "See every page at once, to jump anywhere (O)", onclick: () => Reader.toggleGrid() }, h("span", { class: "ico" }, "▦ "), "Grid"),
         )),

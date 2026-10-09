@@ -1349,6 +1349,8 @@ dialog.tx-dlg kbd { display: inline-block; min-width: 18px; padding: 1px 5px; bo
 .sv-over button:hover { border-color: var(--table-muted); }
 .sv-hint { color: var(--table-muted); font-size: 11px; }
 #sheet-dlg .sv-bar { margin-bottom: 10px; }
+#rd-textbtn { display: inline-flex; align-items: center; gap: 6px; }
+#rd-textbtn .ico-text { flex: none; }
 @media (max-width: 700px) { #rd-textbtn { order: -1; } }   /* first in the row of tools that scrolls */
 /* the text goes below the pages only on a narrow screen held upright, or a very narrow one: in a small landscape window
    (750 x 553) the pages keep their height, with the text beside them */
