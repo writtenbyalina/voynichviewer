@@ -99,8 +99,11 @@ const Privacy = {
       else if (e.target.closest(".pv-link")) e.target.closest(".pv-link").href = this.privacyHref();
     });
     document.body.append(el);
+    // its height, for anything fixed to the foot of the window (messages keep above it: style.css #cx-toast)
+    const tall = () => document.documentElement.style.setProperty("--pv-h", el.offsetHeight + "px");
+    tall(); new ResizeObserver(tall).observe(el);
   },
-  hideStrip() { document.getElementById("pv-strip")?.remove(); },
+  hideStrip() { document.getElementById("pv-strip")?.remove(); document.documentElement.style.removeProperty("--pv-h"); },
 };
 
 document.addEventListener("DOMContentLoaded", () => Privacy.start());
