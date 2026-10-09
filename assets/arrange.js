@@ -301,7 +301,7 @@ const Arrange = {
   /* the order yours was started from (a built-in order is its own source) */
   source(o) {
     if (!MyOrders.isMine(o.id)) return o;
-    return [...ORDERS.values()].find(x => !MyOrders.isMine(x.id) && x.title === o.from) || ORDERS.get("beinecke");
+    return ORDERS.get(o.fromId) || [...ORDERS.values()].find(x => !MyOrders.isMine(x.id) && x.title === o.from) || ORDERS.get("beinecke");
   },
   /* Booklets and sheets that differ from the source order. A sheet has changed when it is in another booklet, folded
      another way, or out of step with the sheets around it; moving one sheet doesn't mark the ones it pushed along. */
@@ -390,7 +390,7 @@ const Arrange = {
     const mine = MyOrders.isMine(o.id), hst = this.histOf(o.id), hidden = View3D.mod?.hiddenQuires().size || 0;
     const items = [
       mine ? { text: "Rename this order…", fn: () => this.rename() } : { text: "Make my own copy now", fn: () => this.edit(() => {}, { ms: 0 }) },
-      { text: "Export a progress file", fn: () => Work.exportFile(), disabled: !MyOrders.list.length && !Crops.mine.size },
+      { text: "Export a progress file", fn: () => Work.exportFile(), disabled: !MyOrders.list.length && !Crops.mine.size && !Bookmarks.list.length },
       { text: "Import a progress file…", fn: () => Work.pickFile() },
       { text: "All your work…", fn: () => Work.open() },
       hidden ? { text: `Show every quire in 3D (${hidden} hidden)`, fn: () => View3D.mod.showAllQuires() } : null,

@@ -643,6 +643,9 @@ const CropEditor = {
 // ================================================================ your orders
 /* An order of your own: a full order (no base) with id "my-…", kept in localStorage under "mine". Every sheet is in
    it exactly once: in a gathering, or set aside in `unplaced`. */
+/* Names the built-in orders had before they were renamed, so that copies made under an old name still know their source. */
+const FORMER_TITLES = { "Davis: complete proposed order": "davis" };
+
 const MyOrders = {
   list: [],
   load() {
@@ -688,8 +691,12 @@ const MyOrders = {
     for (const id of SHEETS.keys()) if (!seen.has(id)) unplaced.push(id);   // nothing goes missing
     const id = this.isMine(o.id) ? o.id : this.newId();
     const title = String(o.title || "My order").slice(0, 80);
-    return { id, title, mine: true, from: o.from || "", gatherings, unplaced,
-             subtitle: `Your own order${o.from ? `, started from “${o.from}”` : ""}. Saved in this browser.`, updated: o.updated || null };
+    // the built-in order it was started from: by its id, or (files from before ids were kept) by its title, then or now
+    const builtIn = x => x && !this.isMine(x) && ORDERS.has(RETIRED[x] || x) ? RETIRED[x] || x : null;
+    const fromId = builtIn(o.fromId) || builtIn([...ORDERS.values()].find(x => !x.mine && x.title === o.from)?.id) || builtIn(FORMER_TITLES[o.from]);
+    const from = String(o.from || ""), now = fromId ? ORDERS.get(fromId).title : from;   // kept as written; shown by its name now
+    return { id, title, mine: true, from, ...(fromId ? { fromId } : {}), gatherings, unplaced,
+             subtitle: `Your own order${now ? `, started from “${now}”` : ""}. Saved in this browser.`, updated: o.updated || null };
   },
   newId: () => "my-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
   freeTitle(base = "My order") {
@@ -700,7 +707,7 @@ const MyOrders = {
 
   /* A copy of any order to rearrange. */
   copyOf(order, title) {
-    return this.clean({ id: this.newId(), title: title || this.freeTitle(), from: order.title,
+    return this.clean({ id: this.newId(), title: title || this.freeTitle(), from: order.title, fromId: order.id,
       gatherings: order.gatherings.map(g => ({ quire: g.quire, type: g.type, bifolia: [...g.bifolia], sheets: JSON.parse(JSON.stringify(g.sheets || {})) })),
       unplaced: unplacedOf(order) });
   },
@@ -916,7 +923,7 @@ const Work = {
   exportFile() {
     const data = { app: "voynich-viewer", version: 1, exported: new Date().toISOString(),
       crops: Object.fromEntries([...Crops.mine].map(([k, r]) => [k, { quad: r.quad, rotate: r.rotate }])),
-      orders: MyOrders.list.map(({ id, title, from, gatherings, unplaced, updated }) => ({ id, title, from, gatherings, unplaced, updated })),
+      orders: MyOrders.list.map(({ id, title, from, fromId, gatherings, unplaced, updated }) => ({ id, title, from, fromId, gatherings, unplaced, updated })),
       bookmarks: Bookmarks.list.map(({ id, page, name, at }) => ({ id, page, name, at })), viewer: APP_VERSION };
     const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" })),
       download: `voynich-viewer-progress-${new Date().toISOString().slice(0, 10)}.json` });
@@ -930,11 +937,12 @@ const Work = {
     let data;
     try { data = JSON.parse(await f.text()); } catch { toast("That file is not a progress file (it is not JSON)"); return; }
     if (!data || data.app !== "voynich-viewer") { toast("That file is not a Voynich Viewer progress file"); return; }
-    let nOrders = 0;
+    let nOrders = 0, current = false;
     for (const o of Array.isArray(data.orders) ? data.orders : []) {
       const c = MyOrders.clean(o);
-      if (c) { MyOrders.put(c, { show: false }); nOrders++; }
+      if (c) { MyOrders.put(c, { show: false }); nOrders++; current ||= c.id === S.order; }
     }
+    if (current) setOrder(S.order);   // the order on screen came in again: every view shows the imported version
     const keys = [];
     for (const [key, r] of Object.entries(data.crops || {})) {
       if (!Crops.base.has(key) || !Array.isArray(r?.quad) || r.quad.length !== 4) continue;
