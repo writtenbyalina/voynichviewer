@@ -214,6 +214,8 @@ def share(units, n, expect, widths, xh, ext=None):
     gapw = np.r_[0.0, starts[1:] - stops[:-1]]                 # the gap before each unit
     unit_ink = inks.mean() or 1.0
     leftout = np.r_[0.0, np.cumsum(inks)] / unit_ink * 2.5     # cost of leaving units out
+    gapc = 0.3 if n == 1 else 1.5                              # (a label alone has no neighbour to give a gap to:
+                                                               # its glyphs are often written wide apart)
 
     def word_cost(i, j, k):
         a, b = starts[j], stops[k]
@@ -221,7 +223,7 @@ def share(units, n, expect, widths, xh, ext=None):
         wpos = 0.8 if (ext is None or ext[i] is not None) else 0.15   # (an estimated place is trusted less)
         c = wpos * ((a + b) / 2 - expect[i]) ** 2 / (2.2 * xh) ** 2  # where the old shape put it
         c += 3.0 * math.log(w / widths[i]) ** 2                     # as wide as its glyphs
-        c += 1.5 * float(np.clip(gapw[j + 1:k + 1] - 0.55 * xh, 0, None).sum()) / xh   # no word gap inside it
+        c += gapc * float(np.clip(gapw[j + 1:k + 1] - 0.55 * xh, 0, None).sum()) / xh   # no word gap inside it
         if ext and ext[i]:                                          # not past its old box by more than a glyph or so
             lo, hi = ext[i]
             if a < lo - 1.5 * xh or b > hi + 1.5 * xh:
@@ -315,9 +317,10 @@ class Line:
     """One line of one panel, straightened: its strip, where its words were expected along it, and the rows of the
     strip where a line of glyphs runs (candidates for this line's own row)."""
 
-    def __init__(self, words, ink, H, ring=None, settled=False, est=None):
+    def __init__(self, words, ink, H, ring=None, settled=False, est=None, tall=None):
         self.words, self.ring, self.ok = words, ring, False
         self.est = est or [(0,)] * len(words)
+        self.tall = tall or [False] * len(words)                  # a word with a gallows (k t p f) in it
         k = self.k = H / 1000.0                                    # thousandths of height -> pixels
         polys = [shape_poly(kind, v) * k for _, kind, v, _ in words]
         centres = np.array([p.mean(0) for p in polys])
@@ -529,11 +532,11 @@ class Line:
         whole = (own_n > 0) & (oth_n == 0)
         whole[0] = False
         between = (rows_ >= up[None, :]) & (rows_ < dn[None, :])
-        mine = B.astype(bool) & between & touches[lab] & ((own_n[lab] >= oth_n[lab]) | whole[lab])
+        mine = B.astype(bool) & touches[lab] & ((between & (own_n[lab] >= oth_n[lab])) | whole[lab])
         self.debug = dict(vc=vc, xh=xh, top=top, bot=bot)
         out, good = {}, 0
         pad = PAD * xh
-        for (wi, kind, v, g), jk, es, w_exp in zip(words, got, e_s, widths):
+        for (wi, kind, v, g), jk, es, w_exp, tall in zip(words, got, e_s, widths, self.tall):
             if jk is None:
                 continue
             j, kk2 = jk
@@ -558,6 +561,19 @@ class Line:
             while r1_ > body_hi and foreign[max(0, r1_ - max(1, int(xh))):r1_, :].sum() > lim:
                 r1_ -= 1
             v0, v1 = max(v0, r0_), min(v1, r1_)
+            # a gallows is in the word: its loop is never cut off. Its strokes are often fainter and finer than the
+            # body's, so the box rises to the faint ink above the body (as far as a gallows reaches), and always at
+            # least most of a gallows' height
+            if tall:
+                hi_ = float(np.mean(lo_band[a:b]))
+                r0 = max(0, int(hi_ - 2.3 * xh)); r1 = min(S.shape[0], int(hi_ + 0.3 * xh))
+                F = (self.S[r0:r1, a:b] > 0.12).astype(np.uint8)    # (before tall strokes were taken out)
+                nf, lf, _s, _c = cv2.connectedComponentsWithStats(F, connectivity=8)
+                on_body = np.unique(lf[-max(1, int(0.5 * xh)):, :])  # faint strokes rising from the word's body:
+                on_body = on_body[on_body > 0]                       # its gallows (not the tails of the line above)
+                ys_ = np.nonzero(np.isin(lf, on_body))[0]
+                reach = (hi_ - r0 - ys_.min()) if ys_.size else 0
+                v0 = min(v0, hi_ - max(0.8 * xh, reach) - pad)
             out[wi] = self.shape(u0, u1, v0, v1)
             good += 1
         if good < MIN_FIT * len(words):
@@ -740,19 +756,57 @@ def fit_label(kind, nums, glyphs, ink, H, t_page=None):
     for i in range(1, nw):
         m = (labw == i) & (G > 0) & (near > 0)                # (never far outside the label's given place)
         ov = int((m & (old > 0)).sum())
-        if ov < 0.3 * m.sum() or m.sum() < 1.2 * xh * xh:
+        if ov < 0.3 * m.sum() or m.sum() < 0.8 * xh * xh:
             continue
         score = ov - 0.2 * int((m & (old == 0)).sum())
         if best is None or score > best[0]:
             best = (score, m)
     if best is None:
         return None
-    ys, xs = np.nonzero(best[1])
-    pts = np.c_[xs + x0, ys + y0].astype(np.float32)
-    (cx, cy), (rw, rh), ang = cv2.minAreaRect(pts)
-    if rw < rh:
-        rw, rh, ang = rh, rw, ang + 90
-    ang = ((ang + 90) % 180) - 90                              # read left to right (or downwards)
+    # a label's glyphs, written wide apart, are several clusters: the others in its given place, a glyph or so from
+    # the cluster found, are the same word's
+    def rect(M):
+        """the box round M's ink, along the way it runs; strokes well off that line (a drawing's) left out"""
+        keep = M.copy()
+        for _ in range(3):
+            ys, xs = np.nonzero(keep)
+            pts = np.c_[xs + x0, ys + y0].astype(float)
+            c = pts.mean(0)
+            evals, evecs = np.linalg.eigh(np.cov((pts - c).T)) if len(pts) > 2 else (None, np.eye(2))
+            d = evecs[:, 1]; nv = np.array([-d[1], d[0]])
+            v = (pts - c) @ nv
+            v_lo, v_hi = np.percentile(v, 3), np.percentile(v, 97)
+            if v_hi - v_lo <= 2.8 * xh:
+                break
+            comp = lab[keep]                                   # a stroke whose middle is far off the line goes
+            far = [i for i in np.unique(comp) if abs(np.median(v[comp == i])) > 1.3 * xh]
+            if not far:
+                break
+            keep &= ~np.isin(lab, far)
+            if keep.sum() < 0.5 * M.sum():
+                keep = M; break
+        ys, xs = np.nonzero(keep)
+        pts = np.c_[xs + x0, ys + y0].astype(float)
+        u, v = (pts - c) @ d, (pts - c) @ nv
+        u_lo, u_hi, v_lo, v_hi = u.min(), u.max(), np.percentile(v, 2), np.percentile(v, 98)
+        cx, cy = c + d * (u_lo + u_hi) / 2 + nv * (v_lo + v_hi) / 2
+        ang = math.degrees(math.atan2(d[1], d[0]))
+        return cx, cy, u_hi - u_lo, v_hi - v_lo, ((ang + 90) % 180) - 90   # read left to right (or downwards)
+    M = best[1]
+    reach = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int(3.2 * xh) | 1, int(3.2 * xh) | 1))
+    for _ in range(4):
+        grown, R_ = M.copy(), cv2.dilate(M.astype(np.uint8), reach) > 0
+        for i in range(1, nw):
+            m = (labw == i) & (G > 0) & (near > 0)
+            if not m.any() or (m & M).any() or not (m & R_).any() or (m & (old > 0)).sum() < 0.5 * m.sum():
+                continue
+            grown |= m
+        if grown.sum() == M.sum():
+            break
+        if rect(grown)[3] > 3.6 * xh:                          # (no longer one line of glyphs)
+            break
+        M = grown
+    cx, cy, rw, rh, ang = rect(M)
     if rw < 0.4 * glyphs * xh or rw > 3.0 * glyphs * xh + 2 * xh or rh > 3.6 * xh:   # not the size of this word
         return None
     pad = PAD * xh
@@ -840,6 +894,8 @@ def refine(page: str, data: dict, loci_sta: list[str], panels: dict[int, np.ndar
         ws.sort(key=lambda w: w[0])
         sta = loci_sta[li] if li < len(loci_sta) else ""
         glyphs = [sum(WIDE.get(ch, 1.0) for c in CODE.findall(w) for ch in EVA.get(c, "o")) for w in re.split(r"[.,\-]", sta)]
+        tall_ = [any(ch in "ktpf" for c in CODE.findall(w) for ch in EVA.get(c, "")) for w in re.split(r"[.,\-]", sta)]
+        tall_of = lambda wi: wi < len(tall_) and tall_[wi]
         items = [(wi, kind, nums, glyphs[wi] if wi < len(glyphs) else 4) for wi, kind, nums, _r in ws]
         H = panels[pi].shape[0]
         ring = ring_of(items)
@@ -881,14 +937,16 @@ def refine(page: str, data: dict, loci_sta: list[str], panels: dict[int, np.ndar
             wis = {it[0] for it in seg}
             est_of = {w[0]: (w[3][-1],) for w in ws}
             try:
-                ln = Line(seg, inks[pi], H, ring if len(seg) >= 2 else None, est=[est_of[it[0]] for it in seg])
+                ln = Line(seg, inks[pi], H, ring if len(seg) >= 2 else None, est=[est_of[it[0]] for it in seg],
+                          tall=[tall_of(it[0]) for it in seg])
             except Exception as e:                               # a strip off the panel's edge, say
                 print(f"  {page} locus {li}: {e}", file=sys.stderr)
                 ln = None
             alt = None
             if seg is items and items is not plain:              # the label as it was, should the turned one not fit
                 try:
-                    alt = Line(plain, inks[pi], H, None, est=[est_of[it[0]] for it in plain])
+                    alt = Line(plain, inks[pi], H, None, est=[est_of[it[0]] for it in plain],
+                               tall=[tall_of(it[0]) for it in plain])
                 except Exception:
                     alt = None
             lines[(li, pi, si)] = (ln, [w for w in ws if w[0] in wis], alt)
@@ -929,6 +987,13 @@ def refine(page: str, data: dict, loci_sta: list[str], panels: dict[int, np.ndar
             fl = fit_label(kind, nums, ln.words[0][3], inks[key[1]], panels[key[1]].shape[0])
             if fl:
                 got = {wi: fl}
+        for wi, kind, nums, r in ws:                           # a box shrunk to a sliver of its given place has
+            if wi in got and not r[-1]:                         # found a stray mark, not the word
+                k2, n2 = got[wi][:2]
+                a_new = abs(cv2.contourArea(shape_poly(k2, n2).astype(np.float32)))
+                a_old = abs(cv2.contourArea(shape_poly(kind, nums).astype(np.float32)))
+                if a_new < 0.2 * a_old:
+                    del got[wi]
         if got:
             stats["refit"] += 1
             stats["words_refit"] += len(got)
