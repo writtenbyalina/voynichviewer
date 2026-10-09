@@ -60,13 +60,17 @@ python3 -m http.server 8000
 and open <http://localhost:8000>. (Opening `index.html` straight from disk does not work: browsers block `fetch` of
 local files.)
 
+To run the automatic checks (Node.js 20 or newer): `npm install`, `npx playwright install chromium` once, then
+`npm test`. GitHub runs the same checks on every pull request; see [tests/README.md](tests/README.md).
+
 ## Layout
 
 ```
 index.html              the page
 assets/app.js           the Reader, Info (with the Folio order tables), the order logic and the shared place (POS)
 assets/work.js          your work: crops (cut in the browser), your own orders, export and import
-assets/arrange.js       the Rearrange dock of the 3D view
+assets/arrange.js       Rearrange in 3D: the table's selection, bar, menus and keys (the table itself is drawn in
+                        view3d.js), the list beside it, and the panel under the book on phones
 assets/view3d.js        the 3D view (ES module, loaded when the 3D tab first opens)
 assets/privacy.js       the cookie strip and consent; loads Microsoft Clarity only after "Accept"
 assets/style.css
@@ -85,6 +89,8 @@ data/folds.json         which way each foldout's folds go and which faces touch 
 tools/import_from_scout.py   refreshes data/codex.json and data/panels/ from a local Voynich Scout checkout
 tools/seams.py          measures those bands from data/panels/ and rewrites data/seams.json (run it after an import)
 CNAME                   the custom domain for GitHub Pages
+tests/                  the automatic checks (Playwright); what they cover and how to read a failure: tests/README.md
+.github/workflows/tests.yml   runs them on GitHub for every pull request and every push to main
 ```
 
 ## What's new: logging changes and fixes
