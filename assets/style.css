@@ -568,9 +568,13 @@ dialog.work-dlg { width: min(620px, 94vw); max-height: 86vh; overflow: auto; pad
 .v3-arrange { flex: none; background: var(--table); color: var(--table-ink); border-top: 1px solid var(--table-line); padding: 8px 14px 10px; font-size: 13px; user-select: none; }
 .v3-arrange[hidden] { display: none; }
 #v-three.arranging .v3-strip { display: none; }
-body.arranging #cx-toast { bottom: calc(var(--dock-h, 0px) + 16px); }
+/* (only while 3D is the view on screen: the Reader keeps its messages where they always are) */
+body.arranging:not(.on-table):has(#v-three:not([hidden])) #cx-toast { bottom: calc(var(--dock-h, 0px) + 16px); }   /* above the panel, on a phone */
 /* on the table, messages sit at the foot of the column beside it, where they cover neither piles nor the bar */
-@media (min-width: 901px) { body.arranging.on-table #cx-toast { left: 14px; bottom: 14px; transform: none; max-width: 300px; } }
+body.arranging.on-table:has(#v-three:not([hidden])) #cx-toast { left: 14px; bottom: 14px; transform: none; max-width: 300px; }
+@media (max-width: 900px) {   /* no column beside the table in a small window: above the selection's bar, when it shows */
+  body.arranging.on-table:has(#v-three:not([hidden])):has(#v3-arr-acts:not([hidden])) #cx-toast { bottom: 80px; }
+}
 .v3-arrange button { background: transparent; color: var(--table-ink); border-color: var(--table-line); }
 .v3-arrange button:hover:not([disabled]) { border-color: var(--table-muted); }
 .v3-arrange button.on { background: #f3c35c; color: #2d2925; border-color: #f3c35c; }
@@ -612,7 +616,7 @@ body.arranging #cx-toast { bottom: calc(var(--dock-h, 0px) + 16px); }
 #v-three.table .v3-stage.hudcol .v3-arr-acts { left: 314px; max-width: calc(100% - 328px); }   /* beside the panel's column */
 .al-hudslot { position: sticky; top: -12px; height: 0; z-index: 5; margin: -12px -12px 12px; }   /* the panel, over the top of the list */
 .al-hudslot .v3-hud { left: 0; right: 0; top: 0; width: auto; max-width: none; max-height: 70vh; border-radius: 0 0 10px 10px; box-shadow: 0 8px 20px rgba(0, 0, 0, .35); background: #1d1a17; }
-@media (min-width: 901px) { body.arranging.on-table.list-open #cx-toast { left: auto; right: 14px; max-width: 292px; } }   /* messages at the foot of the list */
+@media (min-width: 901px) { body.arranging.on-table.list-open:has(#v-three:not([hidden])) #cx-toast { left: auto; right: 14px; max-width: 292px; } }   /* messages at the foot of the list */
 .v3-arr-acts .aa-what { color: var(--table-muted); }
 .v3-arr-acts .aa-what b { font: 600 13px ui-monospace, Menlo, monospace; color: #f3c35c; }
 .v3-arr-acts .ar-acts { margin: 0; }
@@ -835,6 +839,8 @@ svg.glyph { display: block; flex: none; overflow: visible; }
   .ar-book { height: auto; }
   .ar-body { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .ar-stack, .ar-row { height: 190px; }
+  .ar-detail .ar-acts, .ar-detail .ar-hint { order: 1; margin-top: 2px; }   /* a picked sheet's buttons first, its two sides under them */
+  .ar-detail .ar-faces { order: 2; }
 }
 
 /* ---------- Info: credits, contents, Davis's research ---------- */

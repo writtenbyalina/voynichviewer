@@ -789,9 +789,13 @@ const MyOrders = {
     o = this.clean({ ...o, updated: new Date().toISOString() });
     const i = this.list.findIndex(x => x.id === o.id);
     if (i >= 0) this.list[i] = o; else this.list.push(o);
+    ORDERS.set(o.id, o);   // before persist(), which redraws Your work and Rearrange from ORDERS
     this.persist();
-    ORDERS.set(o.id, o);
     fillOrderSelect();
+    if (!show && S.order === o.id) {   // renamed from Your work, say: the views showing it take the new version quietly
+      $("#cx-order").title = o.subtitle || "";
+      if (S.view === "three" && View3D.mod) View3D.open(o, { instant: true });
+    }
     if (show) {
       if (S.order !== o.id) setOrder(o.id, { ms, moved });
       else {
@@ -804,10 +808,13 @@ const MyOrders = {
   },
 
   remove(id) {
+    const from = ORDERS.get(id)?.fromId;
     this.list = this.list.filter(o => o.id !== id);
     ORDERS.delete(id);
+    if (typeof Arrange !== "undefined") Arrange.hist.delete(id);   // its undo steps, and the quires it hid in 3D, go with it
+    View3D.mod?.dropHidden(id);
     this.persist();
-    if (S.order === id) setOrder("beinecke");
+    if (S.order === id) setOrder(ORDERS.has(from) && !this.isMine(from) ? from : "beinecke");   // back to the order it was made from
     fillOrderSelect();
   },
 };
@@ -1012,7 +1019,7 @@ const Work = {
     let nOrders = 0, current = false;
     for (const o of Array.isArray(data.orders) ? data.orders : []) {
       const c = MyOrders.clean(o);
-      if (c) { MyOrders.put(c, { show: false }); nOrders++; current ||= c.id === S.order; }
+      if (c) { MyOrders.put(c, { show: false }); nOrders++; current ||= c.id === S.order; if (typeof Arrange !== "undefined") Arrange.hist.delete(c.id); }   // its undo steps were for the version it replaced
     }
     if (current) setOrder(S.order);   // the order on screen came in again: every view shows the imported version
     const keys = [];

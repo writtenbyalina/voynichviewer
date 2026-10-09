@@ -10,11 +10,14 @@ const hud = page => page.locator("#v3-hud");
 const bar = page => page.locator("#v3-arr-acts");
 const caption = (page, key) => page.locator(`.v3-pile[data-key="${key}"]`);
 
+/** wait until nothing on the table is moving or about to (a slow machine draws few frames: don't guess from two readings) */
+const still = page => page.waitForFunction(() => !View3D.mod.debug.busy, null, { timeout: 15_000 });
 async function openTable(page, order = "beinecke") {
   await openThree(page, `#three/${order}`);
   await page.keyboard.press("a");
   await expect(page.locator("#v-three")).toHaveClass(/table/);
   await expect.poll(() => page.locator(".v3-pile").count()).toBeGreaterThan(5);
+  await still(page);
 }
 /** a point on the screen for a thing on the table (book-space point, from the 3D view's own layout) */
 const screen = (page, fn, arg) => page.evaluate(([src, arg]) => {
@@ -328,8 +331,7 @@ test.describe("the list beside the table (Rearrange as it used to be)", () => {
     await page.locator("#v3-arrange").getByRole("button", { name: "List of quires" }).click();
     await expect(list(page)).toBeVisible();
     // the table is narrower now: wait for the camera to have fitted it again
-    let was = -1;
-    await expect.poll(async () => { const d = await page.evaluate(() => View3D.mod.debug.CAM.dist); const same = Math.abs(d - was) < .01; was = d; return same; }, { intervals: [250] }).toBe(true);
+    await still(page);
   }
   /** drag a list row by its handle onto another row (its lower half: after it) */
   async function dragRow(page, from, to, after = true) {

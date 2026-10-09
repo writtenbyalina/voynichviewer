@@ -824,9 +824,11 @@ function resize() {
   fitStage();
   // still at a named view (not turned, panned or zoomed since), or holding a sheet: keep it framed as the stage changes size
   clearTimeout(resize.t);
+  resize.pending = true;
   resize.t = setTimeout(() => {
+    resize.pending = false;
     if (!V.layout) return;
-    if (V.arrange) { if (!TW.on) frameTable(); }   // Rearrange's table: fitted to the stage again
+    if (V.arrange) frameTable();   // Rearrange's table: fitted to the stage again (even while a sheet is moving: it frames the plan)
     else if (V.hand.on) frameHand(); else if (V.preset) preset(V.preset, { instant: REDUCED });
   }, 120);
   wake();
@@ -1433,7 +1435,7 @@ function setArrange(on) {
   if (!V.model || on === V.arrange) return;
   if (on) {
     if (V.hand.on) putBack({ silent: true });
-    if (V.inspect) { V.inspect = false; renderInspector(); }
+    if (V.inspect) { V.inspect = false; renderInspector(); pushHash(); }
     if (V.contact.on) setContactView(false);
     if (V.mode === "opening") setMode("block", { view: false });
     ARR.cam = { yaw: CAM.goal.yaw, pitch: CAM.goal.pitch, dist: CAM.goal.dist, fov: CAM.goal.fov, target: CAM.goal.target.clone(), preset: V.preset };
@@ -2170,6 +2172,18 @@ function setHidden(quire, hide, { quiet = false } = {}) {
   if (V.arrange) relayout(REDUCED ? 0 : 400);   // on the table the other piles close up (or make room)
   tint(); marks(); wake(); Arrange.render();
 }
+/* Your order changed (arrange.js edit): its hidden quires go along with it. A copy starts with the ones hidden in the order it
+   was made from, a renamed quire stays hidden under its new name, and a name the order no longer has is forgotten (so a
+   quire merged away, or one put back later under that name, isn't hidden by mistake). */
+function keepHidden(order, { from = null, renamed = null } = {}) {
+  const names = new Set(HID[order.id] || (from && HID[from]) || []);
+  if (renamed && names.delete(String(renamed[0]))) names.add(String(renamed[1]));
+  const have = new Set(order.gatherings.map(g => String(g.quire)));
+  const keep = [...names].filter(n => have.has(n));
+  if (keep.length) HID[order.id] = keep; else delete HID[order.id];
+  store.set("3d:hidden", HID);
+}
+function dropHidden(id) { if (HID[id]) { delete HID[id]; store.set("3d:hidden", HID); } }
 function showAllQuires() { for (const q of hiddenQuires()) setHidden(q, false, { quiet: true }); toast("Every quire is shown"); }
 /* Strip ticks: the current sheet, hidden quires, bookmarked sheets. */
 function marks() {
@@ -2710,6 +2724,7 @@ function frameHand() {
   V.preset = null; renderViews();
 }
 function selectSheet(i) {
+  if (V.arrange) { setCur(i); Arrange.mark(curSheet(), true); return; }   // on the table (a bookmark): the sheet is selected there; no inspector
   if (V.mode === "opening") setMode("block", { view: false });
   if (V.hand.on) putBack({ silent: true });
   V.cur = clamp(i, 0, V.model.all.length - 1);
@@ -2809,6 +2824,8 @@ export default {
   setHidden,
   showAllQuires,
   hiddenQuires,
+  keepHidden,
+  dropHidden,
   curSheet,
   focusSheet,
   setPanel,
@@ -2837,6 +2854,12 @@ export default {
     get camera() { return camera; },
     get tray() { return ARR.tray; },   // the set-aside pile's dashed place on the table
     pickAt(x, y) { return pick({ clientX: x, clientY: y })?.en.id ?? null; },
+    /* true while anything is still moving or about to: a tween, the camera on its way, a resize not yet fitted */
+    get busy() {
+      const g = CAM.goal, size = renderer.getSize(new THREE.Vector2());
+      return TW.on || !!resize.pending || size.x !== stage.clientWidth || size.y !== stage.clientHeight
+        || Math.abs(CAM.dist - g.dist) > g.dist * 1e-3 || CAM.target.distanceTo(g.target) > .05 || Math.abs(CAM.yaw - g.yaw) > .05 || Math.abs(CAM.pitch - g.pitch) > .05;
+    },
     /* jump to the end of whatever is moving (the folds, the camera) and draw it: for checks that look at a still view.
        k < 1 stops the folds that far through, with the camera already where it is going. */
     settle(k = 1) {

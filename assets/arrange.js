@@ -133,31 +133,49 @@ const Arrange = {
   el() { return $("#v3-arrange"); },
 
   // ---------------------------------------------------------------- editing
-  snap: o => JSON.stringify({ gatherings: o.gatherings, unplaced: o.unplaced, title: o.title }),
+  snap: o => JSON.stringify({ gatherings: o.gatherings, unplaced: o.unplaced }),   // what undo brings back (not the order's name)
 
   /* Apply fn to a copy of the current order. A built-in order is first copied into an order of your own. `moved` names
-     the sheets the change is about: only they lift in 3D, the others slide aside (null: let 3D decide). */
-  edit(fn, { ms = 1000, moved = null, copy = false } = {}) {
+     the sheets the change is about: only they lift in 3D, the others slide aside (null: let 3D decide). `renamed`:
+     [old, new] quire names, so a quire hidden in 3D stays hidden under its new name. */
+  edit(fn, { ms = 1000, moved = null, copy = false, renamed = null } = {}) {
     let o = this.order(), started = null, from = o.id;
     if (!MyOrders.isMine(o.id)) { started = o.title; o = MyOrders.copyOf(o); }
     const before = this.snap(o);
     const next = JSON.parse(JSON.stringify(o));
     if (fn(next) === false) return false;
     // a change that changes nothing (a sheet let go where it was) is no change, and doesn't start a copy either
-    if (this.snap(next) === before && !copy) return false;
-    const hst = this.histOf(next.id);
-    hst.undo.push({ s: before, moved }); hst.redo = [];
-    if (hst.undo.length > 100) hst.undo.shift();
+    const changed = this.snap(next) !== before;
+    if (!changed && !copy) return false;
+    if (changed) {
+      const hst = this.histOf(next.id);
+      hst.undo.push({ s: before, moved }); hst.redo = [];
+      if (hst.undo.length > 100) hst.undo.shift();
+    }
+    // the quires hidden in 3D: a copy keeps the ones hidden in the order it came from, a renamed one keeps its state
+    View3D.mod?.keepHidden(next, { from: started ? from : null, renamed });
     MyOrders.put(next, { ms, moved });
-    // a first move makes a new order: say so, and let it be taken back at once
-    if (started) toast(`You're now changing your own copy, “${next.title}”. “${started}” stays as it was.`, { label: "Undo", fn: () => this.unstart(next.id, from) });
+    // a first move makes a new order: say so, and let it be taken back at once (until the next move: then Undo is
+    // one step back, ⌘Z, and taking back the copy would throw that move away too)
+    if (started) {
+      const msg = `You're now changing your own copy, “${next.title}”. “${started}” stays as it was.`;
+      toast(msg, { label: "Undo", fn: () => this.unstart(next.id, from) });
+      this.firstMsg = { id: next.id, msg };
+    } else if (this.firstMsg?.id === next.id) {
+      const t = $("#cx-toast");
+      if (t?.classList.contains("show") && t.firstChild?.textContent === this.firstMsg.msg) toast(this.firstMsg.msg);
+      this.firstMsg = null;
+    }
     this.render();
     return true;
   },
-  /* Take back the copy a first move made: it goes, and the order it came from is shown again. */
+  /* Take back the copy a first move made: it goes, and the order it came from is shown again. (Only while that move is
+     all there is in the copy; after more, it is an ordinary undo.) */
   unstart(id, from) {
-    MyOrders.remove(id); this.hist.delete(id);
-    if (ORDERS.has(from)) setOrder(from);
+    if (S.order !== id) return;
+    if ((this.hist.get(id)?.undo.length || 0) > 1) return this.undo();
+    MyOrders.remove(id);
+    if (ORDERS.has(from) && S.order !== from) setOrder(from);
     toast(`Back to “${ORDERS.get(S.order).title}”, unchanged`);
     this.render();
   },
@@ -259,7 +277,7 @@ const Arrange = {
     const t = await askText("Name this quire", { value: String(g.quire), ok: "Rename", placeholder: "e.g. 4, 13b, Herbal A" });
     if (!t) return;
     const was = String(g.quire);
-    this.edit(o => { o.gatherings[gi].quire = /^\d+$/.test(t) ? +t : t; }, { ms: 300 });
+    this.edit(o => { o.gatherings[gi].quire = /^\d+$/.test(t) ? +t : t; }, { ms: 300, renamed: [was, t] });
     if (this.at === was) this.at = String(this.order().gatherings[gi]?.quire ?? was);
     this.render();
   },
@@ -359,14 +377,17 @@ const Arrange = {
     document.body.classList.toggle("arranging", this.on);   // messages rise above the dock (style.css)
     document.body.classList.toggle("on-table", this.on && !!this.table);   // or, on the table, go to its side
     const acts = $("#v3-arr-acts");
-    if (!this.on) { el.hidden = true; el.innerHTML = ""; if (acts) { acts.hidden = true; acts.replaceChildren(); } ArrangeList.render(); return; }
+    if (!this.on) {
+      el.hidden = true; el.innerHTML = ""; if (acts) { acts.hidden = true; acts.replaceChildren(); }
+      document.documentElement.style.removeProperty("--dock-h");
+      ArrangeList.render(); return;
+    }
     const o = this.order();
     if (!o) return;   // an order being deleted: the page moves on to another, which draws it again
     this.shown = o;   // a different order, or a new version of yours, draws the dock again (mark)
     this.ch = this.changes(o);
     if (this.table) {   // on the table: a bar of its own above the book, and the picked sheet's buttons over it
       el.hidden = false; el.replaceChildren(this.topEl(o));
-      document.documentElement.style.setProperty("--dock-h", "84px");
       this.renderActs(o);
       ArrangeList.render();   // and the list beside it, if it is open
       return;
@@ -621,6 +642,7 @@ const Arrange = {
     if (this.noClick) return;
     View3D.mod?.focusSheet(id);   // the book turns to it, and calls mark()
     if (this.sel !== id) this.mark(id);
+    $(".ar-acts", this.el())?.scrollIntoView({ block: "nearest" });   // on a phone the panel scrolls: its buttons, in view
   },
   tabClick(key, gi) {
     if (this.noClick) return;
@@ -1067,7 +1089,7 @@ const Arrange = {
       if (keep && t && t !== String(key) && gi >= 0) {
         if (o.gatherings.some((g, j) => j !== gi && String(g.quire) === t)) { toast(`There is already a quire called ${t}`); gone = false; input.select(); return; }
         input.replaceWith(h("b", {}, t));
-        this.edit(oo => { oo.gatherings[this.gIndex(oo, key)].quire = /^\d+$/.test(t) ? +t : t; }, { ms: 300 });
+        this.edit(oo => { oo.gatherings[this.gIndex(oo, key)].quire = /^\d+$/.test(t) ? +t : t; }, { ms: 300, renamed: [String(key), t] });
         this.setSel([], { quires: [t] });
       } else input.replaceWith(h("b", {}, was));
     };
@@ -1251,6 +1273,12 @@ const Arrange = {
     });
   },
 };
+
+/* A window made narrower or wider than a phone's while Rearrange is open (a tablet turned, a window resized): it opens
+   again the way that width has it, the table or the panel under the book. */
+matchMedia("(max-width: 760px)").addEventListener("change", e => {
+  if (Arrange.on && Arrange.table === e.matches) { Arrange.close(); Arrange.open(); }
+});
 
 /* The list: Rearrange as it was before the table, every quire and its sheets in a column beside the table. A second
    view of the same order: a change made in either shows in both at once (each goes through Arrange's edits, which the
