@@ -288,10 +288,11 @@ test.describe("foldouts", () => {
     expect(k, "the book should have a sheet that opens in the sheet viewer").toBeGreaterThan(0);
     await page.evaluate(k => Reader.go(k, 0), k);
     await page.keyboard.press("u");
-    await expect(page.locator("#sheet-dlg")).toBeVisible();
-    await expect.poll(async () => page.evaluate(() => [...document.querySelectorAll("#sheet-dlg img")].every(i => i.complete && i.naturalWidth > 0))).toBe(true);
+    const viewer = page.locator("#rd-stage .sv-over");   // since Text (1.6), the sheet opens out over the pages, not in a dialog
+    await expect(viewer).toBeVisible();
+    await expect.poll(async () => page.evaluate(() => [...document.querySelectorAll("#rd-stage .sv-over img")].every(i => i.complete && i.naturalWidth > 0))).toBe(true);
     await page.keyboard.press("Escape");
-    await expect(page.locator("#sheet-dlg")).toBeHidden();
+    await expect(viewer).toHaveCount(0);
   });
 
   test("on an opening with nothing folded, U says so", async ({ page }) => {

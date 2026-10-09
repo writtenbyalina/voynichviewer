@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text redesign mocks</title>
+<!-- Mocks of docs/text/REDESIGN.md, drawn from real data (data.json, made with the site's own code).
+     Screens: ?s=hover | word | line | lines | search | phone-word | phone-search -->
+<style>
+@font-face { font-family: "Voynich VV"; src: url(../../../../assets/fonts/voynich-vv.woff2) format("woff2"); }
+:root {
+  --bg: #f6f4ef; --panel: #fff; --ink: #1f2328; --muted: #646b73; --line: #d9d5cc; --accent: #2b5fd9;
+  --table: #2d2925; --table2: #221e1a; --table-ink: #e9e3d8; --table-muted: #a69d8f; --table-line: #4a443d;
+  --sel: #ff5c8a; --differ: #ff8a4c; --radius: 6px;
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; color: var(--ink);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
+button { font: inherit; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+/* site header */
+.top { display: flex; align-items: center; gap: 14px; padding: 8px 16px; background: #fff; border-bottom: 1px solid var(--line); flex: none; }
+.brand { font-weight: 700; }
+.ver { font: 11px ui-monospace, Menlo, monospace; border: 1px solid var(--line); border-radius: 99px; padding: 0 6px; background: #efece5; }
+.tabs { display: flex; gap: 4px; }
+.tabs span { padding: 4px 10px; border-radius: var(--radius); }
+.tabs span.on { background: var(--ink); color: #fff; }
+.top .sp { flex: 1; }
+.top .pill { border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 10px; background: #fff; }
+/* Reader */
+.reader { flex: 1; display: flex; flex-direction: column; background: var(--table); color: var(--table-ink); min-height: 0; }
+.rd-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--table-line); flex: none; }
+.rd-bar .b { border: 1px solid var(--table-line); border-radius: var(--radius); padding: 3px 10px; color: var(--table-ink); }
+.rd-bar .b.on { background: var(--table-ink); color: var(--table); }
+.rd-bar .where { font-weight: 600; }
+.rd-bar .meta { color: var(--table-muted); font-size: 13px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row { flex: 1; display: flex; min-height: 0; }
+.stage { flex: 1; position: relative; overflow: hidden; }
+.spread { position: absolute; display: flex; gap: 2px; transform-origin: 0 0; }
+.pg { position: relative; flex: none; background: #e8dcc2; box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.pg img { display: block; width: 100%; height: 100%; }
+.wbox { position: absolute; border-radius: 3px; }
+.wbox.hover { outline: 1.5px solid rgba(255, 92, 138, .7); outline-offset: 3px; }  /* Spec: 1.5 px, pink at 70%, 3 px padding, no fill */
+.wbox.sel { outline: 2px solid var(--sel); outline-offset: 3px;                   /* Spec: 2 px solid + 4 px halo at 25% */
+  box-shadow: 0 0 0 7px rgba(255, 92, 138, .25), 0 0 0 9999px rgba(45, 41, 37, .38); }  /* Spec: the rest at 38% table colour */
+.tip { position: absolute; transform: translate(-50%, calc(-100% - 8px)); background: #1d1a17; color: #fff; border-radius: 99px;
+  padding: 6px 12px; font-size: 13px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.35); }   /* Spec: one line, 8 px above */
+.tip b { font: 600 13px ui-monospace, Menlo, monospace; margin-right: 6px; }
+.tip .gt { color: #ffb38c; }
+.tip .chev { color: #a69d8f; margin-left: 8px; }
+.foot { height: 44px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 16px; color: var(--table-muted); font-size: 12px; }
+.foot .z { display: flex; gap: 4px; }
+.foot .z span { border: 1px solid var(--table-line); border-radius: var(--radius); min-width: 32px; text-align: center; padding: 3px 6px; color: var(--table-ink); }
+.strip { height: 38px; flex: none; border-top: 1px solid var(--table-line); display: flex; gap: 1px; align-items: flex-end; padding: 6px 16px 8px; overflow: hidden; }
+.strip i { width: 5px; height: 18px; background: #8a7d6a; flex: none; }
+.strip i.cur { background: #f3c35c; }
+/* the panel: 360 px (Spec) */
+.panel { width: 360px; flex: none; background: var(--table2); border-left: 1px solid var(--table-line); display: flex; flex-direction: column; min-height: 0; }
+.ph { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--table-line); flex: none; }
+.ph .t { font-weight: 600; }
+.ph .m { color: var(--table-muted); font-size: 13px; }
+.ph .sp { flex: 1; }
+.ph .ic { border: 1px solid var(--table-line); border-radius: var(--radius); min-width: 30px; height: 30px; display: inline-grid; place-items: center; color: var(--table-ink); padding: 0 8px; font-size: 13px; }
+.seg2 { display: inline-flex; border: 1px solid var(--table-line); border-radius: var(--radius); overflow: hidden; }
+.seg2 span { padding: 4px 10px; font-size: 13px; }
+.seg2 span.on { background: var(--table-ink); color: var(--table); }
+.pb { flex: 1; overflow: auto; padding: 12px 14px 18px; }
+/* page text */
+.ln { display: grid; grid-template-columns: 24px 1fr; gap: 0 8px; }
+.ln.ps { margin-top: 10px; }
+.ln .no { color: var(--table-muted); font: 12px/26px ui-monospace, Menlo, monospace; text-align: right; }
+.ln .tx { font: 15px/26px ui-monospace, "SF Mono", Menlo, monospace; word-spacing: .2em; }
+.ln .w { border-radius: 3px; padding: 0 1px; }
+.ln .w.lit { background: rgba(255, 255, 255, .1); }
+.ln .w.sel { box-shadow: inset 0 -2px 0 var(--sel); background: rgba(255, 92, 138, .14); }
+.ln .g { position: relative; }
+.ln .g.d::after { content: ""; position: absolute; left: calc(50% - 1.5px); bottom: -1px; width: 3px; height: 3px; border-radius: 50%; background: rgba(255, 138, 76, .85); }  /* Spec: one 3 px orange dot */
+.ln .us { color: var(--table-muted); }
+.pf { margin-top: 18px; padding-top: 8px; border-top: 1px solid var(--table-line); color: var(--table-muted); font-size: 12px; }
+/* word */
+.crop { width: 100%; border-radius: 6px; display: block; background: #e8dcc2; box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+.cropcap { color: var(--table-muted); font-size: 11px; margin: 4px 0 12px; }
+.reading { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.reading .gl { font: 34px/1.1 "Voynich VV", serif; }
+.reading .ev { font: 22px ui-monospace, Menlo, monospace; letter-spacing: .02em; }
+.verdict { font-size: 15px; line-height: 1.45; margin: 10px 0 12px; }
+.verdict b { font-weight: 600; }
+.bars { display: flex; gap: 6px; align-items: flex-end; margin: 4px 0 4px; }
+.bars .gb { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bars .gb span { font: 15px ui-monospace, Menlo, monospace; }
+.bars .gb i { display: block; height: 3px; width: 100%; min-width: 16px; border-radius: 2px; }
+.band-all { background: #6f665a; } .band-most { background: #f2b98f; } .band-disputed { background: var(--differ); }
+.key { display: flex; gap: 12px; color: var(--table-muted); font-size: 11.5px; margin-bottom: 16px; }
+.key i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.h { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--table-muted); font-weight: 600; margin: 14px 0 6px; }
+.rd { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--table-line); }
+.rd .r { font: 15px ui-monospace, Menlo, monospace; }
+.rd .r .x { color: var(--differ); }
+.rd .n { justify-self: end; color: var(--table-ink); font-size: 13px; }
+.rd .who { grid-column: 1 / -1; color: var(--table-muted); font-size: 12px; }
+.more { color: var(--table-ink); font-size: 13px; margin-top: 6px; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--table-muted); }
+.else { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.minis { display: flex; gap: 1px; height: 10px; align-items: flex-end; margin: 6px 0 4px; }
+.minis i { flex: 1; height: 2px; background: #4a443d; }
+.minis i.h { height: 10px; background: var(--sel); }
+.disc { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--table-line); border-bottom: 1px solid var(--table-line); margin-top: 14px; font-size: 13.5px; }
+.src { color: var(--table-muted); font-size: 11.5px; margin-top: 14px; }
+.al { margin-top: 6px; font: 13px/22px ui-monospace, Menlo, monospace; }
+.al .r2 { display: grid; grid-template-columns: 110px 1fr; gap: 8px; }
+.al .who { font: 11.5px/22px -apple-system, system-ui, sans-serif; color: var(--table-muted); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.al .cons { color: var(--table-ink); font-weight: 700; }
+.al .same { color: rgba(233, 227, 216, .3); }   /* Spec: agreeing glyphs at 30% ink */
+.al .x { color: var(--differ); font-weight: 700; }
+.al .note { grid-column: 2; color: var(--table-muted); font: 12px -apple-system, system-ui, sans-serif; }
+/* Text tab: search */
+.sx { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--bg); }
+.sx-top { background: #fff; padding: 14px 24px 10px; border-bottom: 1px solid var(--line); }
+.box { display: flex; gap: 8px; }
+.box .in { flex: 1; height: 48px; border: 1.5px solid var(--ink); border-radius: 10px; display: flex; align-items: center; padding: 0 14px; font: 18px ui-monospace, Menlo, monospace; background: #fff; }
+.box .in .q { margin-left: auto; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font: 13px -apple-system, system-ui, sans-serif; color: var(--muted); }
+.box .go { height: 48px; border: none; border-radius: 10px; background: var(--accent); color: #fff; padding: 0 20px; font-weight: 600; }
+.chips { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.chip { height: 32px; border: 1px solid var(--line); border-radius: 99px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; background: #fff; }
+.chip .k { color: var(--muted); }
+.count { font-size: 16px; margin: 12px 0 2px; }
+.count b { font-family: ui-monospace, Menlo, monospace; }
+.count .i { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font-size: 11px; vertical-align: 2px; margin-left: 4px; }
+.ex { color: var(--muted); font-size: 12.5px; }
+.bstrip { padding: 10px 24px 8px; background: #fff; border-bottom: 1px solid var(--line); }
+.bars2 { position: relative; height: 36px; display: flex; align-items: flex-end; gap: 1px; }
+.bars2 .qz { position: absolute; top: 0; bottom: 0; }
+.bars2 i { position: relative; flex: 1; min-width: 1px; background: var(--sel); }
+.bars2 i.z { background: #d9d5cc; height: 1px !important; }
+.secs { display: flex; gap: 1px; margin-top: 3px; }
+.secs span { height: 8px; }
+.secn { position: relative; height: 16px; margin-top: 3px; font-size: 11px; color: var(--muted); }
+.secn span { position: absolute; white-space: nowrap; }
+.hovcard { position: absolute; background: #1f2328; color: #fff; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; width: 300px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.hovcard .s { color: #c9ced4; font: 12px ui-monospace, Menlo, monospace; margin-top: 3px; }
+.hovcard .s em { color: #ff9cbb; font-style: normal; font-weight: 700; }
+.sbody { flex: 1; display: flex; min-height: 0; }
+.facets { width: 240px; flex: none; background: #fff; border-right: 1px solid var(--line); padding: 14px 16px; overflow: auto; }
+.facets h4 { margin: 0 0 6px; font-size: 13px; }
+.facets .fr { display: flex; justify-content: space-between; height: 24px; align-items: center; font-size: 14px; }
+.facets .fr .n { color: var(--muted); }
+.facets .one { display: flex; justify-content: space-between; height: 34px; align-items: center; border-top: 1px solid var(--line); font-size: 13.5px; margin-top: 4px; }
+.facets .one .v { color: var(--muted); }
+.res { flex: 1; overflow: auto; padding: 14px 24px; }
+.res .rh { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--muted); font-size: 13px; }
+.pgh { display: flex; gap: 10px; align-items: center; margin: 14px 0 4px; }
+.pgh img { width: 30px; height: 42px; object-fit: cover; border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.pgh b { font-size: 15px; }
+.pgh span { color: var(--muted); font-size: 13px; }
+.hit { display: grid; grid-template-columns: 36px 1fr; gap: 8px; padding: 4px 0; font: 15px/1.6 ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink); border-radius: 4px; }
+.hit .no { color: var(--muted); font-size: 12px; text-align: right; line-height: 24px; }
+.hit em { font-style: normal; background: rgba(255, 92, 138, .18); box-shadow: inset 0 -2px 0 var(--sel); border-radius: 2px; }
+/* phone */
+body.phone .top { flex-wrap: wrap; gap: 8px; }
+body.phone .rd-bar .meta { display: none; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 55%; background: var(--table2); border-radius: 14px 14px 0 0; box-shadow: 0 -6px 24px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+.sheet .grab { width: 40px; height: 4px; border-radius: 2px; background: #6f665a; margin: 8px auto 2px; }
+</style>
+</head>
+<body>
+<script>
+const S = new URLSearchParams(location.search).get("s") || "word";
+const PHONE = S.startsWith("phone");
+if (PHONE) document.body.classList.add("phone");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const IMG = img => `../../../../data/panels/${img}_l.jpg`;
+fetch("data.json").then(r => r.json()).then(D => {
+  const W = D.word;
+  const header = tab => `<div class="top"><span class="brand">Voynich Viewer</span><span class="ver">v1.5</span>
+    <span class="tabs"><span>3D</span><span class="${tab === "read" ? "on" : ""}">Reader</span><span class="${tab === "text" ? "on" : ""}">Text</span><span>Info</span></span>
+    ${PHONE ? "" : `<span class="sp"></span><span class="pill">Current binding (folio order) ▾</span><span class="pill">★</span><span class="pill">Your work</span><span class="pill">?</span>`}</div>`;
+
+  // ---------- the Reader ----------
+  function reader({ panel, hover, sel, zoom, sheet }) {
+    const pages = ["f1v", "f2r"].map(p => D.pages[p]);
+    const H = PHONE ? 330 : 690;
+    const body = document.createElement("div");
+    body.className = "reader";
+    body.innerHTML = `<div class="rd-bar"><span class="b">‹</span><span class="b">›</span><span class="where">1v | 2r</span>
+      <span class="meta">Quire 1 · bifolium 2|7 · Botanical · Scribe 1 · Currier A · opening 2 of 117</span>
+      ${PHONE ? '<span style="flex:1"></span>' : ""}<span class="b on">Text</span>${PHONE ? "" : '<span class="b">Unfold</span><span class="b">Go to…</span><span class="b">☆ Bookmark</span><span class="b">▦ Grid</span>'}</div>
+      <div class="row"><div class="stage" id="stage"></div>${panel && !PHONE ? `<aside class="panel">${panel}</aside>` : ""}</div>
+      ${PHONE ? "" : `<div class="foot"><span class="z"><span>−</span><span>${zoom ? Math.round(zoom * 100) + "%" : "100%"}</span><span>+</span></span><span>Point at any word on the page to read it; click it for more.</span></div>
+      <div class="strip">${Array.from({ length: 117 }, (_, i) => `<i class="${i === 1 ? "cur" : ""}"></i>`).join("")}</div>`}`;
+    document.body.append(body);
+    const stage = body.querySelector("#stage");
+    const sp = document.createElement("div");
+    sp.className = "spread";
+    for (const [k, p] of pages.entries()) {
+      const w = Math.round(H * p.w / p.h);
+      const el = document.createElement("div");
+      el.className = "pg"; el.style.width = w + "px"; el.style.height = H + "px";
+      el.innerHTML = `<img src="${IMG(p.img)}" alt="">`;
+      if (k === 1) {
+        const b = W.box;
+        const box = document.createElement("div");
+        box.className = "wbox " + (sel ? "sel" : hover ? "hover" : "");
+        Object.assign(box.style, { left: b[0] / 10 + "%", top: b[1] / 10 + "%", width: b[2] / 10 + "%", height: b[3] / 10 + "%" });
+        if (sel || hover) el.append(box);
+        if (hover) {
+          const tip = document.createElement("div");
+          tip.className = "tip";
+          tip.innerHTML = `<b>${W.eva}</b><span class="gt">transcribers differ</span><span class="chev">›</span>`;
+          Object.assign(tip.style, { left: (b[0] + b[2] / 2) / 10 + "%", top: b[1] / 10 + "%" });
+          el.append(tip);
+        }
+      }
+      sp.append(el);
+    }
+    stage.append(sp);
+    requestAnimationFrame(() => {
+      const sw = stage.clientWidth, sh = stage.clientHeight;
+      const tw = sp.scrollWidth;
+      if (zoom) {   // the word framed: zoomed in, centred in the room the panel leaves
+        const pg = sp.children[1], b = W.box;
+        const cx = pg.offsetLeft + pg.offsetWidth * (b[0] + b[2] / 2) / 1000, cy = pg.offsetHeight * (b[1] + b[3] / 2) / 1000;
+        const vy = PHONE ? sh * 0.22 : sh / 2;
+        sp.style.transform = `translate(${sw / 2 - cx * zoom}px, ${vy - cy * zoom}px) scale(${zoom})`;
+      } else sp.style.transform = `translate(${(sw - tw) / 2}px, ${(sh - H) / 2}px)`;
+    });
+    if (sheet) { const s = document.createElement("div"); s.className = "sheet"; s.innerHTML = `<div class="grab"></div>` + sheet; stage.append(s); }
+  }
+
+  // the page text (no word selected)
+  function pageText(litWord) {
+    const p = D.pages.f2r;
+    const lines = p.lines.map((l, li) => `<div class="ln${l.ps && li ? " ps" : ""}"><span class="no">${li + 1}</span><span class="tx">${
+      l.words.map((w, wi) => `<span class="w${litWord && li === 3 && wi === 0 ? " " + litWord : ""}">${w.parts.map(([e, d]) => e === "," ? '<span class="us">·</span>' : `<span class="g${d ? " d" : ""}">${esc(e)}</span>`).join("")}</span>`).join(" ")
+    }</span></div>`).join("");
+    return `<div class="ph"><span class="t">2r</span><span class="m">12 lines</span><span class="sp"></span>
+      <span class="seg2"><span class="on">Eva</span><span>Glyphs</span></span><span class="ic">⋯</span><span class="ic">✕</span></div>
+      <div class="pb">${lines}<div class="pf">Orange dots: transcribers disagree on that glyph. The text is the consensus of 6 transcriptions (how it is made). Transcriptions by René Zandbergen and Gabriel Landini, Glen Claston, Takeshi Takahashi, the First Study Group, Prescott Currier and others, from voynich.nu (CC0).</div></div>`;
+  }
+
+  // the word panel
+  function crop() {
+    const [x, y, w, h] = W.box, q = W.quad, qw = q[1][0] - q[0][0], qh = q[2][1] - q[1][1];
+    const pad = 0.35;
+    const X = Math.round(q[0][0] + (x - w * pad) / 1000 * qw), Y = Math.round(q[0][1] + (y - h * pad * 2.4) / 1000 * qh);
+    const Wd = Math.round(w * (1 + 2 * pad) / 1000 * qw), Hd = Math.round(h * (1 + 4.8 * pad) / 1000 * qh);
+    return `https://collections.library.yale.edu/iiif/2/${W.iiif}/${X},${Y},${Wd},${Hd}/656,/0/default.jpg`;
+  }
+  function wordPanel({ open }) {
+    const g = W.groups, top = g[0];
+    const diff = (t) => { // mark the glyphs that differ from the consensus, glyph by glyph
+      const cons = W.glyphs.map(x => x.eva); let out = "", i = 0;
+      for (const c of cons) { const seg = t.slice(i, i + c.length); out += seg === c ? esc(seg) : `<span class="x">${esc(seg)}</span>`; i += c.length; }
+      return out + (t.length > i ? `<span class="x">${esc(t.slice(i))}</span>` : "");
+    };
+    const rows = g.slice(0, 3).map(r => `<div class="rd"><span class="r">${diff(r.t)}</span><span class="n">${r.n} of ${W.voters}</span><span class="who">${r.who.join(", ")}${r.t.includes("?") ? " · could not read a glyph" : ""}</span></div>`).join("");
+    const align = open ? `<div class="al">${(() => {
+      const cons = W.line[0], lines = W.line;
+      const consWords = D.pages.f2r.lines[W.lineNo - 1].words.map(w => w.eva);
+      const row = (who, words, isCons) => `<div class="r2"><span class="who">${who}</span><span>${words.map((t, i) => isCons ? `<span class="cons">${esc(consWords[i])}</span>` :
+        (t === consWords[i] ? `<span class="same">${esc(t)}</span>` : `<span class="x">${esc(t.replace(/\./g, " ").replace(/,/g, "·")) || "–"}</span>`)).join(" ")}</span></div>`;
+      const differ = lines.filter(l => l.words.some((t, i) => t !== consWords[i]));
+      return row("Consensus", consWords, true) + differ.map(l => row(l.who, l.words)).join("") +
+        `<div class="r2"><span></span><span class="note">${lines.length - differ.length ? `and ${lines.length - differ.length} more read the line as the consensus` : "every transcriber differs somewhere on this line"}</span></div>`;
+    })()}</div>` : "";
+    return `<div class="ph"><span class="ic">←</span><span class="m">2r · line ${W.lineNo} · word ${W.index}</span><span class="sp"></span><span class="ic">‹</span><span class="ic">›</span><span class="ic">✕</span></div>
+      <div class="pb">
+        <img class="crop" src="${crop()}" alt="The word on the page, from Yale's photograph">
+        <div class="cropcap">From Yale's photograph of 2r</div>
+        <div class="reading"><span class="gl">${esc(W.glyph)}</span><span class="ev">${W.eva}</span></div>
+        <div class="verdict">Transcribers <b>differ on the first glyph</b>: 2 of the 4 who could read it saw <b class="mono">sh</b>, one <span class="mono">so</span>, one <span class="mono">ch</span>. On the rest they agree, but for one <span class="mono">in</span> for <span class="mono">ii</span>.</div>
+        <div class="bars">${W.glyphs.map(x => `<span class="gb"><span>${esc(x.eva)}</span><i class="band-${x.band}"></i></span>`).join("")}</div>
+        <div class="key"><span><i class="band-all"></i>all agree</span><span><i class="band-most"></i>most agree</span><span><i class="band-disputed"></i>disputed</span></div>
+        <div class="h">Readings</div>${rows}
+        <div class="more">All readings (${g.length}), and RF1 and voynichese.com</div>
+        <div class="h">Elsewhere in the book</div>
+        <div class="else">${W.elsewhere.n === 1 ? "Only here in the book." : `${W.elsewhere.n} times on ${W.elsewhere.pages} pages`}<span style="flex:1"></span><span class="more" style="margin:0">Find words like it ›</span></div>
+        <div class="disc"><span>How each transcriber wrote this line</span><span>${open ? "▾" : "▸"}</span></div>${align}
+        <div class="src">Consensus of ${W.voters} transcriptions · word position: The Voynichese Project · photograph: Yale University</div>
+      </div>`;
+  }
+
+  // ---------- the Text tab ----------
+  function search() {
+    const X = D.search;
+    const per = X.perPage, max = Math.max(...Object.values(per));
+    const order = X.order, n = order.length;
+    const secs = [];
+    order.forEach((pg, i) => { const s = (X.sections[pg] || "").split("/")[0].trim(); if (!secs.length || secs[secs.length - 1].s !== s) secs.push({ s, a: i, b: i }); else secs[secs.length - 1].b = i; });
+    const COL = { Botanical: "#7fa36b", Astronomy: "#5f86b5", Zodiac: "#8b74b8", Balneology: "#c98b6b", Rose: "#c9a64f", Pharmaceutical: "#5aa3a0", "Starred paragraphs": "#b5707c" };
+    const NAME = { Botanical: "Herbal", Astronomy: "Astronomical", Zodiac: "Zodiac", Balneology: "Balneological", Rose: "Rosettes", Pharmaceutical: "Pharmaceutical", "Starred paragraphs": "Recipes" };
+    const qz = []; order.forEach((pg, i) => { const q = X.quires[pg]; if (!qz.length || qz[qz.length - 1].q !== q) qz.push({ q, a: i, b: i }); else qz[qz.length - 1].b = i; });
+    const bars = order.map(pg => per[pg] ? `<i style="height:${Math.max(3, Math.round(36 * per[pg] / max))}px" title="${pg}"></i>` : `<i class="z"></i>`).join("");
+    const groups = []; for (const h of X.hits) { const pg = h.id.slice(0, h.id.lastIndexOf(".")); let g = groups.find(x => x.pg === pg); if (!g) groups.push(g = { pg, hits: [] }); g.hits.push(h); }
+    const facet = Object.entries(secs.reduce((m, s) => { const k = s.s; m[k] = (m[k] || 0) + order.slice(s.a, s.b + 1).reduce((a, pg) => a + (per[pg] || 0), 0); return m; }, {}));
+    const results = groups.slice(0, PHONE ? 2 : 4).map(g => `<div class="pgh"><img src="${IMG(X.thumbs[g.pg])}" alt=""><div><b>${g.pg.slice(1)}</b> <span>· ${NAME[(X.sections[g.pg] || "").split("/")[0].trim()] || ""} · ${per[g.pg]} times</span></div></div>` +
+      g.hits.slice(0, 3).map(h => `<div class="hit"><span class="no">${h.id.split(".")[1]}</span><span>${esc(h.line.slice(0, h.s)).replace(/\./g, " ").replace(/,/g, "·")}<em>${esc(h.line.slice(h.s, h.e))}</em>${esc(h.line.slice(h.e)).replace(/\./g, " ").replace(/,/g, "·")}</span></div>`).join("")).join("");
+    const el = document.createElement("div");
+    el.className = "sx";
+    el.innerHTML = `<div class="sx-top">
+        <div class="box"><div class="in">daiin<span class="q">?</span></div>${PHONE ? "" : '<button class="go">Search</button>'}</div>
+        <div class="chips"><span class="chip">Consensus ▾</span><span class="chip">Spaces: either way ▾</span><span class="chip">More options ▾</span></div>
+        <div class="count"><b>daiin</b> appears <b>${X.total.toLocaleString("en")}</b> times on <b>${X.pages}</b> of ${X.allPages} pages.<span class="i">i</span></div>
+        <div class="ex">An example: the commonest word. Type any word, or start of a word with *, like qok*.</div></div>
+      <div class="bstrip"><div class="bars2">${qz.map((q, k) => k % 2 ? `<span class="qz" style="left:${q.a / n * 100}%;width:${(q.b - q.a + 1) / n * 100}%;background:#f3f1ec"></span>` : "").join("")}${bars}</div>
+        <div class="secs">${secs.map(s => `<span style="flex:${s.b - s.a + 1};background:${COL[s.s] || "#bbb"}"></span>`).join("")}</div>
+        <div class="secn">${(() => { let end = -1; const Wd = PHONE ? 358 : 1390; return secs.filter(s => {   // a name where its section is wide enough, and clear of the last
+          const x = s.a / n * Wd, w = (NAME[s.s] || s.s).length * 6.4;
+          if ((s.b - s.a + 1) / n * Wd < 40 || x < end + 8) return false; end = x + w; return true; })
+          .map(s => `<span style="left:${s.a / n * 100}%">${NAME[s.s] || s.s}</span>`).join(""); })()}</div></div>
+      <div class="sbody">${PHONE ? "" : `<aside class="facets"><h4>Section</h4>${facet.map(([s, c]) => `<div class="fr"><span>${NAME[s] || s}</span><span class="n">(${c})</span></div>`).join("")}
+        <div class="one" style="margin-top:14px"><span>Scribe</span><span class="v">any ▾</span></div><div class="one"><span>Language</span><span class="v">any ▾</span></div><div class="one"><span>Kind of text</span><span class="v">any ▾</span></div><div class="one"><span>Quire</span><span class="v">any ▾</span></div></aside>`}
+        <div class="res"><div class="rh"><span>${PHONE ? '<span class="chip">Filter: all pages ▾</span>' : "In book order"}</span><span>${PHONE ? "" : "Save · Export ▾ · Concordance view"}</span></div>${results}</div></div>`;
+    document.body.append(el);
+    if (!PHONE) requestAnimationFrame(() => {   // the hover card on one bar
+      const pk = Object.entries(per).sort((a, b) => b[1] - a[1])[0][0];   // the page with the most
+      const b2 = el.querySelector(".bars2"), i = order.indexOf(pk), r = b2.getBoundingClientRect();
+      const card = document.createElement("div");
+      card.className = "hovcard";
+      const h = X.hitsOn && X.hitsOn[pk] || X.hits[0];
+      card.innerHTML = `<b>${pk.slice(1)}</b> · ${NAME[(X.sections[pk] || "").split("/")[0].trim()] || ""} · Quire ${X.quires[pk]} · ${per[pk]} times<div class="s">${h ? `${esc(h.line.slice(Math.max(0, h.s - 20), h.s)).replace(/\./g, " ")}<em>${esc(h.line.slice(h.s, h.e))}</em>${esc(h.line.slice(h.e, h.e + 20)).replace(/\./g, " ")}` : ""}</div>`;
+      card.style.left = (r.left + r.width * i / n - 150) + "px"; card.style.top = (r.top - 70) + "px";
+      document.body.append(card);
+    });
+  }
+
+  if (S === "search" || S === "phone-search") { document.body.insertAdjacentHTML("afterbegin", header("text")); search(); }
+  else {
+    document.body.insertAdjacentHTML("afterbegin", header("read"));
+    if (S === "hover") reader({ panel: pageText("lit"), hover: true });
+    if (S === "lines") reader({ panel: pageText() });
+    if (S === "word") reader({ panel: wordPanel({ open: false }), sel: true, zoom: 2.6 });
+    if (S === "line") { reader({ panel: wordPanel({ open: true }), sel: true, zoom: 2.6 }); requestAnimationFrame(() => { const b = document.querySelector(".pb"); b.scrollTop = b.scrollHeight; }); }
+    if (S === "phone-word") reader({ sel: true, zoom: 2.2, sheet: wordPanel({ open: false }) });
+  }
+  document.body.dataset.ready = "1";
+});
+</script>
+</body>
+</html>

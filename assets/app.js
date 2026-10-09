@@ -24,6 +24,13 @@ const h = (tag, attrs = {}, ...kids) => {
   return el;
 };
 const range = (a, b) => Array.from({ length: Math.max(0, b - a) }, (_, i) => a + i);
+/* three lines of writing: the icon of the Text button */
+function textIcon() {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  el.setAttribute("viewBox", "0 0 16 16"); el.setAttribute("width", "15"); el.setAttribute("height", "15"); el.setAttribute("aria-hidden", "true"); el.classList.add("ico-text");
+  el.innerHTML = '<path d="M2.5 4h11M2.5 8h11M2.5 12h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>';
+  return el;
+}
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const store = {
   get(k, d) { try { const v = localStorage.getItem("vv:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -74,7 +81,7 @@ const SECTION = { H: "Herbal", A: "Astronomical", Z: "Zodiac", B: "Balneological
 let D;                       // codex.json
 const SHEETS = new Map();    // "77|82" -> sheet
 let ORDERS = new Map();      // id -> resolved order
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.6";
 const PAGE_SHEET = new Map();   // "f78v" -> "78|81", every page including lost ones
 const RETIRED = { "davis-blog-2025": "davis" };   // orders taken out of the menu -> the order an old link now opens
 
@@ -265,7 +272,7 @@ function segEl(seg, height, { size = "l", labels = true, scribes = true, cls = "
   const img = h("img", { src: imgUrl(seg.img, size, seg.v), alt: pageName(seg), draggable: "false", loading: lazy ? "lazy" : "eager",
     "data-key": seg.img, "data-v": seg.v || "", style: rot ? { transform: `rotate(${rot}deg)` } : null });
   Sharp.seg.set(img, seg);
-  const el = h("div", { class: "seg " + cls, style: { width: w + "px", height: height + "px" }, title: pageName(seg) }, img);
+  const el = h("div", { class: "seg " + cls, style: { width: w + "px", height: height + "px" }, title: pageName(seg), "data-page": seg.page }, img);
   const sc = (seg.scribes || []).filter(n => SCRIBES[n]);
   if (scribes && sc.length) el.append(h("i", { class: "scribe", title: sc.map(n => SCRIBES[n]).join(" + "),
     style: { background: sc.length === 1 ? `var(--h${sc[0]})`
@@ -345,14 +352,16 @@ function goToPage(page, { open = false } = {}) {
 }
 
 function setHash() {
-  const at = S.view === "read" ? short(curLabel() || "") : S.view === "three" ? View3D.state() : S.view === "info" ? (Info.at || "") : "";
-  const hash = `#${S.view}/${encodeURIComponent(S.order)}${at ? "/" + at : ""}`;
-  if (location.hash !== hash) history.replaceState(null, "", hash);
+  const at = S.view === "read" ? short(curLabel() || "") : S.view === "three" ? View3D.state() : S.view === "info" ? (Info.at || "") : S.view === "text" ? TextTab.state() : "";
+  const text = S.view === "read" && TextUI.open ? TextUI.hash() : "";
+  const hash = `#${S.view}/${encodeURIComponent(S.order)}${at || text ? "/" + at : ""}${text ? "/" + text : ""}`;
+  if (location.hash !== hash) history.replaceState(history.state, "", hash);   // (keeping what text.js put there for Back)
 }
 
 function readHash() {
-  const [view, order, at] = location.hash.replace(/^#\/?/, "").split("/").map(x => { try { return decodeURIComponent(x); } catch { return x; } });
-  if (["read", "three", "info"].includes(view)) S.view = view;
+  const [view, order, at, more] = location.hash.replace(/^#\/?/, "").split("/").map(x => { try { return decodeURIComponent(x); } catch { return x; } });
+  if (view === "read") TextUI.fromHash(more);
+  if (["read", "three", "info", "text"].includes(view)) S.view = view;
   if (view === "sources" || view === "collation") S.view = "info";   // the old Sources and Folio order tabs are sections of Info now
   const oid = RETIRED[order] || order;
   if (oid && ORDERS.has(oid)) S.order = oid;
@@ -378,6 +387,7 @@ function setOrder(id, opts = {}) {   // opts reach the 3D morph: { ms, moved }
   if (S.view === "read") Reader.open(o);
   if (S.view === "info") Collation.render();
   if (S.view === "three") View3D.open(o, opts);
+  if (S.view === "text") TextTab.mount();   // the book strip follows the order
   setHash();
 }
 
@@ -388,12 +398,13 @@ function show(view) {
   if (view === "read") Reader.open(ORDERS.get(S.order), POS.by && POS.by !== "read" ? POS.page : undefined);
   if (view === "three") View3D.mount();
   if (view === "info") Info.render();
+  if (view === "text") TextTab.mount();
   setHash();
 }
 
 // ================================================================ READER
 const R = { order: null, pages: null, spreads: null, at: 0, unfold: { L: false, R: false }, busy: false, newSet: null,
-            zoom: 1, zx: 0, zy: 0, settleT: null, dir: 1, aheadT: null,   // the way you are reading (+1 on, -1 back)
+            zoom: 1, zx: 0, zy: 0, rot: 0, rotShown: 0, settleT: null, dir: 1, aheadT: null,   // rot: the pages turned, in degrees; dir: the way you are reading (+1 on, -1 back)
             queue: [], moving: null, turning: null, gen: 0, fetchT: null,   // moves waiting for the one in progress; the leaf in the air; bumped when the book is reopened; the timer for fetching the pictures either side
             chain: false,   // the last leaf landed with more turns waiting: the next lifts at speed, so a run of turns reads as one riffle
             ref: null, refFor: null,   // the page width every plain opening is sized for (see refHalf)
@@ -417,9 +428,13 @@ const Reader = {
           h("button", { id: "rd-scribes", class: S.scribes ? "on" : "", title: "Colour bar = Davis's scribe", onclick: e => { S.scribes = !S.scribes; store.set("scribes", S.scribes); e.target.classList.toggle("on", S.scribes); Reader.render(); } }, "Scribes"),
           h("button", { id: "rd-ghosts", class: S.ghosts ? "on" : "", title: "Show lost leaves as blank pages", onclick: e => { S.ghosts = !S.ghosts; store.set("ghosts", S.ghosts); e.target.classList.toggle("on", S.ghosts); Reader.open(R.order, Reader.nearestKept()); } }, "Lost leaves"),
           h("button", { title: "Go to a folio (G)", onclick: () => Reader.ask() }, "Go to…"),
+          h("button", { id: "rd-textbtn", title: "Read the text: point at any word on the page (T)", "aria-pressed": "false",
+            "aria-controls": "rd-text", onclick: () => TextUI.toggle() }, textIcon(), "Text"),
           h("button", { id: "rd-bm", title: "Bookmark a page of this opening (B)", onclick: () => Bookmarks.here() }, "☆", h("span", { class: "txt" }, " Bookmark")),
           h("button", { id: "rd-gridbtn", title: "See every page at once, to jump anywhere (O)", onclick: () => Reader.toggleGrid() }, h("span", { class: "ico" }, "▦ "), "Grid"),
         )),
+      // the pages, and beside them (below on a phone) the text panel (text.js)
+      h("div", { class: "rd-row", id: "rd-row" }, h("div", { class: "rd-col" },
       h("div", { class: "rd-stage", id: "rd-stage" },
         h("div", { class: "rd-zoomer", id: "rd-zoomer" }),
         // zoomed in: whether the pages on screen are at full size yet (Sharp), over the corner of the pages, so the row
@@ -432,14 +447,16 @@ const Reader = {
       // one slim row under the pages, the same height on every opening: zoom, then this opening's flags and note (two
       // lines at most; "more" opens the whole note in a panel over the foot of the stage, so nothing moves)
       h("div", { class: "rd-foot", id: "rd-foot" },
-        h("div", { class: "rd-zoombar", title: "Pinch or ⌘-scroll to zoom · drag to move · double-click a spot" },
+        h("div", { class: "rd-zoombar", title: "Pinch or ⌘-scroll to zoom · Alt-scroll to turn · drag to move · double-click a spot" },
           h("button", { title: "Zoom out (−)", "aria-label": "Zoom out", onclick: () => Reader.zoomBy(1 / 1.5) }, "−"),
-          h("button", { id: "rd-zoomlvl", title: "Back to the whole opening (0)", onclick: () => Reader.resetZoom() }, "100%"),
-          h("button", { title: "Zoom in (+)", "aria-label": "Zoom in", onclick: () => Reader.zoomBy(1.5) }, "+")),
+          h("button", { id: "rd-zoomlvl", title: "Back to the whole opening, upright (0)", onclick: () => Reader.resetView() }, "100%"),
+          h("button", { title: "Zoom in (+)", "aria-label": "Zoom in", onclick: () => Reader.zoomBy(1.5) }, "+"),
+          h("button", { class: "rot", title: "Turn the pages a quarter (R; Shift+R the other way; Alt-scroll turns them freely)", "aria-label": "Turn the pages", onclick: e => Reader.rotateBy(e.shiftKey ? -90 : 90) }, "⟳")),
         h("div", { class: "rd-note", id: "rd-note" }),
         h("button", { class: "rd-more", id: "rd-more", hidden: true, "aria-expanded": "false", "aria-controls": "rd-notepop",
           onclick: () => Reader.toggleNote() }, "more"),
-        h("div", { class: "rd-notepop", id: "rd-notepop", hidden: true, role: "region", "aria-label": "Note on this opening" })),
+        h("div", { class: "rd-notepop", id: "rd-notepop", hidden: true, role: "region", "aria-label": "Note on this opening" }))),
+        h("aside", { class: "tx", id: "rd-text", hidden: true, "aria-label": "Text of these pages" })),
       h("div", { class: "strip", id: "rd-strip" }),
       h("div", { class: "rd-grid", id: "rd-grid", hidden: true }),
     );
@@ -451,6 +468,7 @@ const Reader = {
     });
     this.wireZoom();
     this.built = true;
+    TextUI.place();
   },
 
   open(order, at) {
@@ -483,6 +501,9 @@ const Reader = {
   report() {
     const p = curSide();
     if (p) setPos(p.shown.page, p.sheet, "read");
+    for (const q of R.spreads?.[R.at] || []) if (q && !q.lost) (R.visited ||= new Set()).add(q.shown.page);   // the strip marks where you have been
+    this.markVisited();
+    TextUI.sync();
   },
 
   /* label of the current page, or of the nearest page that is not a lost leaf (used when hiding them) */
@@ -567,7 +588,8 @@ const Reader = {
     R.busy = true; R.moving = k;
     try {
       if (flip) {
-        if (R.zoom > 1) { await this.easeZoom(); if (!same()) return; }
+        SheetView.close();
+        if (R.zoom > 1 || R.rot) { await this.easeZoom(); if (!same()) return; }
         if (R.unfold.L || R.unfold.R) { await this.setUnfold({ L: false, R: false }, { within: true, speed: .65 }); if (!same()) return; }
         await Promise.race([this.pictures(k), new Promise(r => setTimeout(r, 1200))]);
         if (!same()) return;
@@ -576,6 +598,7 @@ const Reader = {
       R.focus = focus;
       if (k !== from) R.dir = k > from ? 1 : -1;   // the way you are reading, which Sharp loads ahead along
       if (R.zoom > 1) { R.zoom = 1; R.zx = 0; R.zy = 0; }   // zoomed in on a spot: start the new opening whole; zoomed out stays out
+      if (R.rot) { R.rot = 0; if (R.zoom === 1) R.zx = R.zy = 0; }   // and upright
       R.unfold = { L: false, R: false };
       this.markStrip();
       this.report();
@@ -610,7 +633,7 @@ const Reader = {
   easeZoom() {
     const z = $("#rd-zoomer");
     z.style.transition = "transform .22s ease";
-    R.zoom = 1; R.zx = 0; R.zy = 0;
+    R.zoom = 1; R.zx = 0; R.zy = 0; R.rot = 0;
     this.applyZoom();
     return new Promise(done => setTimeout(() => { z.style.transition = ""; done(); }, 240));
   },
@@ -859,6 +882,8 @@ const Reader = {
     sp.style.transform = `translate(${x}px, ${y}px)` + (k < 1 ? ` scale(${k})` : "");
     this.applyZoom();
     this.renderInfo();
+    if (resizeOnly && SheetView.inReader) SheetView.refresh();   // a whole sheet over the pages fits the new size too
+    if (resizeOnly && TextUI.mod) TextUI.mod.recentre = true;      // zoomed in on words chosen: they stay in the middle
   },
 
   /* The note row is two lines; when the note needs more, "more" shows all of it in a panel over the foot of the stage.
@@ -880,20 +905,22 @@ const Reader = {
     const z = $("#rd-zoomer");
     if (!z) return;
     const st = $("#rd-stage");
-    if (R.zoom < 1) {   // zoomed out: always centred, so it stays put when the window resizes
-      R.zx = st.clientWidth / 2 * (1 - R.zoom); R.zy = st.clientHeight / 2 * (1 - R.zoom);
-    }
-    z.style.transform = R.zoom !== 1 ? `translate(${R.zx}px, ${R.zy}px) scale(${R.zoom})` : "";
-    st.classList.toggle("zoomed", R.zoom > 1);
+    if (R.zoom < 1) [R.zx, R.zy] = this.centred(R.zoom, R.rot);   // zoomed out: always centred, so it stays put when the window resizes
+    z.style.transform = R.zoom !== 1 || R.rot ? `translate(${R.zx}px, ${R.zy}px)${R.rot ? ` rotate(${R.rot}deg)` : ""} scale(${R.zoom})` : "";
+    z.style.setProperty("--iz", 1 / R.zoom);   // lines drawn over the pages (the word outlines) stay as thin at any zoom
+    st.classList.toggle("zoomed", this.free());
+    st.classList.toggle("turned", !!(R.rot % 360));
     // While you zoom or pan, the layer moves as one picture (will-change, in the CSS), drawn at the size it had when
     // you began; once you stop, it is drawn again at the size it has now, or zoomed pages would stay as blurry as at
     // the first step.
     st.classList.add("moving");
     clearTimeout(R.settleT);
     R.settleT = setTimeout(() => st.classList.remove("moving"), 200);
-    $("#rd-zoomlvl").textContent = Math.round(R.zoom * 100) + "%";
+    const turned = Math.round(((R.rot % 360) + 540) % 360 - 180);
+    $("#rd-zoomlvl").textContent = Math.round(R.zoom * 100) + "%" + (turned ? ` ↻${turned > 0 ? "" : "−"}${Math.abs(turned)}°` : "");
     Sharp.check(st, R.zoom, $("#rd-sharp"));
     this.ahead();
+    if (R.rot !== R.rotShown) { R.rotShown = R.rot; TextUI.mod?.reacts(); }   // the word panel's turn button follows
   },
 
   /* When you stop on an opening for half a second, load ahead the full-size pages you are likely to zoom into next
@@ -923,7 +950,7 @@ const Reader = {
     cx = cx ?? r.width / 2; cy = cy ?? r.height / 2;
     let z1 = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, R.zoom * f));
     if (Math.abs(z1 - 1) < 0.03 || (R.zoom > 1) !== (z1 > 1) && R.zoom !== 1) z1 = 1;   // stop at 100% on the way through
-    if (z1 === 1) { this.resetZoom(); return; }
+    if (z1 === 1 && !R.rot) { this.resetZoom(); return; }
     const z0 = R.zoom;
     R.zx = cx - (cx - R.zx) * (z1 / z0);
     R.zy = cy - (cy - R.zy) * (z1 / z0);
@@ -933,29 +960,65 @@ const Reader = {
 
   zoomBy(f) { this.zoomAt(f); },
 
-  resetZoom() { R.zoom = 1; R.zx = 0; R.zy = 0; this.applyZoom(); },
+  resetZoom() { R.zoom = 1; [R.zx, R.zy] = this.centred(1, R.rot); this.applyZoom(); },
+  resetView() { this.view({ zoom: 1, rot: 0, ease: true }); },
+
+  /* The pages can be turned (R.rot, degrees, clockwise), as you would turn a book on the table to read a word written
+     round a circle. The layer is drawn translate(zx, zy) rotate(rot) scale(zoom) from its top left corner. */
+  free() { return R.zoom > 1 || (R.zoom === 1 && !!(R.rot % 360)); },   // can be dragged about
+  /* where the layer goes for the middle of the stage to stay in the middle */
+  centred(zoom, rot) {
+    const st = $("#rd-stage"), cx = st.clientWidth / 2, cy = st.clientHeight / 2, a = (rot || 0) * Math.PI / 180;
+    return [cx - zoom * (Math.cos(a) * cx - Math.sin(a) * cy), cy - zoom * (Math.sin(a) * cx + Math.cos(a) * cy)];
+  },
+  /* Look at the point `at` of the stage (its own pixels; the middle if left out) with this zoom and turn: that point
+     moves to the middle of the stage. `ease` animates it; a turn always goes the short way round. */
+  view({ at = null, zoom = R.zoom, rot = R.rot, ease = false } = {}) {
+    const st = $("#rd-stage"), cx = st.clientWidth / 2, cy = st.clientHeight / 2;
+    const [px, py] = at || [cx, cy], a0 = (R.rot || 0) * Math.PI / 180;
+    const dx = (px - R.zx) / R.zoom, dy = (py - R.zy) / R.zoom;
+    const qx = Math.cos(a0) * dx + Math.sin(a0) * dy, qy = -Math.sin(a0) * dx + Math.cos(a0) * dy;   // the point, on the layer
+    const r1 = R.rot + ((((rot - R.rot) % 360) + 540) % 360 - 180), a1 = r1 * Math.PI / 180;
+    R.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+    R.rot = Math.abs(r1 % 360) < .01 ? 0 : r1;
+    if (R.zoom === 1 && !R.rot) { R.zx = R.zy = 0; }
+    else { R.zx = cx - R.zoom * (Math.cos(a1) * qx - Math.sin(a1) * qy); R.zy = cy - R.zoom * (Math.sin(a1) * qx + Math.cos(a1) * qy); }
+    const z = $("#rd-zoomer");
+    if (ease && !REDUCED) { z.style.transition = "transform .35s ease"; clearTimeout(R.easeT); R.easeT = setTimeout(() => { z.style.transition = ""; }, 370); }
+    this.applyZoom();
+  },
+  rotateBy(d, at = null) { this.view({ at, rot: R.rot + d, ease: true }); },
 
   wireZoom() {
     const stage = $("#rd-stage");
     let drag = null;
     stage.addEventListener("wheel", e => {
+      if (e.target.closest?.(".sv-over, .sky, .tx-peek")) return;   // a whole sheet, the word across the book, a peek: their own
+      if (e.altKey) {   // turn the pages about the pointer
+        e.preventDefault();
+        const r = stage.getBoundingClientRect(), d = Math.max(-12, Math.min(12, (e.deltaY || e.deltaX) * .2));
+        let to = R.rot + d;
+        if (Math.abs(((to % 90) + 90) % 90) < 1.5 || Math.abs(((to % 90) + 90) % 90 - 90) < 1.5) to = Math.round(to / 90) * 90;   // settles on a quarter
+        this.view({ at: [e.clientX - r.left, e.clientY - r.top], rot: to });
+        return;
+      }
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const r = stage.getBoundingClientRect();
         this.zoomAt(Math.exp(-Math.max(-40, Math.min(40, e.deltaY)) * 0.01), e.clientX - r.left, e.clientY - r.top);
-      } else if (R.zoom > 1) {
+      } else if (this.free()) {
         e.preventDefault();
         R.zx -= e.deltaX; R.zy -= e.deltaY;
         this.applyZoom();
       }
     }, { passive: false });
     stage.addEventListener("dblclick", e => {
-      if (e.target.closest("button")) return;
+      if (e.target.closest("button, .sv-over, .sky, .tx-peek") || TextUI.mod?.justPicked()) return;   // a click that just picked a word (text.js)
       const r = stage.getBoundingClientRect();
       if (R.zoom !== 1) this.resetZoom(); else this.zoomAt(2.5, e.clientX - r.left, e.clientY - r.top);
     });
     stage.addEventListener("pointerdown", e => {
-      if (R.zoom <= 1 || e.button !== 0 || e.target.closest("button")) return;
+      if (!this.free() || e.button !== 0 || e.target.closest("button, .sv-over, .sky, .tx-peek")) return;
       drag = { x: e.clientX, y: e.clientY, zx: R.zx, zy: R.zy };
       stage.setPointerCapture(e.pointerId);
       stage.classList.add("panning");
@@ -1089,6 +1152,7 @@ const Reader = {
     const nt = note || (ev ? ev[0].text : "");
     $("#rd-note").replaceChildren(h("span", { class: "rd-note-text" }, ...flags.flatMap(f => [f, " "]), nt));
     this.toggleNote(false);
+    TextUI.sync();
   },
 
   renderStrip() {
@@ -1107,20 +1171,72 @@ const Reader = {
         const bm = [p.shown, ...p.segs].map(x => Bookmarks.of(x.page)).find(Boolean);
         const fold = !p.lost && (p.segs.length > 1 || p.grid);   // a page that unfolds stands a little taller
         ticks.append(h("button", { class: `t${p.lost ? " lost" : ""}${same ? "" : " moved"}${bm ? " bm" : ""}${fold ? " fold" : ""}`, "data-i": i,
-          title: `${bm ? `★ ${bm.name} · ` : ""}${sideLabel(p)} (${qTag(g.quire)})${fold ? " · foldout" : ""}`, onclick: () => Reader.go(spread, 0) }));
+          "aria-label": `${bm ? `★ ${bm.name} · ` : ""}${sideLabel(p)} (${qTag(g.quire)})`, title: `${bm ? `★ ${bm.name} · ` : ""}${sideLabel(p)} (${qTag(g.quire)})${fold ? " · foldout" : ""}`, onclick: () => Reader.go(spread, 0) }));
         idx++;
       }
       strip.append(h("div", { class: `g${g.type === "singulions" ? " sing" : ""}` },
         h("span", { class: "gl", style: same ? null : { color: "#f3c35c" } }, `${qTag(g.quire)}${same ? "" : " •"}`), ticks));
     });
     this.markStrip();
+    this.markVisited();
+    if (R.hits) this.markHits(R.hits.weights, R.hits.say);
+    this.wireStripPeek(strip);
+  },
+
+  /* The strip is the book's compass (docs/text/REDESIGN.md 9): every page always in the same place, the one you are on in
+     gold, a dot under each page you have been to, and, while the text panel looks at a word or a set of words, a mark
+     on each page they are on (brighter where there are more). Pointing at a page shows it, without going there. */
+  pagesOf(p) { return p.lost ? [] : [...new Set([p.shown.page, ...p.segs.filter(x => !x.missing).map(x => x.page)])]; },
+  markVisited() {
+    const seen = R.visited || new Set();
+    for (const t of $$("#rd-strip .t")) { const p = R.pages[+t.dataset.i]; t.classList.toggle("vis", !!p && this.pagesOf(p).some(x => seen.has(x))); }
+  },
+  /* weights: page -> 0..1 (null clears); say: what the marks are, for the hover card ("3 places") */
+  markHits(weights, say = null) {
+    R.hits = weights ? { weights, say } : null;
+    const strip = $("#rd-strip");
+    if (!strip) return;
+    strip.classList.toggle("has-hits", !!weights);
+    for (const t of $$(".t", strip)) {
+      const p = R.pages[+t.dataset.i], w = weights && p ? Math.max(0, ...this.pagesOf(p).map(x => weights.get(x) || 0)) : 0;
+      t.classList.toggle("hit", w > 0);
+      t.style.setProperty("--w", w ? (0.45 + 0.55 * w).toFixed(2) : "");
+    }
+  },
+  wireStripPeek(strip) {
+    if (strip.dataset.peek) return;
+    strip.dataset.peek = "1";
+    let card = null, timer = null;
+    const hide = () => { clearTimeout(timer); timer = setTimeout(() => { card?.remove(); card = null; }, 250); };
+    strip.addEventListener("pointerover", e => {
+      const t = e.target.closest(".t");
+      if (!t || e.pointerType !== "mouse") return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const p = R.pages[+t.dataset.i];
+        if (!p) return;
+        const pages = this.pagesOf(p), n = R.hits && pages.reduce((a, x) => a + (R.hits.say?.(x) || 0), 0);
+        card?.remove();
+        card = h("div", { class: "strip-peek", role: "status" },
+          p.lost ? h("span", { class: "sp-lost" }, "lost") : h("img", { src: imgUrl(p.shown.img, "s", p.shown.v), alt: "" }),
+          h("div", { class: "sp-t" }, h("b", {}, sideLabel(p)), h("span", {}, [p.shown.section, qWord(p.quire)].filter(Boolean).join(" · ")),
+            n ? h("span", { class: "sp-n" }, `${n} ${n === 1 ? "place" : "places"}`) : "",
+            (R.visited || new Set()).has(p.shown.page) ? h("span", { class: "sp-v" }, "you have been here") : ""));
+        document.body.append(card);
+        const r = t.getBoundingClientRect(), cw = card.offsetWidth;
+        card.style.left = Math.max(8, Math.min(innerWidth - cw - 8, r.left + r.width / 2 - cw / 2)) + "px";
+        card.style.top = (r.top - card.offsetHeight - 8) + "px";
+      }, card ? 60 : 300);
+    });
+    strip.addEventListener("pointerout", e => { if (e.target.closest(".t")) hide(); });
+    strip.addEventListener("scroll", () => { card?.remove(); card = null; }, { passive: true });
   },
 
   /* ---- the grid: every page at once, quire by quire, to jump anywhere ---- */
   toggleGrid(on = !R.grid) {
     R.grid = on;
     $("#rd-grid").hidden = !on;
-    for (const id of ["#rd-stage", "#rd-foot", "#rd-strip"]) $(id).hidden = on;
+    for (const id of ["#rd-row", "#rd-stage", "#rd-foot", "#rd-strip"]) $(id).hidden = on;
     $("#rd-gridbtn").classList.toggle("on", on);
     if (on) this.renderGrid(true); else this.render(true);
   },
@@ -1181,6 +1297,7 @@ const Reader = {
     if (e.key === "b" || e.key === "B") { Bookmarks.here(); return; }
     if (R.grid) { if (e.key === "Escape") this.toggleGrid(false); return; }
     if (e.key === "Escape" && R.noteOpen) { this.toggleNote(false); return; }
+    if (SheetView.inReader && e.key === "Escape" && !(TextUI.open && TextUI.key(e))) { SheetView.close(); return; }
     // a held key turns one page after another as each lands; its repeats do not queue up turns ahead of the eye
     if (e.key === "ArrowRight" || e.key === "PageDown") { if (!(e.repeat && (R.busy || R.queue.length))) this.step(1); e.preventDefault(); }
     else if (e.key === "ArrowLeft" || e.key === "PageUp") { if (!(e.repeat && (R.busy || R.queue.length))) this.step(-1); e.preventDefault(); }
@@ -1189,8 +1306,11 @@ const Reader = {
     else if (e.key === "u" || e.key === "U") this.toggleUnfold();
     else if (e.key === "+" || e.key === "=") this.zoomBy(1.5);
     else if (e.key === "-" || e.key === "_") this.zoomBy(1 / 1.5);
-    else if (e.key === "0") this.resetZoom();
+    else if (e.key === "0") this.resetView();
+    else if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) this.rotateBy(e.shiftKey ? -90 : 90);
     else if (e.key === "g" || e.key === "G") this.ask();
+    else if (e.key === "t" || e.key === "T") TextUI.toggle();
+    else if (TextUI.open && TextUI.key(e)) e.preventDefault();
     else if (e.key === "c" || e.key === "C") {
       const p = curSide();
       const sg = p && !p.lost && (p.shown.img ? p.shown : p.segs.find(x => !x.missing));
@@ -1442,29 +1562,49 @@ function zoomable(stage, layer, onChange) {
 }
 
 // ================================================================ SHEET VIEW (a whole sheet, both faces)
+/* A sheet too big to show as a page (the Rosettes), opened out whole. In the Reader it lies over the pages, so the text
+   panel beside them stays open and reads the sheet (text.js); elsewhere it is a dialog. */
 const SheetView = {
-  cur: null,
+  cur: null, inReader: false,
   refresh() {
-    const d = $("#sheet-dlg");
-    if (d && d.open && this.cur) this.open(this.cur.id, this.cur.face);
+    if (this.cur && (this.inReader || $("#sheet-dlg")?.open)) this.open(this.cur.id, this.cur.face);
+  },
+  /* the panels on show, row by row */
+  segs() { return this.cur ? SHEETS.get(this.cur.id)[this.cur.face].flat().filter(sg => sg && !sg.missing) : []; },
+  close() {
+    if (this.inReader) {
+      $("#rd-stage .sv-over")?.remove();
+      this.inReader = false;
+      TextUI.sync();
+    }
+    $("#sheet-dlg")?.open && $("#sheet-dlg").close();
   },
   open(id, face = "inside") {
     const sh = SHEETS.get(id);
     this.cur = { id, face };
-    let dlg = $("#sheet-dlg");
-    if (!dlg) {
-      dlg = h("dialog", { id: "sheet-dlg", style: { maxWidth: "96vw", background: "#2d2925", color: "#e9e3d8", borderColor: "#4a443d" } });
-      document.body.append(dlg);
+    const stage = S.view === "read" && $("#rd-stage");
+    let host;
+    if (stage) {
+      host = $(".sv-over", stage) || h("div", { class: "sv-over", role: "region", "aria-label": `Sheet ${id}, opened out` });
+      if (!host.isConnected) stage.append(host);
+      this.inReader = true;
+    } else {
+      host = $("#sheet-dlg");
+      if (!host) {
+        host = h("dialog", { id: "sheet-dlg", style: { maxWidth: "96vw", background: "#2d2925", color: "#e9e3d8", borderColor: "#4a443d" } });
+        document.body.append(host);
+      }
     }
     const draw = f => {
       this.cur = { id, face: f };
-      dlg.innerHTML = "";
+      host.innerHTML = "";
       const rows = sh[f];
       const ncol = rows[0].length;
       const colA = range(0, ncol).map(c => Math.max(...rows.map(r => r[c].missing ? .68 : aspect(r[c]))));
       const widest = colA.reduce((a, b) => a + b, 0);
-      const maxH = Math.min((window.innerHeight * 0.8 - 70) / rows.length, 620);
-      const ph = Math.min(maxH, (window.innerWidth * 0.92 - 50) / widest);
+      const W = stage ? stage.clientWidth - 24 : window.innerWidth * 0.92 - 50;
+      const maxH = stage ? (stage.clientHeight - 74) / rows.length : Math.min((window.innerHeight * 0.8 - 70) / rows.length, 620);
+      const ph = Math.min(maxH, W / widest);
       const grid = h("div", { style: { display: "grid", justifyContent: "center",
         gridTemplateColumns: colA.map(a => Math.round(a * ph) + "px").join(" ") } });
       rows.forEach(r => r.forEach((s, c) => {
@@ -1473,23 +1613,24 @@ const SheetView = {
         grid.append(el);
       }));
       const svStage = h("div", { class: "sv-stage", style: { width: Math.round(widest * ph) + "px", height: Math.round(rows.length * ph) + "px" } }, grid);
-      const zoom = zoomable(svStage, grid, st => { lvl.textContent = Math.round(st.z * 100) + "%"; Sharp.check(svStage, st.z, sharp); });
+      const zoom = zoomable(svStage, grid, st => { lvl.textContent = Math.round(st.z * 100) + "%"; Sharp.check(svStage, st.z, sharp); grid.style.setProperty("--iz", 1 / st.z); });
       const lvl = h("button", { title: "Back to the whole sheet", onclick: () => zoom.reset() }, "100%");
       const sharp = h("span", { class: "sv-sharp", role: "status" });
-      dlg.append(
-        h("div", { style: { display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" } },
+      host.append(
+        h("div", { class: "sv-bar" },
           h("b", {}, `Sheet ${id} — ${f === "inside" ? "inside face" : "outside face"}`),
-          h("span", { style: { color: "#a69d8f" } }, f === "inside" ? "the face inside the fold as bound now" : "the face you see when it is turned over"),
-          h("span", { class: "sv-zoom", style: { marginLeft: "auto" } },
+          h("span", { class: "muted" }, f === "inside" ? "the face inside the fold as bound now" : "the face you see when it is turned over"),
+          h("span", { class: "sv-zoom" },
             h("button", { "aria-label": "Zoom out", onclick: () => zoom.at(1 / 1.5) }, "−"), lvl,
             h("button", { "aria-label": "Zoom in", onclick: () => zoom.at(1.5) }, "+"), sharp),
           h("button", { onclick: () => draw(f === "inside" ? "outside" : "inside") }, "Turn over"),
-          h("button", { onclick: () => dlg.close() }, "Close")),
+          h("button", { title: "Back to the book (Esc)", onclick: () => this.close() }, "Close")),
         svStage,
-        h("div", { style: { color: "#a69d8f", fontSize: "11px", marginTop: "6px" } }, "Pinch or ⌘-scroll to zoom · drag to move · double-click a spot"));
+        h("div", { class: "sv-hint" }, "Pinch or ⌘-scroll to zoom · drag to move · double-click a spot"));
+      if (this.inReader) TextUI.sync();
     };
     draw(face);
-    if (!dlg.open) dlg.showModal();
+    if (!stage && !host.open) host.showModal();
   },
 };
 
@@ -1520,6 +1661,83 @@ const View3D = {
   key(e) { this.mod?.key(e); },
   state() { return this.pending || (this.mod ? this.mod.state() : ""); },
   restore(st) { if (this.mod) this.mod.restore(st); else this.pending = st; },
+};
+
+// ================================================================ TEXT (text.js)
+/* The text of the pages, from their transcriptions: the Reader's text panel. The code (assets/text.js) and the data
+   (data/text/) load the first time the panel opens. */
+const TextUI = {
+  mod: null, loading: null,
+  open: store.get("text:open", false),
+  wanted: null,   // what the address asked of the panel ("text?l=f1r.2"), until the panel has it
+  load() {
+    this.loading ||= import(ASSETS + "text.js").then(m => {
+      this.mod = m.default;
+      if (this.wanted) this.mod.fromHash(String(this.wanted).split("?")[1] || "");   // what the address asked
+      return this.mod;
+    }).catch(e => {
+      this.loading = null;
+      const el = $("#rd-text");
+      if (el) el.replaceChildren(h("p", { class: "tx-msg" }, "The text could not load: " + e.message));
+      throw e;
+    });
+    return this.loading;
+  },
+  toggle(on = !this.open) {
+    this.open = on;
+    store.set("text:open", on);
+    this.place();
+    setHash();
+  },
+  /* show or hide the panel, and fill it */
+  place() {
+    const el = $("#rd-text"), b = $("#rd-textbtn");
+    if (!el) return;
+    el.hidden = !this.open;
+    b.classList.toggle("on", this.open);
+    b.setAttribute("aria-pressed", String(this.open));
+    if (!this.open) this.mod?.undecorate();   // the words on the photographs go with the text
+    this.sync();
+  },
+  /* the panel follows the opening (cheap when nothing changed) */
+  sync() {
+    if (this.open && $("#rd-text") && R.spreads) this.load().then(m => m.sync()).catch(() => {});
+  },
+  key(e) { return this.mod ? this.mod.key(e) : false; },
+  hash() { return this.mod ? this.mod.hash() : this.wanted || "text"; },
+  fromHash(more) {
+    const [what, query] = String(more || "").split("?");
+    if (what !== "text") return;
+    this.open = true;
+    this.wanted = more;
+    if (this.mod) this.mod.fromHash(query || "");
+  },
+};
+
+/* The Text tab: search the whole book's text (assets/search.js), loaded the first time it opens. */
+const TextTab = {
+  mod: null, loading: null, pending: "",
+  load() {
+    this.loading ||= import(ASSETS + "search.js").then(m => (this.mod = m.default)).catch(e => {
+      this.loading = null;
+      $("#v-text").replaceChildren(h("p", { class: "sx-fail" }, "Search could not load: " + e.message));
+      throw e;
+    });
+    return this.loading;
+  },
+  mount() {   // at once when loaded, so that the address it reads is the one show() writes back
+    if (this.mod) this.mod.mount(); else this.load().then(m => m.mount()).catch(() => {});
+  },
+  state() {   // before search.js has loaded: what the address asks for, or a plain "search" (so #text alone is #text/order/search)
+    if (this.mod) return this.mod.state();
+    const m = location.hash.match(/^#\/?text(?:\/[^/]*)?(?:\/(.*))?$/);
+    return (m && m[1]) || "search";
+  },
+  /* "/" anywhere: the search box */
+  focus() {
+    if (S.view !== "text") show("text");
+    this.load().then(m => setTimeout(() => m.focus(), 0)).catch(() => {});
+  },
 };
 
 // ================================================================ FOLIO ORDER (a section of Info)
@@ -1858,6 +2076,7 @@ const Info = {
         ["colours", "The colours"], ["views", "Three ways to look"], ["yours", "Make it your own"]]],
       ["Lisa Fagin Davis's research", [["blog", "“Voynich Codicology” in brief"], ["quires", "Folio order: her quire diagrams"], ["history", "Her history of the book"],
         ["singulions", "The 2026 proposal"], ["folds", "How the foldouts fold"]]],
+      ["Reading the text", [["text", "Letters for shapes"], ["consensus", "The text you see"], ["search", "Searching the text"], ["transcribers", "Who made the text"]]],
       ["Reference", [["sure", "Known or guessed?"], ["notes", "Notes on single sheets"], ["words", "Words used here"], ["sources", "Sources"], ["privacy", "Privacy and cookies"]]]];
     const cite = k => this.cite(k);
     const blogUrl = D.orders.sources.LFD2025blog.url, yaleUrl = D.orders.sources.Yale.url;
@@ -2074,6 +2293,46 @@ const Info = {
           "Quires 17 and 19. Each flap leaves part of its leaf bare, so 94v also touches 95r1, and 100v also touches 101r."),
         h("p", { class: "small muted" }, "Quire 14, the Rosettes, folds in two directions and is not drawn here; Davis confirms every face the viewer has touching there. The panels in 3D are cut from Yale's photographs, whose widths are only roughly right, so 3D cannot show every face that touches in part; the list in Touching faces follows Davis.")),
 
+      // ---------------------------------------------------------------- reading the text (text.js, search.js)
+      h("div", { class: "info-part" }, "Reading the text"),
+      this.sec("text", "Letters for shapes",
+        h("p", {}, "Nobody can read the manuscript's writing, but people can still study it. To do that, they copy it out glyph by glyph (a ", h("b", {}, "glyph"), " is one written shape) into letters a computer can count and search. A copy like that is a ", h("b", {}, "transcription"), "."),
+        h("p", {}, "Most transcriptions use ", h("b", {}, "Eva"), ", an alphabet René Zandbergen and Gabriel Landini made for the manuscript in the 1990s. Each Eva letter is a name for a shape, picked because it looks a little like it: ", h("i", {}, "o"), " is a small circle, ", h("i", {}, "ch"), " two joined c's, ", h("i", {}, "k"), " and ", h("i", {}, "t"), " are tall loops called gallows. ",
+          h("b", {}, "The letters are not sounds."), " “daiin” is a way of writing down which shapes are on the page, not a word anyone knows how to say."),
+        h("p", {}, "In the Reader, press ", h("kbd", {}, "T"), " (or the Text button), then point at any word on the page: it is outlined and says what it reads and how often it is in the book. Click it, and the page stays where it is while the panel shows the word on its own: cut sharp from Yale's photograph and turned to read upright, its glyphs with their letters underneath, and every other place in the book it appears, as pictures. ",
+          this.link("#read/beinecke/2r/text", "Try it on 2r"))),
+      this.sec("consensus", "The text you see",
+        h("p", {}, "Copying unknown glyphs is hard, and careful people disagree: is this an ", h("i", {}, "a"), " or an ", h("i", {}, "o"), "? Is that a space, or just a wider gap? The text in the Reader is ", h("b", {}, "RF1b"), ", René Zandbergen's ", h("b", {}, "reference transliteration"), " (2025). He made it by lining up, glyph by glyph, the two most detailed transcriptions there are, his own with Gabriel Landini and Glen Claston's, choosing between them where they differ and correcting clear mistakes. Its aim is to count the glyphs of every line as exactly as possible, so that every glyph in the manuscript can have its own number and other transcriptions can be compared against it."),
+        h("p", {}, "RF1b is kept in Zandbergen's ", h("b", {}, "STA"), ", an alphabet big enough to hold every other one, so his own tables can write it in Eva. Choose how to see it in the dropdown at the top of the text:"),
+        h("dl", { class: "info-dl" },
+          ...[["Glyphs", "the manuscript's own shapes, drawn with Glen Claston's font (words are matched as Eva)"], ["Eva", "the alphabet most people use today (Landini and Zandbergen, 1998)"]]
+            .flatMap(([t, d]) => [h("dt", {}, t), h("dd", {}, d)])),
+        h("ul", {},
+          h("li", {}, h("b", {}, "Find"), ", under the title of the text, finds a word anywhere in the book as you type: Eva (qokeedy), or the glyph keys. Words that begin with what you type count, the exact word first; chips under the box switch to the whole word or to words that contain it, and * stands for any run of glyphs. Each word that matches opens on its places, which open beside the page you are on."),
+          h("li", {}, "A faint ", h("b", {}, "·"), " between two words is an ", h("b", {}, "uncertain space"), ": Zandbergen could not be sure it is a space."),
+          h("li", {}, h("b", {}, "The strip under the pages"), " is the book's compass. Every page has its place on it; the page you are on is gold, a dot marks each page you have been to, and while you look at a word, every page it is on is lit. Point at a page there to see it without going."),
+          h("li", {}, h("b", {}, "Its other places"), " open beside the page you are on, never in place of it: the line around the word, cut from its photograph, and where it is on its page. ", h("kbd", {}, "N"), " goes on to the next. ", h("b", {}, "Open page"), " turns the book there; the Back chip, or the browser's Back, returns you."),
+          h("li", {}, h("b", {}, "A phrase"), ": shift-click, drag across words, or the + either side of its line, to see whether that run of words appears anywhere else."),
+          h("li", {}, h("b", {}, "Words in any order"), ": ⌘-click (Ctrl-click) words to collect them, and see the pages that hold them all, or most, with how many pages would by chance. ", h("b", {}, "Pages that share these words"), ", under a page's name, does the same for all of a page's words, or just its labels or rings, rare words counting for more; “one glyph off” lets near spellings count, which matters for labels, most of which are found only once."),
+          h("li", {}, h("b", {}, "A ring unrolled"), ": click a ring's number in the text. Its words are laid out in a line, cut upright from the photograph; an arc joins a word to the next place it comes round again, and below are the other lines that share a run of its words in the same order."),
+          h("li", {}, "Words written round a circle are outlined as part of the ring. Choosing a word never turns or zooms the page; ", h("b", {}, "Turn the page to read it"), " does, if you ask. ", h("kbd", {}, "R"), " turns the pages a quarter, Alt-scroll turns them freely, and ", h("kbd", {}, "0"), " puts them back.")),
+        h("p", {}, "The Text tab can also search the ", h("b", {}, "consensus"), " of up to twelve independent transcriptions, voted glyph by glyph, or any one transcriber, to see how much a count depends on who did the copying. The method is written out in the viewer's design notes (docs/TEXT.md).")),
+      this.sec("search", "Searching the text",
+        h("p", {}, "The ", h("b", {}, "Text"), " tab (or ", h("kbd", {}, "/"), " anywhere) searches the whole book. Type Eva; the line under the box says back what it understood."),
+        h("dl", { class: "info-dl" },
+          ...[["qokeedy", "the word qokeedy"], ["qok*  *dy  *ke*", "words beginning, ending or with something inside (* is any glyphs)"], ["ch?dy", "? is any one glyph"],
+            ["[kt]eedy", "either glyph"], ["<gallows>edy", "a kind of glyph: <gallows>, <bench>, <pedestal>, <loop>, <unread>"], ["chol daiin", "two words in a row"],
+            ["dy-qo  dy_qo  dy~qo", "joined, across a word break, or either"], ["^qo*  *dy$", "first or last in a line"], ["A A", "the same word twice in a row"],
+            ["/qo[kt]e+dy/", "a regular expression over each line"], ["scribe:2  lang:B  section:balneo  quire:13  in:label  page:f75r-f84v", "filters"]]
+            .flatMap(([t, d]) => [h("dt", { class: "mono" }, t), h("dd", {}, d)])),
+        h("p", {}, "It searches RF1b, the Reader's text, unless you choose another reading. The count is said in one sentence; its ⓘ gives the same search in the three fullest transcriptions alone (Zandbergen & Landini's, Claston's, Takahashi's), so you can see how much a count depends on who did the copying. The strip is the book page by page, in the order chosen at the top, with its sections named under it; the narrowing on the left, the saved searches and the exports keep to what you have chosen. ",
+          this.link("#text/beinecke/search?q=qok*", "Try qok*"))),
+      this.sec("transcribers", "Who made the text",
+        h("p", {}, "The Reader's text is RF1b, by René Zandbergen, from his and Gabriel Landini's transcription and Glen Claston's. Search can also read the work of everyone else who transcribed the manuscript, over eighty years: Takeshi Takahashi; the First Study Group led by William Friedman; Prescott Currier and Mary D'Imperio; Jorge Stolfi; John Grove; John Tiltman; Don Latham; Theodore Petersen (from Karl Kluge's copy); Mike Roe; and Denis Mardle."),
+        h("p", {}, "Their transcriptions come from René Zandbergen's ", h("a", { href: "https://www.voynich.nu/transcr.html", target: "_blank", rel: "noopener" }, "voynich.nu"), ", which makes them available under the CC0 licence, and from the Landini–Stolfi interlinear file. Zandbergen also made the STA alphabet and the tables that write RF1b in Eva, v101, FSG and Currier (", h("a", { href: "https://www.voynich.nu/extra/sta-aaa.html", target: "_blank", rel: "noopener" }, "about RF1b"), "). The viewer's own work is putting the words on the photographs, and the consensus Search offers; any mistake in those is the viewer's."),
+        h("p", {}, "Where each word sits on the page comes from The Voynichese Project's word boxes (2014, Apache License 2.0), which the viewer fits to Yale's photographs and carries over to RF1b's words; a word in a ring is then drawn as the stretch of the ring its box holds. On the Rosettes foldout, which that project did not cover, the words' places are Alessandro Placa's (voynich-spatial-data, 2026, CC BY 4.0), carried to Yale's photograph and to RF1b's words. Each box is then fitted to the word's own ink. f116v has none. A dashed outline marks a word whose place could not be confirmed on the ink. On the Rosettes, each word was also read from Yale's photograph by Claude, Anthropic's AI model, without being shown any transcription: an independent reading, not checked by a person, shown beside RF1b and never instead of it."),
+        h("p", {}, "The glyphs are drawn with ", h("b", {}, "Voynich VV"), ": Glen Claston's Voynich font (2005, given to the public domain; William Porquet fixed it for Unicode), with 89 rare glyphs added for this viewer from Claston's own shapes. The words about the words are set in Newsreader, by Production Type (SIL Open Font License).")),
+
       // ---------------------------------------------------------------- reference
       h("div", { class: "info-part" }, "Reference"),
       this.sec("sure", "Known or guessed?",
@@ -2099,11 +2358,16 @@ const Info = {
             ["Foliation", "The numbers written on the leaves (here in the 1600s)."], ["Binding", "How the quires are sewn together, and so the order of the pages."],
             ["Foldout", "A sheet with extra panels that fold in."], ["Collation", "A description of how a book's quires are made up."],
             ["Scribe, hand", "A handwriting. Davis finds five."], ["Currier A / B", "The two flavours of the writing, with different favourite words and spellings."],
-            ["Paleography", "The study of old handwriting."], ["Codicology", "The study of how books are physically made."]].flatMap(([t, d]) => [h("dt", {}, t), h("dd", {}, d)]))),
+            ["Paleography", "The study of old handwriting."], ["Codicology", "The study of how books are physically made."],
+            ["Glyph", "One written shape of the manuscript's script."], ["Transcription", "The manuscript's writing copied out into letters, glyph by glyph."],
+            ["Eva", "The alphabet of Latin letters most transcriptions use: names for shapes, not sounds."],
+            ["Line (locus)", "One line or label of text, numbered as transcriptions number them: f1r.2 is the second line of 1r."],
+            ["RF1b", "René Zandbergen's reference transliteration: the text the Reader shows."],
+            ["Consensus", "The reading most transcribers agree on, glyph by glyph (in Search)."]].flatMap(([t, d]) => [h("dt", {}, t), h("dd", {}, d)]))),
 
       this.sec("sources", "Sources",
         h("ul", { class: "info-src" }, Object.keys(D.orders.sources).map(k => h("li", {}, cite(k)))),
-        h("p", { class: "small muted" }, "Scribes and section names: Davis. Illustration type and Currier language: the page labels of Zandbergen's transliteration file; the viewer never uses the transliterated text. 3D drawing: three.js (MIT licence)."),
+        h("p", { class: "small muted" }, "Scribes and section names: Davis. Illustration type and Currier language: the page labels of Zandbergen's transliteration file. The text: RF1b and the transcriptions on voynich.nu, and the Landini–Stolfi interlinear (see “Who made the text”). Where each word is on the photographs: The Voynichese Project's word boxes (2014, Apache License 2.0), and on the Rosettes Alessandro Placa's positions (2026, CC BY 4.0), fitted to Yale's photographs. 3D drawing: three.js (MIT licence)."),
         h("p", { class: "small muted" }, `Voynich Viewer ${APP_VERSION} is an independent project. It is not made or endorsed by Yale University or by Lisa Fagin Davis.`)),
 
       this.privacySec());
@@ -2115,7 +2379,10 @@ const Info = {
             h("a", { href: yaleUrl, target: "_blank", rel: "noopener" }, "See the manuscript at Yale"))),
         h("div", { class: "credit" }, h("span", { class: "ci", "aria-hidden": "true" }, "✎"),
           h("div", {}, h("b", {}, "The research belongs to Lisa Fagin Davis."), " The collation, the five scribes, the section names and the reconstructions of the book's order shown here are her work. ",
-            h("a", { href: blogUrl, target: "_blank", rel: "noopener" }, "Read “Voynich Codicology”")))),
+            h("a", { href: blogUrl, target: "_blank", rel: "noopener" }, "Read “Voynich Codicology”"))),
+        h("div", { class: "credit" }, h("span", { class: "ci", "aria-hidden": "true" }, "Aa"),
+          h("div", {}, h("b", {}, "The text belongs to its transcribers."), " The Reader's text is RF1b, René Zandbergen's reference transliteration. Transcriptions by René Zandbergen and Gabriel Landini, Glen Claston, Takeshi Takahashi, the First Study Group (William Friedman), Prescott Currier and Mary D'Imperio, Jorge Stolfi, John Grove, John Tiltman, Don Latham, Karl Kluge (from Theodore Petersen's copy), Mike Roe and Denis Mardle, from René Zandbergen's voynich.nu (CC0) and the Landini–Stolfi interlinear. ",
+            h("a", { href: "https://www.voynich.nu/transcr.html", target: "_blank", rel: "noopener" }, "See voynich.nu")))),
       h("div", { class: "info-cols" }, tocEl, body));
   },
 };
@@ -2217,6 +2484,7 @@ async function boot() {
     }
     if (e.metaKey || e.ctrlKey || (e.altKey && S.view !== "three")) return;
     if (e.key === "?") { $("#cx-help-dlg").showModal(); return; }
+    if (e.key === "/") { e.preventDefault(); TextTab.focus(); return; }
     if (S.view === "read") Reader.key(e);
     else if (S.view === "three") View3D.key(e);
   });

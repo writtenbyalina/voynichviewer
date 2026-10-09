@@ -14,7 +14,7 @@ test("the site opens on the 3D book with the header in place", async ({ page }) 
   for (const sel of ["#cx-tabs", "#cx-order", "#cx-bm", "#cx-work", "#cx-help", "#cx-bug", "#cx-ver"]) {
     await expect(page.locator(sel), sel).toBeVisible();
   }
-  await expect(page.locator("#cx-tabs button")).toHaveText(["3D", "Reader", "Info"]);
+  await expect(page.locator("#cx-tabs button")).toHaveText(["3D", "Reader", "Text", "Info"]);
 });
 
 test("each tab shows its own view, and only that one", async ({ page }) => {
@@ -84,7 +84,7 @@ test("the keyboard help opens from the button and from ?, and closes with Escape
   await page.locator("#cx-help").click();
   await expect(dlg).toBeVisible();
   await expect(dlg).toContainText("Reader");
-  await expect(dlg).toContainText("Crop editor");
+  await expect(dlg).toContainText("Anywhere");   // the short list (1.6): only the keys that matter, no Crop editor section
   await page.keyboard.press("Escape");
   await expect(dlg).toBeHidden();
   await page.keyboard.press("?");
