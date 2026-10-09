@@ -125,6 +125,54 @@ def homography(src, dst):
     return H, int(mask.sum()) if mask is not None else 0
 
 
+def register_elsewhere(words, idx, sg):
+    """voynichese.com's boxes words[idx] (its XML frame) laid on panel sg, which its photo does not show: the scale and
+    translation where the boxes cover the most ink, then an affine refinement (ECC) of the boxes against the ink. Returns the XML -> panel-pixel affine
+    (2x3), or None when the boxes do not settle onto the ink convincingly."""
+    import inkfit
+    pan = cv2.imread(str(ROOT / "data" / "panels" / f"{sg['img']}_l.jpg"))
+    H, W = pan.shape[:2]
+    ink = inkfit.ink_map(pan).astype(np.float32)
+    ws = [words[i] for i in idx]
+    A = np.array([w[1:5] for w in ws], float)
+    best = None
+    for sc in np.linspace(0.6, 1.3, 36):
+        x0 = A[:, 0].min() * sc
+        mh, mw = int((A[:, 1] + A[:, 3]).max() * sc) + 4, int((A[:, 0] + A[:, 2]).max() * sc - x0) + 4
+        if mh >= H or mw >= W:
+            continue
+        mask = np.zeros((mh, mw), np.float32)
+        for x, y, w, h in A:
+            cv2.rectangle(mask, (int(x * sc - x0), int(y * sc)), (int((x + w) * sc - x0), int((y + h) * sc)), 1.0, -1)
+        mask -= mask.mean()
+        res = cv2.matchTemplate(ink, mask, cv2.TM_CCORR)
+        _, mx, _, loc = cv2.minMaxLoc(res)
+        mx /= np.sqrt((mask ** 2).sum())
+        if best is None or mx > best[0]:
+            best = (mx, sc, loc, x0)
+    if best is None:
+        return None
+    _mx, sc, (lx, ly), x0 = best
+    M0 = np.float32([[sc, 0, lx - x0], [0, sc, ly]])
+
+    def render(M):
+        m = np.zeros((H, W), np.float32)
+        for x, y, w, h in A:
+            cv2.fillConvexPoly(m, np.int32(cv2.transform(np.float32([[[x, y]], [[x + w, y]], [[x + w, y + h]], [[x, y + h]]]), M).reshape(-1, 2)), 1.0)
+        return m
+    Wm, cc = np.eye(2, 3, dtype=np.float32), 0.0
+    T0 = render(M0)
+    for sig in (12, 6, 3):
+        try:
+            cc, Wm = cv2.findTransformECC(cv2.GaussianBlur(T0, (0, 0), sig), cv2.GaussianBlur(ink, (0, 0), sig), Wm,
+                                          cv2.MOTION_AFFINE, (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 300, 1e-6), None, 5)
+        except cv2.error:
+            return None
+    if cc < 0.25:
+        return None
+    return (np.vstack([Wm, [0, 0, 1]]) @ np.vstack([M0, [0, 0, 1]]))[:2].astype(np.float32)
+
+
 def to_photo(sg):
     """A panel's thousandths -> Yale's photograph (pixels of the full-size image), and back: its quad's corners."""
     quad = np.float32(sg["quad"])
@@ -284,8 +332,35 @@ def main():
                         best = (shown(qq), sg, qq)
             if best:
                 placed[kj] = best[1:]
+        # a panel of the page that voynichese.com's photo leaves out (f101v's left half): its words' layout, as the XML
+        # has it, laid on that panel's ink (register_elsewhere); their boxes are rough, so marked estimated, and
+        # inkfit.py later fits them to the ink
+        rough = set()
+        left = [kj for kj in got if kj not in placed]
+        others = [sg for sg in segs if all(sg is not f[1] for f in fits)]
+        if left and others and placed:
+            idx = sorted({x for kj in left for x in (got[kj] if isinstance(got[kj], tuple) else (got[kj],))})
+            for sg in others:
+                M = register_elsewhere(words, idx, sg)
+                if M is None:
+                    continue
+                pan2 = cv2.imread(str(ROOT / "data" / "panels" / f"{sg['img']}_l.jpg"))
+                PH2, PW2 = pan2.shape[:2]
+                for kj in left:
+                    if kj in placed:
+                        continue
+                    qs = []
+                    for one in (got[kj] if isinstance(got[kj], tuple) else (got[kj],)):
+                        _, x, y, w, h, _s = words[one]
+                        qs.append(cv2.transform(corners(x, y, w, h).reshape(-1, 1, 2), M).reshape(-1, 2))
+                    q = np.concatenate(qs) / [PW2, PH2] * 1000
+                    if shown(q) >= .5:
+                        placed[kj] = (sg, q)
+                        rough.update(toks[kj[0]][kj[1]]["refs"])
+                print(f"  {page}: {sum(1 for v in placed.values() if v[0] is sg)} words laid on {sg['img']} by their layout")
         panels = [f[1] for f in fits if any(sg is f[1] for sg, _q in placed.values())]
         panels += [sg for sg in near if any(x is sg for x, _q in placed.values())]
+        panels += [sg for sg in segs if sg not in panels and any(x is sg for x, _q in placed.values())]
         placed = {kj: (next(n for n, p in enumerate(panels) if p is sg), q) for kj, (sg, q) in placed.items()}
         if not panels:
             report.append((page, "no word on its panels", inl, 0, len(words), 0, 0)); continue
@@ -318,6 +393,7 @@ def main():
             # (an estimate goes only where its line has words on this panel, and not onto a word placed on another)
             elsewhere = off | {w for pj, o in enumerate(per) if pj != pi for w in o}
             est = estimate(pp, loci, elsewhere, (1000, 1000))
+            est.update({w: pp[w] for w in pp if w in rough})          # laid by layout only: as estimated
             n_est += len(est)
             for (li, wi), b in {**pp, **est}.items():
                 out.append([li, wi, k(b[0]), k(b[1]), max(1, k(b[2] - b[0])), max(1, k(b[3] - b[1]))]

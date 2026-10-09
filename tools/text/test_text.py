@@ -129,16 +129,28 @@ class Data(unittest.TestCase):
                          set(vote.ORDER) | set(vote.REFERENCE))
 
     def test_readings_rebuild_every_transcribers_line(self):
-        """The site rebuilds each transcriber's reading from the page files (assets/text.js); it must give their own
-        line back, wherever the build did not keep that line as it is (x, a line that lines up only roughly)."""
-        import shutil
-        import subprocess
-        if not shutil.which("node"):
-            self.skipTest("needs node")
-        out = json.loads(subprocess.run(["node", str(HERE / "check_readings.mjs")], capture_output=True, text=True,
-                                        check=True).stdout)
-        self.assertGreater(out["checked"], 30000)
-        self.assertEqual(out["wrong"], [])
+        """Each transcriber's reading rebuilt from the page files (readings.py; the Text tab's "How the transcribers
+        read it" reads the same columns) gives their own line back, wherever the build did not keep that line as it is
+        (x, a line that lines up only roughly)."""
+        import readings
+        index = json.loads((DATA / "index.json").read_text())["loci"]
+        pos = {r[0]: i for i, r in enumerate(index)}
+        W = {}
+        for f in (DATA / "w").glob("*.json"):
+            d = json.loads(f.read_text())
+            W[d["witness"]] = d["lines"]
+        checked, wrong = 0, []
+        for f in (DATA / "pages").glob("*.json"):
+            for loc in json.loads(f.read_text())["loci"]:
+                for who, lines in W.items():
+                    rd = readings.reading_of(loc, who)
+                    if rd is None or ("x" in loc and who in loc["x"]):
+                        continue
+                    checked += 1
+                    if not readings.matches(rd, lines[pos[loc["id"]]]):
+                        wrong.append((loc["id"], who))
+        self.assertGreater(checked, 30000)
+        self.assertEqual(wrong, [])
 
     def test_few_lines_line_up_only_roughly(self):
         n = collections.Counter()

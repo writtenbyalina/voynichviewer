@@ -38,6 +38,7 @@ import collections
 import difflib
 import json
 import math
+import os
 import re
 import sys
 from pathlib import Path
@@ -561,9 +562,14 @@ def main():
         "tools/text/rf.py.", "credit": CREDIT, "version": "RF1b", "pages": pages}, separators=(",", ":"), ensure_ascii=False) + "\n")
     (OUT / "alpha.json").write_text(json.dumps(alphabets(used), separators=(",", ":"), ensure_ascii=False) + "\n")
     (OUT / "shapes" / "pages.json").write_text(json.dumps(sorted(p.stem for p in (OUT / "shapes").glob("f*.json")), separators=(",", ":")) + "\n")
+    # every word's outline fitted to its ink (inkfit.py); INKFIT=0 leaves the shapes as above, to look at
+    stats["on ink"] = 0
+    if os.environ.get("INKFIT", "1") != "0":
+        import inkfit
+        stats["on ink"] = inkfit.refine_all()["words_refit"]
     print(f"{len(pages)} pages, {sum(len(r) for _, r in pages)} loci; words {stats['words']}, placed {stats['placed']} "
           f"({100 * stats['placed'] / max(1, stats['words']):.1f}%): upright {stats['r']}, turned {stats['o']}, "
-          f"round a ring {stats['a']}; estimated {stats['estimated']}")
+          f"round a ring {stats['a']}; estimated {stats['estimated']}; fitted to the ink {stats['on ink']}")
 
 
 if __name__ == "__main__":
