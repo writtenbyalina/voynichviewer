@@ -76,7 +76,7 @@ jobs:
           GREP: ${{ inputs.grep }}
           REPEAT: ${{ inputs.repeat }}
         run: |
-          args=(--shard="${{ matrix.shard }}/$SHARDS" --reporter=blob,github,list)
+          args=(--shard="${{ matrix.shard }}/$SHARDS" "--reporter=blob,github,list")
           if [ -n "$GREP" ]; then args+=(--grep "$GREP"); fi
           if [[ "$REPEAT" =~ ^[0-9]+$ ]] && [ "$REPEAT" -gt 1 ]; then args+=(--repeat-each "$REPEAT" --retries 0); fi
           npx playwright test "${args[@]}"
