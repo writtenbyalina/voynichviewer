@@ -2062,6 +2062,7 @@ function build() {
     renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
   } catch (err) {
     V.gl = false;
+    Privacy.tag("webgl", "failed"); Privacy.event("error_webgl");
     stage.append(h("div", { class: "v3-nogl" }, "This browser cannot draw WebGL, which the 3D book needs. ",
       h("button", { onclick: () => show("read") }, "Reader"), " and ", h("button", { onclick: () => showFolios() }, "Folio order (in Info)"), " show the same sheets."));
     V.built = true;
@@ -2707,6 +2708,7 @@ function openingFolds() {
 }
 /* U, or the Unfold button on the stage: the opening the book is open at, or the sheet picked. */
 function unfoldHere() {
+  Privacy.event("unfold_3d");
   if (V.mode === "opening" && !V.inspect) {
     const steps = openingFolds();
     if (!steps) { toast("Nothing folded in this opening"); return; }
@@ -2767,6 +2769,7 @@ const foldTime = steps => 300 + 520 * steps;   // each fold takes its turn
    before it, so the rest of the strip comes out with it; closing it first closes those that close before it. A sheet of
    two rows is one sequence for both its leaves. */
 function toggleFold(k, i) {
+  Privacy.event("fold_flap_3d");
   const en = V.model?.all[V.cur];
   if (!en || i >= foldsOf(en, k)) return;
   if (!V.inspect) V.inspect = true;
@@ -2811,6 +2814,7 @@ function frameHand() {
   V.preset = null; renderViews();
 }
 function selectSheet(i) {
+  Privacy.event("pick_sheet_3d");
   if (V.arrange) { setCur(i); Arrange.mark(curSheet(), true); return; }   // on the table (a bookmark): the sheet is selected there; no inspector
   if (V.mode === "opening") setMode("block", { view: false });
   if (V.hand.on) putBack({ silent: true });

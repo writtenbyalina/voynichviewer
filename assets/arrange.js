@@ -117,6 +117,7 @@ const Arrange = {
 
   // ---------------------------------------------------------------- opening
   async open() {
+    Privacy.event("rearrange_open");
     this.kept = new Set(); this.versioned = new Set();
     if (S.view !== "three") show("three");
     const m = await View3D.load();
@@ -236,6 +237,7 @@ const Arrange = {
   },
   /* Move a sheet to position i of gathering gi (-1: set aside). Empty gatherings are dropped. */
   move(id, gi, i) {
+    Privacy.event("rearrange_move");
     this.sel = id;
     this.edit(o => {
       const from = this.locate(o, id);
