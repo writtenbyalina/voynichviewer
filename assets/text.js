@@ -671,6 +671,7 @@ const T = {
   pick(k, { extend = false, collect = false } = {}) {
     const it = this.item(k);
     if (!it) return;
+    Privacy.event(collect ? "word_collect" : extend ? "word_phrase" : "word_pick");
     this.closePeek();
     this.closeSky();
     if (collect) {

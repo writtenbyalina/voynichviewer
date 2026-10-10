@@ -51,7 +51,7 @@ function toast(msg, action) {
 /* An in-page replacement for prompt(), which some embedded browsers do not support. */
 function modal({ title, body = "", input = null, ok = "OK", cancel = "Cancel", danger = false }) {
   return new Promise(resolve => {
-    const field = input ? h("input", { type: "text", value: input.value || "", placeholder: input.placeholder || "",
+    const field = input ? h("input", { type: "text", "data-clarity-mask": "true", value: input.value || "", placeholder: input.placeholder || "",
       "aria-label": input.label || title }) : null;
     const done = v => { const t = $("#cx-toast", d); if (t) document.body.append(t); d.close(); d.remove(); resolve(v); };
     const okBtn = h("button", { class: danger ? "danger-solid" : "primary", onclick: () => done(field ? field.value.trim() : true) }, ok);
@@ -356,6 +356,8 @@ function setHash() {
   const text = S.view === "read" && TextUI.open ? TextUI.hash() : "";
   const hash = `#${S.view}/${encodeURIComponent(S.order)}${at || text ? "/" + at : ""}${text ? "/" + text : ""}`;
   if (location.hash !== hash) history.replaceState(history.state, "", hash);   // (keeping what text.js put there for Back)
+  Privacy.tag("order", S.order);
+  if (S.view === "read" && at) Privacy.tag("folio", at);
 }
 
 function readHash() {
@@ -379,6 +381,7 @@ function fillOrderSelect() {
 
 function setOrder(id, opts = {}) {   // opts reach the 3D morph: { ms, moved }
   if (!ORDERS.has(id)) return;
+  if (id !== S.order) Privacy.event("change_order");
   S.order = id;
   store.set("order", id);
   $("#cx-order").value = id;
@@ -392,7 +395,9 @@ function setOrder(id, opts = {}) {   // opts reach the 3D morph: { ms, moved }
 }
 
 function show(view) {
+  if (S.view !== view) Privacy.event("view_" + view);
   S.view = view;
+  Privacy.tag("view", view);
   for (const b of $$("#cx-tabs button")) b.setAttribute("aria-selected", String(b.dataset.view === view));
   for (const v of $$(".view")) v.hidden = v.id !== "v-" + view;
   if (view === "read") Reader.open(ORDERS.get(S.order), POS.by && POS.by !== "read" ? POS.page : undefined);
@@ -441,7 +446,7 @@ const Reader = {
         // under them keeps still
         h("span", { class: "rd-sharp", id: "rd-sharp", role: "status" }),
         // fold or unfold this opening: over the foot of the pages, only where there is a foldout
-        h("button", { class: "rd-fold", id: "rd-fold", hidden: true, onclick: () => Reader.toggleUnfold() }),
+        h("button", { class: "rd-fold", id: "rd-fold", hidden: true, onclick: () => { Privacy.event("unfold_pill_click"); Reader.toggleUnfold(); } }),
         h("button", { class: "rd-nav prev", "aria-label": "Previous opening", onclick: () => Reader.step(-1) }, "‹"),
         h("button", { class: "rd-nav next", "aria-label": "Next opening", onclick: () => Reader.step(1) }, "›")),
       // one slim row under the pages, the same height on every opening: zoom, then this opening's flags and note (two
@@ -567,6 +572,7 @@ const Reader = {
      for the first sight of the book from a link */
   go(k, dir = 0, focus = null, still = false) {
     if (!R.spreads || k < 0 || k >= R.spreads.length) return;
+    if (k !== R.at) Privacy.event(Math.abs(dir) === 1 ? "turn_page" : "jump_to_folio");
     if (R.grid) this.toggleGrid(false);
     if (!R.busy) { this.travel(k, focus, still); return; }
     if (Math.abs(dir) === 1) { if (R.queue.length < 6) R.queue.push({ k, focus }); }
@@ -683,6 +689,8 @@ const Reader = {
     const prev = R.unfold;
     if (R.busy && !within) return Promise.resolve();
     if (prev.L === next.L && prev.R === next.R) return Promise.resolve();
+    if (!within) Privacy.event(next.L || next.R ? "unfold" : "fold");
+    Privacy.tag("foldout_open", String(next.L || next.R));
     if (REDUCED || document.hidden) { R.unfold = next; this.render(); return Promise.resolve(); }
     const a = this.layout(prev), b = this.layout(next);
     R.unfold = { L: prev.L || next.L, R: prev.R || next.R };
@@ -871,6 +879,7 @@ const Reader = {
         el.append(h("button", { class: "foldtab", title: p.grid ? "Open the whole sheet" : (unfolded ? "Fold" : "Unfold"),
           onclick: () => {
             if (p.grid) { SheetView.open(p.sheet); return; }
+            Privacy.event("unfold_tab_click");
             this.setUnfold({ ...R.unfold, [side]: !R.unfold[side] });
           } }, p.grid ? "open sheet" : unfolded ? "fold" : `unfold +${n}`));
       }
@@ -1303,7 +1312,7 @@ const Reader = {
     else if (e.key === "ArrowLeft" || e.key === "PageUp") { if (!(e.repeat && (R.busy || R.queue.length))) this.step(-1); e.preventDefault(); }
     else if (e.key === "Home") this.go(0, 0);
     else if (e.key === "End") this.go(R.spreads.length - 1, 0);
-    else if (e.key === "u" || e.key === "U") this.toggleUnfold();
+    else if (e.key === "u" || e.key === "U") { Privacy.event("unfold_key"); this.toggleUnfold(); }
     else if (e.key === "+" || e.key === "=") this.zoomBy(1.5);
     else if (e.key === "-" || e.key === "_") this.zoomBy(1 / 1.5);
     else if (e.key === "0") this.resetView();
@@ -1642,6 +1651,7 @@ const View3D = {
   load() {
     this.loading ||= import(ASSETS + "view3d.js").then(m => (this.mod = m.default)).catch(e => {
       this.loading = null;
+      Privacy.event("error_3d_load");
       $("#v-three").replaceChildren(h("p", { class: "v3-nogl" }, "The 3D view could not load: " + e.message));
       throw e;
     });
@@ -1678,12 +1688,14 @@ const TextUI = {
     }).catch(e => {
       this.loading = null;
       const el = $("#rd-text");
+      Privacy.event("error_text_load");
       if (el) el.replaceChildren(h("p", { class: "tx-msg" }, "The text could not load: " + e.message));
       throw e;
     });
     return this.loading;
   },
   toggle(on = !this.open) {
+    if (on && !this.open) Privacy.event("text_panel_open");
     this.open = on;
     store.set("text:open", on);
     this.place();
@@ -2426,7 +2438,7 @@ const Changes = {
       h("h4", {}, h("span", { class: "rel-v" }, "v" + r.version), h("time", { datetime: r.date }, this.date(r.date))),
       h("ul", {}, ...r.changes.map(c => h("li", {}, h("span", { class: `kind ${c.kind}` }, this.KINDS[c.kind] || c.kind), " ", c.text)))))
       : [h("p", { class: "muted" }, "The list of changes could not be loaded.")]));
-    if (!dlg.open) dlg.showModal();
+    if (!dlg.open) { dlg.showModal(); Privacy.event("whats_new_opened"); }
     list.scrollTop = 0;
     if (this.rel[0]) { store.set("seenVersion", this.rel[0].version); $("#cx-ver").classList.remove("dot"); }
   },
@@ -2463,13 +2475,14 @@ async function boot() {
   $("#cx-order").addEventListener("change", e => setOrder(e.target.value));
   $("#cx-order").title = ORDERS.get(S.order).subtitle || "";
   for (const b of $$("#cx-tabs button")) b.addEventListener("click", () => show(b.dataset.view));
-  $("#cx-help").addEventListener("click", () => $("#cx-help-dlg").showModal());
+  const help = () => { $("#cx-help-dlg").showModal(); Privacy.event("help_opened"); };
+  $("#cx-help").addEventListener("click", help);
   Changes.init();   // not awaited: the page doesn't wait for the list of changes
   $("#cx-work").addEventListener("click", () => Work.open());
   $("#cx-bm").addEventListener("click", () => (Bookmarks.pop && !Bookmarks.pop.hidden ? Bookmarks.close() : Bookmarks.open()));
   Bookmarks.render();
   const bug = $("#cx-bug-dlg");
-  $("#cx-bug").addEventListener("click", () => bug.showModal());
+  $("#cx-bug").addEventListener("click", () => { bug.showModal(); Privacy.event("bug_report_opened"); });
   bug.addEventListener("click", e => { if (e.target === bug) bug.close(); });   // a click outside the box closes it
   $("#cx-bug-copy").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText("alinajafri4@gmail.com"); toast("Email address copied"); }
@@ -2483,7 +2496,7 @@ async function boot() {
       e.preventDefault(); e.shiftKey ? Arrange.redo() : Arrange.undo(); return;
     }
     if (e.metaKey || e.ctrlKey || (e.altKey && S.view !== "three")) return;
-    if (e.key === "?") { $("#cx-help-dlg").showModal(); return; }
+    if (e.key === "?") { help(); return; }
     if (e.key === "/") { e.preventDefault(); TextTab.focus(); return; }
     if (S.view === "read") Reader.key(e);
     else if (S.view === "three") View3D.key(e);
@@ -2497,6 +2510,8 @@ async function boot() {
     show(S.view);
     if (at2 && S.view === "read") { const k = Reader.find(at2); if (k >= 0) Reader.go(k, 0, at2); }
   });
+  Privacy.tag("version", APP_VERSION);
+  Privacy.tag("landing_view", S.view);
   show(S.view);
   if (at && S.view === "read") { const k = Reader.find(at); if (k >= 0) Reader.go(k, 0, at, true); }
 }

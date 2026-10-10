@@ -72,6 +72,21 @@ const Privacy = {
         y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
     })(window, document, "clarity", "script", this.CLARITY_ID);
     window.clarity("consent");   // the visitor agreed: Clarity may set its cookies
+    for (const [k, v] of Object.entries(this.tags)) window.clarity("set", k, v);   // what was tagged before it loaded
+  },
+
+  /* What the visitor does, for Clarity's filters and funnels: the 3D book is a canvas, which recordings show blank, so
+     the actions in it are named here. tag(): the current context (view, folio...), kept to hand on if Clarity loads
+     later. event(): one action. Both do nothing without Clarity (a local copy, or no consent). */
+  tags: {},
+  tag(key, value) {
+    value = String(value);
+    if (this.tags[key] === value) return;
+    this.tags[key] = value;
+    if (window.clarity) try { window.clarity("set", key, value); } catch { /* analytics never break the page */ }
+  },
+  event(name) {
+    if (window.clarity) try { window.clarity("event", name); } catch { /* analytics never break the page */ }
   },
 
   dropCookies() {
