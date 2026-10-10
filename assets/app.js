@@ -1683,6 +1683,7 @@ const TextUI = {
   load() {
     this.loading ||= import(ASSETS + "text.js").then(m => {
       this.mod = m.default;
+      Privacy.tag("script", this.mod.script);   // how the visitor reads the text, for Clarity's filters
       if (this.wanted) this.mod.fromHash(String(this.wanted).split("?")[1] || "");   // what the address asked
       return this.mod;
     }).catch(e => {

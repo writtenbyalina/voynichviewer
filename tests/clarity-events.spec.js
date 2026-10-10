@@ -62,3 +62,21 @@ test("text a visitor types in a box (an order's name) is masked in recordings", 
   const masked = await page.evaluate(() => { askText("Name"); return document.querySelector("dialog input[type=text]")?.dataset.clarityMask; });
   expect(masked).toBe("true");
 });
+
+test("the text panel names what is done in it, and never what was typed into Find", async ({ page }) => {
+  await withClarity(page);
+  await openSite(page, "#read/beinecke/1r");
+  await page.evaluate(() => TextUI.toggle(true));
+  await expect.poll(async () => (await tags(page)).script).toBeTruthy();
+  const T = () => page.evaluate(() => TextUI.mod);
+  await expect.poll(async () => !!(await T())).toBe(true);
+  await page.evaluate(() => { TextUI.mod.setFind("qokeedy"); });
+  await page.evaluate(() => { TextUI.mod.setFind("qokeedyy"); });   // a longer search is the same search
+  await page.evaluate(() => { TextUI.mod.setFind("zzzzzz"); });
+  await page.evaluate(() => { TextUI.mod.setScript(TextUI.mod.script === "eva" ? "glyphs" : "eva"); TextUI.mod.helpDialog(); });
+  const ev = await events(page);
+  expect(ev.filter(e => e === "find_search")).toHaveLength(1);
+  expect(ev).toEqual(expect.arrayContaining(["text_panel_open", "find_no_results", "script_change", "text_help_opened"]));
+  const all = JSON.stringify(await page.evaluate(() => window.__calls));
+  expect(all, "no search text is sent").not.toMatch(/qokeedy|zzzzzz/);
+});
