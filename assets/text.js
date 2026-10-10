@@ -671,6 +671,7 @@ const T = {
   pick(k, { extend = false, collect = false } = {}) {
     const it = this.item(k);
     if (!it) return;
+    Privacy.event(collect ? "word_collect" : extend ? "word_phrase" : "word_pick");
     this.closePeek();
     this.closeSky();
     if (collect) {
@@ -824,6 +825,7 @@ const T = {
     const from = letters(this.script);
     this.script = v;
     store.set("text:script", v);
+    Privacy.event("script_change"); Privacy.tag("script", v);
     if (this.set.length && letters(v) !== from) {   // a set's words, rewritten in the new alphabet
       this.set = this.set.map(x => x.k && this.item(x.k) ? { ...x, s: this.wordText(this.item(x.k).w) } : x);
     }
@@ -847,6 +849,7 @@ const T = {
       "↩ Back to ", h("b", {}, this.back.label));
   },
   goBack() {
+    Privacy.event("return_chip_click");
     const b = this.back;
     this.back = null;
     if (!b) return;
@@ -936,6 +939,7 @@ const T = {
   },
   /* The panel's ?: how to use the text, in a few lines, and where it comes from. One dialog, made once. */
   helpDialog(at = null) {
+    Privacy.event("text_help_opened");
     let d = $("#tx-help-dlg");
     if (!d) {
       const row = (k, say) => h("p", {}, h("kbd", {}, k), " ", say);
@@ -1033,6 +1037,7 @@ const T = {
     }
     if (this.view?.kind === "find" && this.view.q === q) return;
     const was = this.view?.kind === "find" ? this.view : null;
+    if (!was) Privacy.event("find_search");   // what was typed stays out of analytics
     if (!was) { $("#tx-tip")?.remove(); this.closePeek(); this.closeSky(); this.anchor = this.focus = null; this.set = []; }
     this.similar = null; this.filter = null;
     this.view = { kind: "find", q, word: was ? was.word : null };
@@ -1056,6 +1061,7 @@ const T = {
         : this.MODES.map(([m, say]) => h("button", { type: "button", class: `tx-chip${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
           onclick: () => { this.findMode = m; store.set("text:findMode", m); this.show(); this.marks(); setHash(); } }, say))));
     if (!words.length) {
+      if (this.noResults !== q) { this.noResults = q; Privacy.event("find_no_results"); }
       v.word = null; v.onShow = [];
       const how = wild ? "matches" : mode === "whole" ? "reads" : mode === "contains" ? "contains" : "begins with";
       kids.push(h("p", { class: "tx-say" }, `No word in the book ${how} `, h("b", { class: "mono" }, q), "."));
@@ -1100,7 +1106,7 @@ const T = {
     const wild = /[*?]/.test(q), at = wild ? -1 : this.findMode === "begins" ? (w.startsWith(q) ? 0 : -1) : w.indexOf(q);
     const eva = at < 0 ? [w] : [w.slice(0, at), h("mark", {}, w.slice(at, at + q.length)), w.slice(at + q.length)];
     return h("li", { class: `tx-fwi${on ? " on" : ""}` }, h("button", { type: "button", class: `tx-fw${on ? " on" : ""}`, "aria-pressed": String(on), title: `The ${plural(n, "place", "places")} of ${w}`,
-      onclick: () => { if (on) return; this.view.word = w; this.similar = null; this.filter = null; this.keepScroll = true; this.show(); this.marks(); setHash(); } },
+      onclick: () => { if (on) return; Privacy.event("find_result_click"); this.view.word = w; this.similar = null; this.filter = null; this.keepScroll = true; this.show(); this.marks(); setHash(); } },
       h("span", { class: "g", "aria-hidden": "true" }, this.glyphsOf(w)), h("span", { class: "e" }, ...eva),
       h("span", { class: "n" }, `${n.toLocaleString("en")} · ${plural(pages, "page", "pages")}`)));
   },
@@ -1263,7 +1269,7 @@ const T = {
   /* Layer two: every other place, as a crop of the photograph centred on the word, with where it is; book order, or
      sorted by the word before or after so that a recurring frame lines up. A click opens it in a peek. */
   placesEl(words, places, first) {
-    const sec = h("details", { class: "tx-places", open: !this.placesShut, ontoggle: e => { this.placesShut = !e.target.open; } });
+    const sec = h("details", { class: "tx-places", open: !this.placesShut, ontoggle: e => { this.placesShut = !e.target.open; if (e.target.open) Privacy.event("word_section_open_places"); } });
     const sort = h("select", { "aria-label": "Order of the places", onclick: e => e.stopPropagation(), onchange: e => { this.sortBy = e.target.value; this.keepScroll = true; this.show(); } },
       [["book", "in book order"], ["before", "by the word before"], ["after", "by the word after"]].map(([v, t]) => { const o = h("option", { value: v }, t); o.selected = this.sortBy === v; return o; }));
     sec.append(h("summary", { class: "tx-ph2" }, h("h4", { class: "tx-h" }, this.similar ? `Places of ${this.similar}` : `${this.view?.kind === "find" ? "Places" : "Other places"} (${places.length.toLocaleString("en")})`),
@@ -1297,6 +1303,7 @@ const T = {
   },
   /* the places as a file: one row each, with its line */
   exportPlaces(places, words) {
+    Privacy.event("word_export");
     const L = letters(this.script), q = s => `"${String(s).replace(/"/g, '""')}"`;
     const rows = [["page", "locus", "word", "words", "line", "alphabet", "text"]];
     for (const x of places) {
@@ -1344,7 +1351,7 @@ const T = {
       ["Section", [...new Set(places.map(x => factsOf(x.page).section))].sort().map(s => [s, x => factsOf(x.page).section === s])],
       ["Currier's language", [["A", x => factsOf(x.page).lang === "A"], ["B", x => factsOf(x.page).lang === "B"]]],
     ];
-    const d = h("details", { class: "tx-door" }, h("summary", {}, "Where it sits"));
+    const d = h("details", { class: "tx-door", ontoggle: e => { if (e.target.open) Privacy.event("word_section_open_where"); } }, h("summary", {}, "Where it sits"));
     const max = places.length;
     for (const [title, rows] of groups) {
       const counted = rows.map(([say, test]) => [say, test, places.filter(test).length]).filter(r => r[2]);
@@ -1360,6 +1367,7 @@ const T = {
   similarEl(w) {
     const d = h("details", { class: "tx-door" }, h("summary", {}, "Similar spellings"));
     d.addEventListener("toggle", () => {
+      if (d.open) Privacy.event("word_section_open_similar");
       if (!d.open || d.children.length > 1) return;
       Find.build(this.script);
       const near = [];
@@ -1367,7 +1375,7 @@ const T = {
       near.sort((a, b) => b[1] - a[1]);
       d.append(near.length ? h("div", { class: "tx-sim" }, near.slice(0, 24).map(([s, n], k) => {
         const chip = h("button", { class: `tx-chip tx-simc${this.similar === s ? " on" : ""}`, title: `Show the places of ${s}`,
-          onclick: () => { this.similar = s; this.filter = null; this.show(); $(".tx-places", this.el)?.scrollIntoView({ block: "start" }); } }, s, h("span", { class: "n" }, n));
+          onclick: () => { Privacy.event("word_similar_click"); this.similar = s; this.filter = null; this.show(); $(".tx-places", this.el)?.scrollIntoView({ block: "start" }); } }, s, h("span", { class: "n" }, n));
         if (k < 12) {   // the spelling as it is written, at its first place: the judgement is made on the ink, not the letters
           const t = Find.toks[Find.byWord.get(s)[0]], slot = h("span", { class: "sim-crop" });
           chip.prepend(slot);
@@ -1379,6 +1387,7 @@ const T = {
     return d;
   },
   copy(its) {
+    Privacy.event("word_copy");
     const L = letters(this.script);
     const words = its.map(it => writeAs(it.w.codes, L)).join(" ");
     const t = `${words} (${its[0].loc.id}${its.length > 1 ? `, ${its.length} words` : ""}, RF1b, ${SCRIPT_NAME[L]})`;
@@ -1410,6 +1419,7 @@ const T = {
      outlined. ‹ › (N, Shift+N) go through them; Open page goes there; Esc closes. */
   openPeek(list, at, words, mode = "place") {
     if (!list[at]) return;
+    if (!this.peekAt) Privacy.event("word_places_peek");
     this.peekAt = { list, at, words, mode };
     const st = $("#rd-stage");
     let el = $(".tx-peek", st);
