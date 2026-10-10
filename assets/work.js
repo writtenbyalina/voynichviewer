@@ -716,7 +716,7 @@ const CropEditor = {
 /* An order of your own: a full order (no base) with id "my-…", kept in localStorage under "mine". Every sheet is in
    it exactly once: in a gathering, or set aside in `unplaced`. */
 /* Names the built-in orders had before they were renamed, so that copies made under an old name still know their source. */
-const FORMER_TITLES = { "Davis: complete proposed order": "davis" };
+const FORMER_TITLES = { "Davis: complete proposed order": "davis", "Davis: proposed order": "davis" };
 
 const MyOrders = {
   list: [],

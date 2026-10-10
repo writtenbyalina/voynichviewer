@@ -261,14 +261,14 @@
   },
   {
    "id": "davis",
-   "title": "Davis: proposed order",
+   "title": "Davis/Layfield: proposed order",
    "subtitle": "Every sheet read on its own (singulions), as the 2026 paper proposes; only quires 13 and 20 are re-sequenced, so elsewhere the sheets keep today's sequence; quire 9 re-sewn",
    "sources": [
     "LD2026",
     "LFD2025blog",
     "LFD2025talk"
    ],
-   "summary": "Everything Davis has proposed about the order, in one sequence. Layfield & Davis (2026) conclude that the entire manuscript \"was originally intended to be read as a series of sequential singulions\": single folded sheets, each read first leaf recto, first leaf verso, second leaf recto, second leaf verso. Their evidence is that the two halves of one sheet are more alike than pages that face each other in the binding (quire 1: 0.399 against 0.246). So here every sheet is read on its own, and 1v faces 8r, its other half. Where they recovered a sequence, it is used: quires 13 and 20 follow the highest average LSA facing score (table 14), Q13 0.461 → 0.517 (+12.1%), Q20 0.438 → 0.526 (+20%). A sequence of sheets is proposed only for quires 13 and 20. In every other quire, quires 1–8 included, the sheets keep today's sequence, outermost first: that sequence is not part of the proposal, and Davis has no results for quires 1–8 yet. They left the botanical sheets in place because \"each page is a distinct botanical topic\", and did not test the pharmaceutical quires. From Davis's \"Voynich Codicology\" post (Jan 2025), quire 9 is sewn in its original fold between 67v2 and 67v1. That post's waterspout evidence for 78|81 is satisfied too, because every sheet's own centre is now an opening (78v | 81r). The lost bifolium 109|110 cannot be placed.",
+   "summary": "Everything Davis and Layfield have proposed about the order, in one sequence. Layfield & Davis (2026) conclude that the entire manuscript \"was originally intended to be read as a series of sequential singulions\": single folded sheets, each read first leaf recto, first leaf verso, second leaf recto, second leaf verso. Their evidence is that the two halves of one sheet are more alike than pages that face each other in the binding (quire 1: 0.399 against 0.246). So here every sheet is read on its own, and 1v faces 8r, its other half. Where they recovered a sequence, it is used: quires 13 and 20 follow the highest average LSA facing score (table 14), Q13 0.461 → 0.517 (+12.1%), Q20 0.438 → 0.526 (+20%). A sequence of sheets is proposed only for quires 13 and 20. In every other quire, quires 1–8 included, the sheets keep today's sequence, outermost first: that sequence is not part of the proposal, and Davis has no results for quires 1–8 yet. They left the botanical sheets in place because \"each page is a distinct botanical topic\", and did not test the pharmaceutical quires. From Davis's \"Voynich Codicology\" post (Jan 2025), quire 9 is sewn in its original fold between 67v2 and 67v1. That post's waterspout evidence for 78|81 is satisfied too, because every sheet's own centre is now an opening (78v | 81r). The lost bifolium 109|110 cannot be placed.",
    "gatherings": [
     {
      "quire": 1,

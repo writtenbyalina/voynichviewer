@@ -1,4 +1,4 @@
-// "Davis: proposed order" re-sequences only quires 13 and 20, as the 2026 paper does. Every other quire keeps today's sequence
+// "Davis/Layfield: proposed order" re-sequences only quires 13 and 20, as the 2026 paper does. Every other quire keeps today's sequence
 // of sheets, and the viewer must say so wherever it shows the order, so nobody takes that sequence for part of the proposal
 // (Davis asked for this in Oct 2026: there are no results for quires 1–8 yet).
 const { test, expect, openSite } = require("./fixtures");
@@ -17,7 +17,7 @@ test("only quires 13 and 20 differ from today's sequence, and every other quire 
     .filter(g => !/^Today's sequence of sheets, not a proposal/.test(g.note || "")).map(g => g.quire);
   expect(unmarked).toEqual([]);
   for (const q of [1, 2, 3, 4, 5, 6, 7, 8]) expect(davis.gatherings.find(g => g.quire === q).note).toContain("quires 1–8");
-  expect(davis.title).toBe("Davis: proposed order");
+  expect(davis.title).toBe("Davis/Layfield: proposed order");
   expect(davis.subtitle).toContain("only quires 13 and 20");
   expect(davis.summary).toContain("quires 1–8 included");
 });
