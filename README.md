@@ -42,10 +42,10 @@ Site: [voynichviewer.com](https://voynichviewer.com).
 - **Crop tool**: re-cut any page from Yale's photograph (✂ Crop in the Reader, or in 3D). The photograph is loaded from
   Yale's IIIF image server and cut in the browser.
 
-The menu offers the current binding, "Davis: proposed order" (every sheet read on its own, quires 13 and 20
+The menu offers the current binding, "Davis/Layfield: proposed order" (every sheet read on its own, quires 13 and 20
 re-ordered as in Layfield & Davis 2026, quire 9 re-sewn as in her 2025 post; the other quires keep today's sequence of
 sheets, which is not part of the proposal), and your own orders. Old links to the
-retired "Davis's blog (Jan 2025)" order open Davis's proposed order.
+retired "Davis's blog (Jan 2025)" order open the Davis/Layfield order.
 
 The 🐞 button (top right) shows how to report a bug or suggest a feature. The version (`APP_VERSION` in
 `assets/app.js`, and the badge in `index.html`) is 1.0.

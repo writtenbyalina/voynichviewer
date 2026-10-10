@@ -85,7 +85,7 @@ test("an order made on the table, with every kind of change, comes back from a p
 });
 
 test("a copy of Davis's order made before it was renamed still knows where it came from", async ({ page }) => {
-  // as exported before "Davis: complete proposed order" became "Davis: proposed order"
+  // as exported before "Davis: complete proposed order" became "Davis: proposed order", then "Davis/Layfield: proposed order"
   await openThree(page, "#three/davis");
   const davis = await page.evaluate(() => JSON.parse(JSON.stringify(ORDERS.get("davis"))));
   const q13 = davis.gatherings.find(g => g.quire === 13);
@@ -102,7 +102,7 @@ test("a copy of Davis's order made before it was renamed still knows where it ca
   expect(await page.evaluate(() => [...Arrange.changes(ORDERS.get(S.order)).sheets].length)).toBeLessThanOrEqual(2);
   await expect(page.locator("#cx-order option:checked")).toHaveText("My Davis");
   expect(await page.evaluate(() => ORDERS.get(S.order).from), "the name it was started from, kept as written").toBe("Davis: complete proposed order");
-  expect(await page.evaluate(() => ORDERS.get(S.order).subtitle), "shown by the name it has now").toContain("Davis: proposed order");
+  expect(await page.evaluate(() => ORDERS.get(S.order).subtitle), "shown by the name it has now").toContain("Davis/Layfield: proposed order");
   const { data } = await exportFile(page);
   expect(data.orders.find(o => o.id === "my-oldcopy").fromId, "and by id from now on").toBe("davis");
 });
