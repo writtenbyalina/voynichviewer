@@ -1,0 +1,1262 @@
+{
+ "panels": {
+  "f49r": [
+   {
+    "id": "f49r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Two big green leaf masses, red and blue flowers on long pale stems, and a broad brown root whose right end has a head drawn in outline.",
+    "in": [
+     {
+      "box": [
+       100,
+       95,
+       708,
+       880
+      ]
+     },
+     {
+      "box": [
+       50,
+       870,
+       708,
+       1000
+      ]
+     }
+    ]
+   }
+  ],
+  "f49v": [
+   {
+    "id": "f49v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A crown of green and pale leaves with blue marks, a blue flower above it, a long thin green stem and a round root drawn in outline with small circles.",
+    "in": {
+     "box": [
+      440,
+      15,
+      770,
+      965
+     ]
+    }
+   }
+  ],
+  "f50r": [
+   {
+    "id": "f50r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A large flower head with blue petals, wavy outer hairs and a face drawn at its centre, two green leaves with blue patches and a spread of brown roots.",
+    "in": {
+     "box": [
+      10,
+      230,
+      545,
+      1000
+     ]
+    },
+    "not": {
+     "box": [
+      502,
+      620,
+      740,
+      790
+     ]
+    }
+   }
+  ],
+  "f50v": [
+   {
+    "id": "f50v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A blue flower head with a spotted top and a green bud, three pale stems, two broad green leaves and a pale brown root with many arms.",
+    "in": {
+     "poly": [
+      [
+       435,
+       238
+      ],
+      [
+       612,
+       238
+      ],
+      [
+       612,
+       268
+      ],
+      [
+       660,
+       268
+      ],
+      [
+       660,
+       330
+      ],
+      [
+       700,
+       470
+      ],
+      [
+       703,
+       560
+      ],
+      [
+       703,
+       800
+      ],
+      [
+       665,
+       800
+      ],
+      [
+       665,
+       1000
+      ],
+      [
+       300,
+       1000
+      ],
+      [
+       300,
+       790
+      ],
+      [
+       470,
+       775
+      ],
+      [
+       500,
+       752
+      ],
+      [
+       440,
+       748
+      ],
+      [
+       405,
+       728
+      ],
+      [
+       383,
+       692
+      ],
+      [
+       370,
+       650
+      ],
+      [
+       364,
+       600
+      ],
+      [
+       364,
+       545
+      ],
+      [
+       378,
+       495
+      ],
+      [
+       420,
+       470
+      ],
+      [
+       440,
+       400
+      ],
+      [
+       432,
+       300
+      ]
+     ]
+    }
+   }
+  ],
+  "f51r": [
+   {
+    "id": "f51r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Red and white flowers on round buds at the top, four green spiky leaves on side stems and a red-brown root of two twisted legs.",
+    "in": {
+     "poly": [
+      [
+       340,
+       110
+      ],
+      [
+       600,
+       110
+      ],
+      [
+       600,
+       330
+      ],
+      [
+       700,
+       330
+      ],
+      [
+       700,
+       1000
+      ],
+      [
+       330,
+       1000
+      ],
+      [
+       330,
+       700
+      ],
+      [
+       248,
+       700
+      ],
+      [
+       248,
+       560
+      ],
+      [
+       215,
+       520
+      ],
+      [
+       215,
+       440
+      ],
+      [
+       300,
+       420
+      ],
+      [
+       340,
+       300
+      ]
+     ]
+    }
+   }
+  ],
+  "f51v": [
+   {
+    "id": "f51v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A tall spike of small blue berries on curled stalks, two drooping side sprays of berries, wavy green leaves up the stem and a pale brown root.",
+    "in": {
+     "poly": [
+      [
+       490,
+       15
+      ],
+      [
+       600,
+       15
+      ],
+      [
+       600,
+       265
+      ],
+      [
+       765,
+       265
+      ],
+      [
+       765,
+       1000
+      ],
+      [
+       300,
+       1000
+      ],
+      [
+       300,
+       960
+      ],
+      [
+       480,
+       900
+      ],
+      [
+       480,
+       720
+      ],
+      [
+       488,
+       700
+      ],
+      [
+       493,
+       640
+      ],
+      [
+       492,
+       560
+      ],
+      [
+       485,
+       510
+      ],
+      [
+       465,
+       497
+      ],
+      [
+       475,
+       480
+      ],
+      [
+       420,
+       480
+      ],
+      [
+       415,
+       290
+      ],
+      [
+       490,
+       270
+      ]
+     ]
+    }
+   }
+  ],
+  "f52r": [
+   {
+    "id": "f52r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A tall stem with a blue flower, pointed green leaves and a red-brown root with a face-like opening, and a smaller leafy stem joined to the same long root bar.",
+    "in": {
+     "box": [
+      55,
+      120,
+      610,
+      1000
+     ]
+    }
+   }
+  ],
+  "f52v": [
+   {
+    "id": "f52v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A tall green stem with ten round, spiky dark green leaves on curved stalks, a curled tip and a pale brown root.",
+    "in": {
+     "box": [
+      420,
+      20,
+      765,
+      915
+     ]
+    }
+   }
+  ],
+  "f53r": [
+   {
+    "id": "f53r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A curling stem with many small red-and-white flowers and one large flower, brown, orange and green spiky leaves, and a brown angular root.",
+    "in": {
+     "box": [
+      150,
+      15,
+      590,
+      1000
+     ]
+    }
+   }
+  ],
+  "f53v": [
+   {
+    "id": "f53v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Three red-and-white flowers with blue sepals on a tall stem, long toothed green leaves in crossing pairs, a brown root and thin rootlets.",
+    "in": {
+     "box": [
+      375,
+      150,
+      775,
+      1000
+     ]
+    }
+   }
+  ],
+  "f54r": [
+   {
+    "id": "f54r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Two scaly green and white flower heads with red tips, many toothed green leaves on side stalks, a green stem and pale leaf-like roots drawn in outline.",
+    "in": {
+     "box": [
+      160,
+      0,
+      650,
+      1000
+     ]
+    }
+   }
+  ],
+  "f54v": [
+   {
+    "id": "f54v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A red stem with long pointed green leaves, a curving spray of dark blue spotted buds and a brown root of bulbous knots.",
+    "in": {
+     "box": [
+      330,
+      100,
+      778,
+      965
+     ]
+    }
+   }
+  ],
+  "f55r": [
+   {
+    "id": "f55r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Three red buds with blue-and-white flowers on pale stems, many green toothed leaves and a pale brown root with tangled rootlets.",
+    "in": {
+     "box": [
+      80,
+      360,
+      600,
+      1000
+     ]
+    },
+    "not": {
+     "box": [
+      520,
+      640,
+      610,
+      690
+     ]
+    }
+   }
+  ],
+  "f55v": [
+   {
+    "id": "f55v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A blue chequered flower head on a brown stalk, one large green vase-shaped leaf mass and a brown root whose right branch is shaped like an animal's head.",
+    "in": {
+     "box": [
+      130,
+      20,
+      720,
+      1000
+     ]
+    },
+    "not": {
+     "box": [
+      180,
+      610,
+      370,
+      650
+     ]
+    }
+   }
+  ],
+  "f56r": [
+   {
+    "id": "f56r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A pale stem with two blue flowers, a spiral ringed with long blue spikes, two fans of thin green leaves round blue centres and a braided root.",
+    "in": {
+     "box": [
+      175,
+      195,
+      690,
+      1000
+     ]
+    }
+   }
+  ],
+  "f56v": [
+   {
+    "id": "f56v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Broad green fronds with jagged edges on a green stem, a pale curved hood drawn in outline with a spiky blue part, and a red-brown root.",
+    "in": {
+     "box": [
+      355,
+      50,
+      785,
+      1000
+     ]
+    },
+    "not": {
+     "box": [
+      690,
+      900,
+      760,
+      935
+     ]
+    }
+   }
+  ],
+  "f57r": [
+   {
+    "id": "f57r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A dark blue flower at the top, many lobed green leaves on pale branching stems, small pale blue flowers and a brown root.",
+    "in": [
+     {
+      "box": [
+       330,
+       150,
+       440,
+       250
+      ]
+     },
+     {
+      "box": [
+       85,
+       210,
+       713,
+       1000
+      ]
+     }
+    ],
+    "not": {
+     "box": [
+      713,
+      0,
+      760,
+      1000
+     ]
+    }
+   }
+  ],
+  "f57v": [
+   {
+    "id": "f57v.diagram",
+    "kind": "diagram",
+    "name": "Round diagram",
+    "looks": "Four ruled circles with rings of writing between them round four small figures and a small flower in the middle.",
+    "in": {
+     "circle": [
+      458,
+      383,
+      318
+     ]
+    },
+    "take": "region"
+   },
+   {
+    "id": "f57v.centre",
+    "kind": "emblem",
+    "name": "Flower",
+    "looks": "A small flower of seven rounded petals drawn in outline, with a dot at its centre.",
+    "in": {
+     "box": [
+      432,
+      358,
+      492,
+      418
+     ]
+    },
+    "not": {
+     "box": [
+      425,
+      409,
+      448,
+      430
+     ]
+    }
+   },
+   {
+    "id": "f57v.person-top",
+    "kind": "person",
+    "take": "region",
+    "name": "Figure",
+    "looks": "A small figure with a round shaggy head and outstretched arms, drawn in brown ink.",
+    "in": {
+     "poly": [
+      [
+       396,
+       350
+      ],
+      [
+       394,
+       335
+      ],
+      [
+       400,
+       318
+      ],
+      [
+       407,
+       295
+      ],
+      [
+       410,
+       280
+      ],
+      [
+       395,
+       270
+      ],
+      [
+       391,
+       260
+      ],
+      [
+       410,
+       261
+      ],
+      [
+       425,
+       270
+      ],
+      [
+       440,
+       277
+      ],
+      [
+       455,
+       266
+      ],
+      [
+       470,
+       257
+      ],
+      [
+       485,
+       254
+      ],
+      [
+       500,
+       253
+      ],
+      [
+       515,
+       261
+      ],
+      [
+       535,
+       271
+      ],
+      [
+       553,
+       277
+      ],
+      [
+       557,
+       286
+      ],
+      [
+       545,
+       291
+      ],
+      [
+       525,
+       285
+      ],
+      [
+       506,
+       281
+      ],
+      [
+       501,
+       296
+      ],
+      [
+       498,
+       316
+      ],
+      [
+       486,
+       331
+      ],
+      [
+       470,
+       330
+      ],
+      [
+       457,
+       319
+      ],
+      [
+       449,
+       305
+      ],
+      [
+       446,
+       293
+      ],
+      [
+       432,
+       291
+      ],
+      [
+       423,
+       305
+      ],
+      [
+       418,
+       325
+      ],
+      [
+       415,
+       340
+      ],
+      [
+       411,
+       351
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f57v.person-left",
+    "kind": "person",
+    "take": "region",
+    "name": "Figure",
+    "looks": "A small face in profile with long hair and an arm, drawn in brown ink.",
+    "in": {
+     "poly": [
+      [
+       320,
+       380
+      ],
+      [
+       328,
+       356
+      ],
+      [
+       338,
+       338
+      ],
+      [
+       355,
+       335
+      ],
+      [
+       370,
+       343
+      ],
+      [
+       379,
+       355
+      ],
+      [
+       383,
+       372
+      ],
+      [
+       382,
+       392
+      ],
+      [
+       372,
+       404
+      ],
+      [
+       356,
+       408
+      ],
+      [
+       354,
+       420
+      ],
+      [
+       364,
+       432
+      ],
+      [
+       378,
+       442
+      ],
+      [
+       382,
+       452
+      ],
+      [
+       370,
+       455
+      ],
+      [
+       352,
+       445
+      ],
+      [
+       338,
+       432
+      ],
+      [
+       327,
+       416
+      ],
+      [
+       322,
+       400
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f57v.person-right",
+    "kind": "person",
+    "take": "region",
+    "name": "Figure",
+    "looks": "A small head with hair and a bent arm, drawn in pale brown ink.",
+    "in": {
+     "poly": [
+      [
+       506,
+       412
+      ],
+      [
+       512,
+       405
+      ],
+      [
+       522,
+       407
+      ],
+      [
+       530,
+       394
+      ],
+      [
+       534,
+       380
+      ],
+      [
+       545,
+       370
+      ],
+      [
+       560,
+       367
+      ],
+      [
+       572,
+       374
+      ],
+      [
+       580,
+       391
+      ],
+      [
+       589,
+       400
+      ],
+      [
+       591,
+       420
+      ],
+      [
+       587,
+       437
+      ],
+      [
+       578,
+       448
+      ],
+      [
+       560,
+       450
+      ],
+      [
+       548,
+       442
+      ],
+      [
+       540,
+       431
+      ],
+      [
+       530,
+       428
+      ],
+      [
+       518,
+       432
+      ],
+      [
+       507,
+       428
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f57v.person-bottom",
+    "kind": "person",
+    "take": "region",
+    "name": "Figure",
+    "looks": "A small head with long hair seen from behind, drawn in brown ink.",
+    "in": {
+     "poly": [
+      [
+       437,
+       470
+      ],
+      [
+       442,
+       458
+      ],
+      [
+       452,
+       452
+      ],
+      [
+       468,
+       452
+      ],
+      [
+       482,
+       460
+      ],
+      [
+       495,
+       452
+      ],
+      [
+       508,
+       448
+      ],
+      [
+       512,
+       456
+      ],
+      [
+       508,
+       480
+      ],
+      [
+       506,
+       500
+      ],
+      [
+       500,
+       518
+      ],
+      [
+       488,
+       522
+      ],
+      [
+       470,
+       514
+      ],
+      [
+       455,
+       514
+      ],
+      [
+       442,
+       512
+      ],
+      [
+       436,
+       495
+      ]
+     ]
+    }
+   }
+  ],
+  "f58r": [
+   {
+    "id": "f58r.star-1",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small six-pointed star drawn in brown ink.",
+    "in": {
+     "box": [
+      155,
+      20,
+      212,
+      70
+     ]
+    }
+   },
+   {
+    "id": "f58r.star-2",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star drawn in brown ink, with a dot at its centre.",
+    "in": {
+     "box": [
+      92,
+      305,
+      165,
+      362
+     ]
+    }
+   },
+   {
+    "id": "f58r.star-3",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star drawn in brown ink, with a ring at its centre.",
+    "in": {
+     "box": [
+      106,
+      462,
+      155,
+      516
+     ]
+    }
+   }
+  ],
+  "f58v": [
+   {
+    "id": "f58v.star",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small six-pointed star drawn in brown ink.",
+    "in": {
+     "box": [
+      290,
+      3,
+      335,
+      47
+     ]
+    }
+   }
+  ],
+  "f65r": [
+   {
+    "id": "f65r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Sprays of small star-shaped flowers drawn in outline at the top, many lobed green leaves on pale stems, and a brown root of a round bulb with chains of swollen tubers.",
+    "in": {
+     "box": [
+      30,
+      0,
+      695,
+      1000
+     ]
+    }
+   }
+  ],
+  "f65v": [
+   {
+    "id": "f65v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A blue flower on a tall stalk, clusters of round green flower heads on branching green stems, curled shoots and a brown root of many strands.",
+    "in": {
+     "box": [
+      125,
+      20,
+      785,
+      1000
+     ]
+    }
+   }
+  ],
+  "f66r": [
+   {
+    "id": "f66r.person",
+    "kind": "person",
+    "take": "region",
+    "name": "Figure lying down",
+    "looks": "A small naked figure lying on its back with one knee raised and a hand to its head, drawn in brown ink.",
+    "in": {
+     "poly": [
+      [
+       86,
+       968
+      ],
+      [
+       92,
+       958
+      ],
+      [
+       105,
+       952
+      ],
+      [
+       118,
+       942
+      ],
+      [
+       127,
+       922
+      ],
+      [
+       130,
+       905
+      ],
+      [
+       138,
+       896
+      ],
+      [
+       152,
+       899
+      ],
+      [
+       163,
+       907
+      ],
+      [
+       168,
+       897
+      ],
+      [
+       171,
+       884
+      ],
+      [
+       179,
+       881
+      ],
+      [
+       187,
+       886
+      ],
+      [
+       189,
+       902
+      ],
+      [
+       181,
+       915
+      ],
+      [
+       176,
+       930
+      ],
+      [
+       175,
+       945
+      ],
+      [
+       168,
+       954
+      ],
+      [
+       155,
+       953
+      ],
+      [
+       140,
+       956
+      ],
+      [
+       120,
+       966
+      ],
+      [
+       105,
+       973
+      ],
+      [
+       92,
+       977
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f66r.jar",
+    "kind": "jar",
+    "name": "Small tub",
+    "looks": "A small open tub drawn in brown ink.",
+    "take": "region",
+    "in": {
+     "poly": [
+      [
+       32,
+       947
+      ],
+      [
+       40,
+       944
+      ],
+      [
+       52,
+       944
+      ],
+      [
+       57,
+       948
+      ],
+      [
+       55,
+       969
+      ],
+      [
+       45,
+       972
+      ],
+      [
+       35,
+       970
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f66r.circles",
+    "kind": "other",
+    "name": "Two circles",
+    "looks": "Two small circles side by side drawn in brown ink.",
+    "in": {
+     "box": [
+      57,
+      912,
+      98,
+      945
+     ]
+    },
+    "not": {
+     "box": [
+      45,
+      905,
+      74,
+      925
+     ]
+    }
+   }
+  ],
+  "f66v": [
+   {
+    "id": "f66v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Three fans of curved green leaf strokes, two small blue-and-yellow flowers, a green stem and a red-brown root with fainter rootlets below.",
+    "in": {
+     "box": [
+      225,
+      355,
+      720,
+      1000
+     ]
+    }
+   },
+   {
+    "id": "f66v.sketch",
+    "kind": "other",
+    "name": "Faint sketch",
+    "looks": "Faint thin grey lines forming two small sketchy shapes with leg-like strokes.",
+    "in": {
+     "box": [
+      180,
+      765,
+      365,
+      875
+     ]
+    }
+   }
+  ]
+ }
+}
