@@ -3224,7 +3224,9 @@
       17
      ]
     },
-    "whole": 1.01
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
    },
    {
     "id": "f68r2.star-b",
@@ -3238,7 +3240,9 @@
       18
      ]
     },
-    "whole": 1.01
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
    },
    {
     "id": "f68r2.star-c",
@@ -3252,7 +3256,9 @@
       17
      ]
     },
-    "whole": 1.01
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
    },
    {
     "id": "f68r2.star-d",
@@ -3266,7 +3272,9 @@
       17
      ]
     },
-    "whole": 1.01
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
    },
    {
     "id": "f68r2.star-e",
@@ -3280,7 +3288,9 @@
       16
      ]
     },
-    "whole": 1.01
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
    },
    {
     "id": "f68r2.star-f",
@@ -3294,7 +3304,9 @@
       17
      ]
     },
-    "whole": 1.01
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
    },
    {
     "id": "f68r2.star-g",
@@ -3308,7 +3320,9 @@
       18
      ]
     },
-    "whole": 1.01
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
    },
    {
     "id": "f68r2.star-h",
@@ -3322,7 +3336,162 @@
       16
      ]
     },
-    "whole": 1.01
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   }
+  ],
+  "f68r3": [
+   {
+    "id": "f68r3.diagram",
+    "kind": "diagram",
+    "name": "Round diagram",
+    "looks": "A ring of writing round sectors of yellow stars and words, with a face in a yellow ring at the middle.",
+    "in": {
+     "circle": [
+      402,
+      464,
+      379
+     ]
+    },
+    "take": "region",
+    "fit": true
+   },
+   {
+    "id": "f68r3.centre",
+    "kind": "sun",
+    "name": "Face in a ring",
+    "looks": "A pale face inside a broad yellow ring.",
+    "in": {
+     "circle": [
+      406,
+      462,
+      54
+     ]
+    },
+    "take": "region"
+   },
+   {
+    "id": "f68r3.cluster",
+    "kind": "star",
+    "name": "Cluster of stars on a stalk",
+    "looks": "A tight cluster of seven small yellow stars with a long curved line running from it.",
+    "in": [
+     {
+      "box": [
+       192,
+       302,
+       244,
+       356
+      ]
+     },
+     {
+      "poly": [
+       [
+        203.0,
+        355.5
+       ],
+       [
+        238.0,
+        375.5
+       ],
+       [
+        242.0,
+        368.5
+       ],
+       [
+        207.0,
+        348.5
+       ]
+      ]
+     },
+     {
+      "poly": [
+       [
+        238.9,
+        375.9
+       ],
+       [
+        288.9,
+        389.9
+       ],
+       [
+        291.1,
+        382.1
+       ],
+       [
+        241.1,
+        368.1
+       ]
+      ]
+     },
+     {
+      "poly": [
+       [
+        288.6,
+        389.7
+       ],
+       [
+        320.6,
+        401.7
+       ],
+       [
+        323.4,
+        394.3
+       ],
+       [
+        291.4,
+        382.3
+       ]
+      ]
+     },
+     {
+      "poly": [
+       [
+        319.0,
+        400.6
+       ],
+       [
+        343.0,
+        428.6
+       ],
+       [
+        349.0,
+        423.4
+       ],
+       [
+        325.0,
+        395.4
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "id": "f68r3.star",
+    "kind": "star",
+    "name": "Star",
+    "looks": "Eight-pointed stars painted yellow.",
+    "in": {
+     "ring": [
+      404,
+      463,
+      75,
+      345
+     ]
+    },
+    "take": "each",
+    "min": 400,
+    "not": [
+     {
+      "box": [
+       192,
+       302,
+       244,
+       356
+      ]
+     }
+    ]
    }
   ]
  }
