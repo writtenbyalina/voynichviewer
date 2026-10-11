@@ -52,6 +52,7 @@ line every 50 units and a numbered line every 100.
 | `fill` | `auto` (default), `all` (every space it closes round: a diagram, a pool with its women) or `none` |
 | `fit` | `true` with a `circle`: the circle is moved onto the ruled circle nearest it |
 | `joins` | the id of the same drawing's other part on the next panel of a foldout |
+| `plus` | faint parts of a drawing otherwise cut from its pieces: `[{"in": region, "level": 0.12, "gap": 5}, ...]`, each adding the faint ink (not paint) in its region that joins the drawing: a pale stem or root of a painted plant |
 | `edge` | `true`: a drawing running onto the page's edge gets back what was taken off as the edge, inside its region and joined to it (draw the region tight round the drawing) |
 
 **Regions** (units): `{"box": [x0, y0, x1, y1]}`, `{"poly": [[x, y], ...]}`, `{"circle": [cx, cy, r]}`,

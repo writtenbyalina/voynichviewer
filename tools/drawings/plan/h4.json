@@ -963,12 +963,61 @@
     "id": "f56r.plant",
     "kind": "plant",
     "name": "Plant",
-    "looks": "A pale stem with two blue flowers, a spiral ringed with long blue spikes, two fans of thin green leaves round blue centres and a braided root.",
-    "in": {
+    "looks": "A pale stem with two blue flowers, a spiral ringed with long blue spikes, two fans of thin green leaves round blue centres and a braided root drawn in outline.",
+    "in": [
+     {
+      "box": [
+       175,
+       195,
+       690,
+       830
+      ]
+     },
+     {
+      "poly": [
+       [
+        380,
+        830
+       ],
+       [
+        470,
+        790
+       ],
+       [
+        480,
+        830
+       ],
+       [
+        478,
+        900
+       ],
+       [
+        470,
+        985
+       ],
+       [
+        420,
+        985
+       ],
+       [
+        380,
+        960
+       ],
+       [
+        375,
+        890
+       ]
+      ]
+     }
+    ],
+    "take": "faint",
+    "gap": 5,
+    "level": 0.1,
+    "not": {
      "box": [
-      175,
-      195,
-      690,
+      676,
+      0,
+      800,
       1000
      ]
     }
@@ -979,23 +1028,210 @@
     "id": "f56v.plant",
     "kind": "plant",
     "name": "Plant",
-    "looks": "Broad green fronds with jagged edges on a green stem, a pale curved hood drawn in outline with a spiky blue part, and a red-brown root.",
-    "in": {
-     "box": [
-      355,
-      50,
-      785,
-      1000
-     ]
-    },
-    "not": {
-     "box": [
-      690,
-      900,
-      760,
-      935
-     ]
-    }
+    "looks": "Broad green fronds with jagged edges on a green stem, a pale curved hood drawn in outline with a spiky blue part at its tip, and a red-brown root with three lobes.",
+    "in": [
+     {
+      "box": [
+       355,
+       50,
+       776,
+       880
+      ]
+     },
+     {
+      "poly": [
+       [
+        452,
+        987
+       ],
+       [
+        452,
+        955
+       ],
+       [
+        480,
+        933
+       ],
+       [
+        530,
+        913
+       ],
+       [
+        558,
+        903
+       ],
+       [
+        562,
+        878
+       ],
+       [
+        602,
+        878
+       ],
+       [
+        622,
+        893
+       ],
+       [
+        652,
+        903
+       ],
+       [
+        664,
+        936
+       ],
+       [
+        690,
+        951
+       ],
+       [
+        742,
+        951
+       ],
+       [
+        754,
+        965
+       ],
+       [
+        754,
+        980
+       ],
+       [
+        650,
+        983
+       ],
+       [
+        600,
+        985
+       ]
+      ]
+     }
+    ],
+    "near": 20,
+    "keep": 0.003,
+    "edge": true,
+    "not": [
+     {
+      "poly": [
+       [
+        476,
+        958
+       ],
+       [
+        495,
+        951
+       ],
+       [
+        520,
+        946
+       ],
+       [
+        540,
+        941
+       ],
+       [
+        538,
+        952
+       ],
+       [
+        531,
+        970
+       ],
+       [
+        523,
+        985
+       ],
+       [
+        521,
+        995
+       ],
+       [
+        506,
+        995
+       ],
+       [
+        505,
+        978
+       ],
+       [
+        495,
+        972
+       ],
+       [
+        476,
+        968
+       ]
+      ]
+     },
+     {
+      "box": [
+       445,
+       355,
+       510,
+       396
+      ]
+     },
+     {
+      "box": [
+       414,
+       380,
+       429,
+       394
+      ]
+     },
+     {
+      "poly": [
+       [
+        505,
+        405
+       ],
+       [
+        545,
+        402
+       ],
+       [
+        557,
+        425
+       ],
+       [
+        553,
+        448
+       ],
+       [
+        530,
+        448
+       ],
+       [
+        505,
+        432
+       ]
+      ]
+     },
+     {
+      "poly": [
+       [
+        452,
+        407
+       ],
+       [
+        492,
+        404
+       ],
+       [
+        496,
+        417
+       ],
+       [
+        482,
+        423
+       ],
+       [
+        456,
+        423
+       ]
+      ]
+     }
+    ]
    }
   ],
   "f57r": [
@@ -1003,7 +1239,7 @@
     "id": "f57r.plant",
     "kind": "plant",
     "name": "Plant",
-    "looks": "A dark blue flower at the top, many lobed green leaves on pale branching stems, small pale blue flowers and a brown root.",
+    "looks": "A dark purple flower at the top, many lobed green leaves on pale branching stems, small pale purple and blue flowers and a brown root of many strands.",
     "in": [
      {
       "box": [
@@ -1018,18 +1254,38 @@
        85,
        210,
        713,
-       1000
+       985
       ]
      }
     ],
-    "not": {
-     "box": [
-      713,
-      0,
-      760,
-      1000
-     ]
-    }
+    "near": 15,
+    "keep": 0.002,
+    "not": [
+     {
+      "box": [
+       709,
+       380,
+       800,
+       1000
+      ]
+     },
+     {
+      "box": [
+       660,
+       950,
+       800,
+       1000
+      ]
+     },
+     {
+      "box": [
+       85,
+       205,
+       196,
+       265
+      ]
+     }
+    ]
    }
   ],
   "f57v": [

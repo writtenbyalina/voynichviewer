@@ -306,6 +306,22 @@ def tidy(m: np.ndarray, smallest: int = 20) -> np.ndarray:
     return m.astype(bool)
 
 
+def faint_marks(P, R, spec, paint=False):
+    """ink too faint for the pieces (a quick sketch, a pale stem): within region R, every mark a little darker than
+    the parchment ("level" of the page's darkest ink), writing aside, joined across wider gaps ("gap" px); with paint,
+    the paint there too (which can include paint offset from the facing page)"""
+    t = max(5.0, spec.get("level", 0.07) * P["full"])
+    m = (P["dark"] > t) & R & ~P["writing"] & P["page"]
+    if paint:
+        m |= P["paint"] & R
+    n2, lab2, st2, _ = cv2.connectedComponentsWithStats(m.astype(np.uint8), connectivity=8)
+    keep = np.zeros(n2, bool)
+    keep[1:] = st2[1:, cv2.CC_STAT_AREA] >= 10
+    m = keep[lab2]
+    g = int(spec.get("gap", 7)) | 1
+    return cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (g, g))).astype(bool) & R
+
+
 def split_bodies(m: np.ndarray, k: float) -> list[np.ndarray]:
     """a hole holding two figures that touch (two women side by side in a pool), cut between them: where the hole
     has two thick parts (bodies) joined by a thin one, it is cut along the thin part (a watershed of the distance
@@ -488,16 +504,7 @@ def cut(img: str, drawings: list[dict], P=None):
         elif take == "region":
             out.append((dr["id"], dr, R.copy()))
         elif take == "faint":
-            # a drawing in ink too faint for the pieces (a quick sketch, a pale figure): within its region, every mark
-            # a little darker than the parchment, writing aside, joined across wider gaps, and filled
-            t = max(5.0, dr.get("level", 0.07) * P["full"])
-            m = (P["dark"] > t) & R & ~P["writing"] & P["page"] | (P["paint"] & R)
-            n2, lab2, st2, _ = cv2.connectedComponentsWithStats(m.astype(np.uint8), connectivity=8)
-            keep = np.zeros(n2, bool)
-            keep[1:] = st2[1:, cv2.CC_STAT_AREA] >= 10
-            m = keep[lab2]
-            g = int(dr.get("gap", 7)) | 1
-            m = cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (g, g))).astype(bool) & R
+            m = faint_marks(P, R, dr, paint=True)
             m = specks_out(m, dr.get("keep", 0.06), int(dr.get("near", 4) * k))
             out.append((dr["id"], dr, m))
     res = []
@@ -511,6 +518,12 @@ def cut(img: str, drawings: list[dict], P=None):
             m = m | grow_into(m & back, back)
         if dr.get("take", "pieces") == "pieces":
             m = specks_out(m, dr.get("keep", 0.04), int(dr.get("near", 6) * k))
+        for extra in dr.get("plus", []):
+            # a faint part of a drawing otherwise taken from its pieces (a pale stem, root or flower head): the faint
+            # ink in that region that joins the drawing, ink only (no paint, so no offset from the facing page), and
+            # not the parchment's grain
+            f = faint_marks(P, region(P, extra["in"]), {"level": 0.12, "gap": 5, **extra})
+            m = m | grow_into(f & cv2.dilate(m.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool), f)
         if dr.get("take", "pieces") in ("pieces", "each"):
             # the drawing's own strokes where a word's box took them off (a petal over a line of writing): the ink
             # under the words that carries on from the drawing, a few pixels at a time

@@ -5,7 +5,7 @@
     "id": "f33r.plant",
     "kind": "plant",
     "name": "Plant",
-    "looks": "Two green-and-white rayed flower heads on swollen pale stalks with a small third head, broad pointed green leaves and a spreading orange-brown root with a face drawn faintly at each end.",
+    "looks": "Two green-and-white rayed flower heads and a small third one on pale stalks, broad pointed green leaves, and a long orange-brown root with downward strands whose two ends are drawn faintly as heads with eyes.",
     "in": {
      "box": [
       60,
@@ -32,7 +32,39 @@
       ]
      }
     ],
-    "take": "pieces"
+    "take": "pieces",
+    "plus": [
+     {
+      "in": {
+       "box": [
+        300,
+        300,
+        530,
+        560
+       ]
+      }
+     },
+     {
+      "in": {
+       "box": [
+        60,
+        840,
+        190,
+        965
+       ]
+      }
+     },
+     {
+      "in": {
+       "box": [
+        570,
+        850,
+        700,
+        965
+       ]
+      }
+     }
+    ]
    }
   ],
   "f33v": [
@@ -173,7 +205,17 @@
      }
     ],
     "take": "pieces",
-    "keep": 0.002
+    "keep": 0.002,
+    "not": [
+     {
+      "box": [
+       663,
+       0,
+       700,
+       900
+      ]
+     }
+    ]
    }
   ],
   "f35v": [
@@ -275,6 +317,66 @@
        628,
        640,
        800
+      ]
+     },
+     {
+      "box": [
+       340,
+       296,
+       361,
+       352
+      ]
+     },
+     {
+      "poly": [
+       [
+        379,
+        296
+       ],
+       [
+        418,
+        296
+       ],
+       [
+        418,
+        318
+       ],
+       [
+        412,
+        345
+       ],
+       [
+        400,
+        352
+       ],
+       [
+        379,
+        352
+       ]
+      ]
+     },
+     {
+      "box": [
+       322,
+       350,
+       345,
+       385
+      ]
+     },
+     {
+      "box": [
+       384,
+       352,
+       398,
+       362
+      ]
+     },
+     {
+      "box": [
+       322,
+       320,
+       342,
+       346
       ]
      }
     ],
@@ -3705,7 +3807,7 @@
     "id": "f43r.plant",
     "kind": "plant",
     "name": "Plant",
-    "looks": "A long low mound of overlapping scale-like green-and-white leaves on many thin blue-and-white stems, with seven yellow flower heads on stalks above and a dense mass of wavy red-brown roots below.",
+    "looks": "A long low mound of overlapping scale-like green-and-white leaves on many thin blue-lined stems, with small round yellow-centred flower heads on stalks above and a dense mass of wavy red-brown roots below.",
     "in": {
      "box": [
       25,
@@ -7536,98 +7638,142 @@
       ]
      ]
     },
-    "take": "pieces"
-   },
+    "take": "pieces",
+    "not": [
+     {
+      "poly": [
+       [
+        505,
+        598
+       ],
+       [
+        560,
+        598
+       ],
+       [
+        560,
+        640
+       ],
+       [
+        505,
+        640
+       ],
+       [
+        498,
+        610
+       ]
+      ]
+     },
+     {
+      "box": [
+       458,
+       758,
+       510,
+       845
+      ]
+     }
+    ],
+    "plus": [
+     {
+      "in": {
+       "box": [
+        380,
+        250,
+        480,
+        760
+       ]
+      }
+     },
+     {
+      "in": {
+       "box": [
+        270,
+        720,
+        520,
+        905
+       ]
+      }
+     },
+     {
+      "in": {
+       "box": [
+        80,
+        185,
+        210,
+        300
+       ]
+      }
+     }
+    ]
+   }
+  ],
+  "f48v": [
    {
-    "id": "f48r.faint",
+    "id": "f48v.plant",
     "kind": "plant",
     "name": "Plant",
-    "looks": "Three pale outlined flower heads filled with small dots on thin branching stalks, a tall pale stem with green leaves like tufts of long curled fingers on short side stalks, and a cluster of thin pale roots.",
-    "in": {
-     "poly": [
-      [
-       85,
-       190
-      ],
-      [
-       370,
-       190
-      ],
-      [
-       370,
-       280
-      ],
-      [
-       480,
-       280
-      ],
-      [
-       480,
-       400
-      ],
-      [
-       505,
-       400
-      ],
-      [
-       505,
-       560
-      ],
-      [
-       530,
-       600
-      ],
-      [
-       530,
-       700
-      ],
-      [
-       505,
-       720
-      ],
-      [
-       480,
-       820
-      ],
-      [
-       450,
-       900
-      ],
-      [
-       290,
-       900
-      ],
-      [
-       220,
-       860
-      ],
-      [
-       140,
-       800
-      ],
-      [
-       135,
-       720
-      ],
-      [
-       135,
-       500
-      ],
-      [
-       150,
-       400
-      ],
-      [
-       150,
-       300
-      ],
-      [
-       85,
-       300
+    "looks": "Two pairs of round dark blue and yellow flower heads on green sepals at the tops of two long thin stalks, many deeply lobed dark green leaves on pale branching stems, and a short pale root with thin curling strands.",
+    "in": [
+     {
+      "box": [
+       225,
+       205,
+       335,
+       330
       ]
-     ]
-    },
-    "take": "faint"
+     },
+     {
+      "box": [
+       430,
+       115,
+       560,
+       270
+      ]
+     },
+     {
+      "box": [
+       185,
+       335,
+       665,
+       910
+      ]
+     },
+     {
+      "box": [
+       320,
+       800,
+       590,
+       985
+      ]
+     }
+    ],
+    "not": [
+     {
+      "box": [
+       222,
+       855,
+       262,
+       940
+      ]
+     },
+     {
+      "box": [
+       585,
+       895,
+       665,
+       940
+      ]
+     },
+     {
+      "box": [
+       600,
+       320,
+       630,
+       340
+      ]
+     }
+    ],
+    "take": "pieces"
    }
   ]
  }
