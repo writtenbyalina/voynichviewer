@@ -52,6 +52,7 @@ line every 50 units and a numbered line every 100.
 | `fill` | `auto` (default), `all` (every space it closes round: a diagram, a pool with its women) or `none` |
 | `fit` | `true` with a `circle`: the circle is moved onto the ruled circle nearest it |
 | `joins` | the id of the same drawing's other part on the next panel of a foldout |
+| `edge` | `true`: a drawing running onto the page's edge gets back what was taken off as the edge, inside its region and joined to it (draw the region tight round the drawing) |
 
 **Regions** (units): `{"box": [x0, y0, x1, y1]}`, `{"poly": [[x, y], ...]}`, `{"circle": [cx, cy, r]}`,
 `{"ring": [cx, cy, r0, r1]}`, or a list of them (all of them together).

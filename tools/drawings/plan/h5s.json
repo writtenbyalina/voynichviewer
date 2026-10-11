@@ -17164,7 +17164,7 @@
     "id": "f103v.star",
     "kind": "star",
     "name": "Star",
-    "looks": "Small seven- and eight-pointed stars drawn in outline, some with a red dot or red paint at the centre.",
+    "looks": "Small seven- and eight-pointed stars drawn in outline, every other one with a red centre.",
     "in": {
      "box": [
       100,
@@ -17174,7 +17174,211 @@
      ]
     },
     "take": "each",
-    "min": 300
+    "min": 300,
+    "not": [
+     {
+      "box": [
+       95,
+       150,
+       165,
+       200
+      ]
+     },
+     {
+      "box": [
+       95,
+       236,
+       165,
+       400
+      ]
+     },
+     {
+      "box": [
+       95,
+       90,
+       140,
+       132
+      ]
+     },
+     {
+      "box": [
+       120,
+       698,
+       170,
+       740
+      ]
+     }
+    ]
+   },
+   {
+    "id": "f103v.star-a",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small seven-pointed star with a red centre.",
+    "in": {
+     "circle": [
+      117.9,
+      175,
+      16
+     ]
+    },
+    "not": [
+     {
+      "ring": [
+       117.9,
+       175,
+       16,
+       46
+      ]
+     }
+    ]
+   },
+   {
+    "id": "f103v.star-b",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small seven-pointed star with a red centre.",
+    "in": {
+     "circle": [
+      124.1,
+      257,
+      16
+     ]
+    },
+    "not": [
+     {
+      "ring": [
+       124.1,
+       257,
+       16,
+       46
+      ]
+     }
+    ]
+   },
+   {
+    "id": "f103v.star-c",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small plain seven-pointed star.",
+    "in": {
+     "circle": [
+      122.7,
+      306.5,
+      15.5
+     ]
+    },
+    "not": [
+     {
+      "ring": [
+       122.7,
+       306.5,
+       15.5,
+       45.5
+      ]
+     }
+    ],
+    "take": "faint",
+    "level": 0.3,
+    "gap": 3
+   },
+   {
+    "id": "f103v.star-g",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small seven-pointed star with a red centre.",
+    "in": {
+     "circle": [
+      143.8,
+      718,
+      16
+     ]
+    },
+    "not": [
+     {
+      "ring": [
+       143.8,
+       718,
+       16,
+       46
+      ]
+     }
+    ],
+    "take": "faint",
+    "level": 0.3,
+    "gap": 3
+   },
+   {
+    "id": "f103v.star-f",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small plain seven-pointed star.",
+    "in": {
+     "circle": [
+      117.3,
+      110.4,
+      16
+     ]
+    },
+    "not": [
+     {
+      "ring": [
+       117.3,
+       110.4,
+       16,
+       46
+      ]
+     }
+    ],
+    "take": "faint",
+    "level": 0.3,
+    "gap": 3
+   },
+   {
+    "id": "f103v.star-d",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small seven-pointed star with a red centre.",
+    "in": {
+     "circle": [
+      129.8,
+      350.9,
+      15.5
+     ]
+    },
+    "not": [
+     {
+      "ring": [
+       129.8,
+       350.9,
+       15.5,
+       45.5
+      ]
+     }
+    ]
+   },
+   {
+    "id": "f103v.star-e",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small plain seven-pointed star.",
+    "in": {
+     "circle": [
+      130.7,
+      380.4,
+      16
+     ]
+    },
+    "not": [
+     {
+      "ring": [
+       130.7,
+       380.4,
+       16,
+       46
+      ]
+     }
+    ]
    }
   ]
  }

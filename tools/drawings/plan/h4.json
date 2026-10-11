@@ -24,14 +24,40 @@
       ]
      }
     ],
-    "not": {
-     "box": [
-      80,
-      95,
-      140,
-      141
-     ]
-    }
+    "not": [
+     {
+      "box": [
+       80,
+       95,
+       140,
+       141
+      ]
+     },
+     {
+      "box": [
+       698,
+       0,
+       760,
+       1000
+      ]
+     },
+     {
+      "box": [
+       688,
+       230,
+       698,
+       292
+      ]
+     },
+     {
+      "box": [
+       688,
+       335,
+       698,
+       430
+      ]
+     }
+    ]
    }
   ],
   "f49v": [
@@ -39,13 +65,132 @@
     "id": "f49v.plant",
     "kind": "plant",
     "name": "Plant",
-    "looks": "A crown of green and pale leaves with blue marks, a blue flower above it, a long thin green stem and a round root drawn in outline with small circles.",
+    "looks": "A crown of curled green leaves with blue marks round a pale centre, a long thin green stem and the top of a round root drawn in outline.",
     "in": {
      "box": [
       440,
-      15,
+      88,
       770,
       965
+     ]
+    }
+   },
+   {
+    "id": "f49v.flower",
+    "kind": "other",
+    "name": "Blue flower",
+    "take": "region",
+    "looks": "A small flower of six dark blue petals with a few thin pen strokes round it.",
+    "in": {
+     "poly": [
+      [
+       684,
+       38
+      ],
+      [
+       692,
+       35
+      ],
+      [
+       702,
+       40
+      ],
+      [
+       706,
+       22
+      ],
+      [
+       712,
+       18
+      ],
+      [
+       719,
+       22
+      ],
+      [
+       720,
+       40
+      ],
+      [
+       726,
+       30
+      ],
+      [
+       734,
+       27
+      ],
+      [
+       740,
+       31
+      ],
+      [
+       737,
+       44
+      ],
+      [
+       745,
+       47
+      ],
+      [
+       751,
+       52
+      ],
+      [
+       749,
+       61
+      ],
+      [
+       738,
+       63
+      ],
+      [
+       745,
+       72
+      ],
+      [
+       744,
+       80
+      ],
+      [
+       737,
+       82
+      ],
+      [
+       726,
+       72
+      ],
+      [
+       719,
+       72
+      ],
+      [
+       716,
+       80
+      ],
+      [
+       706,
+       80
+      ],
+      [
+       701,
+       74
+      ],
+      [
+       707,
+       62
+      ],
+      [
+       700,
+       58
+      ],
+      [
+       688,
+       56
+      ],
+      [
+       683,
+       48
+      ]
      ]
     }
    }

@@ -9464,7 +9464,8 @@
       218,
       195
      ]
-    }
+    },
+    "keep": 0.08
    },
    {
     "id": "f89v2.root-2",
@@ -9475,7 +9476,7 @@
      "box": [
       300,
       95,
-      512,
+      505,
       235
      ]
     }
@@ -9702,6 +9703,14 @@
       655,
       838
      ]
+    },
+    "not": {
+     "box": [
+      628,
+      812,
+      660,
+      848
+     ]
     }
    },
    {
@@ -9729,11 +9738,11 @@
       ],
       [
        745,
-       995
+       975
       ],
       [
        600,
-       995
+       975
       ],
       [
        600,
@@ -9777,6 +9786,514 @@
       [
        790,
        800
+      ]
+     ]
+    }
+   }
+  ],
+  "f99r": [
+   {
+    "id": "f99r.jar-1",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A red cylindrical jar with a pale green lid and pale bands round its top and foot.",
+    "in": {
+     "box": [
+      72,
+      40,
+      158,
+      222
+     ]
+    }
+   },
+   {
+    "id": "f99r.jar-2",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A red cylindrical jar with a pale green lid and pale bands.",
+    "in": {
+     "box": [
+      80,
+      275,
+      150,
+      418
+     ]
+    }
+   },
+   {
+    "id": "f99r.jar-3",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A red cylindrical jar with a green lid, pale bands with dark marks, and curled pale feet.",
+    "in": {
+     "box": [
+      70,
+      440,
+      150,
+      592
+     ]
+    }
+   },
+   {
+    "id": "f99r.jar-4",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A red cylindrical jar with a pale green lid and pale bands.",
+    "in": {
+     "box": [
+      70,
+      640,
+      150,
+      835
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-1",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale tan root with thin stems and fine rootlets.",
+    "in": {
+     "box": [
+      168,
+      20,
+      222,
+      140
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-2",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A dark red-purple root with fine rootlets and pale outlined stems.",
+    "in": {
+     "box": [
+      222,
+      20,
+      272,
+      128
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-3",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A long pale tan root tapering to a point, with stems on top.",
+    "in": {
+     "box": [
+      272,
+      20,
+      325,
+      140
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-4",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale feathered root with a red streak down its middle.",
+    "in": {
+     "box": [
+      325,
+      20,
+      375,
+      150
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-5",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale olive horn-shaped root with a long point and stems on top.",
+    "in": {
+     "box": [
+      372,
+      20,
+      415,
+      140
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-6",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A cluster of five pale tube-like shapes on thin stems.",
+    "in": {
+     "box": [
+      415,
+      20,
+      478,
+      145
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-7",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale root with orange streaks round a ringed central stalk.",
+    "in": {
+     "box": [
+      478,
+      20,
+      532,
+      140
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-8",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A dark red twisted root with curled arms and two stems on top.",
+    "in": {
+     "box": [
+      532,
+      20,
+      595,
+      152
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-9",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale curved root with orange streaks and long trailing strands.",
+    "in": {
+     "poly": [
+      [
+       595,
+       30
+      ],
+      [
+       724,
+       30
+      ],
+      [
+       724,
+       140
+      ],
+      [
+       680,
+       130
+      ],
+      [
+       640,
+       118
+      ],
+      [
+       600,
+       125
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-10",
+    "kind": "root",
+    "name": "Root",
+    "looks": "An orange root with fine hairs and long thin strands reaching up to the right.",
+    "in": {
+     "box": [
+      155,
+      100,
+      300,
+      200
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-11",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A long orange root with a hooked head and many short legs along its underside.",
+    "in": {
+     "box": [
+      318,
+      140,
+      432,
+      218
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-12",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A long pale olive root with a knobbed end and long pale strands running to the right.",
+    "in": {
+     "poly": [
+      [
+       432,
+       140
+      ],
+      [
+       600,
+       125
+      ],
+      [
+       640,
+       118
+      ],
+      [
+       680,
+       130
+      ],
+      [
+       724,
+       140
+      ],
+      [
+       724,
+       212
+      ],
+      [
+       432,
+       212
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-13",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A red-brown twisted root with curled ends.",
+    "in": {
+     "box": [
+      148,
+      285,
+      186,
+      380
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-14",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale U-shaped root with orange streaks.",
+    "in": {
+     "box": [
+      186,
+      295,
+      248,
+      382
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-15",
+    "kind": "root",
+    "name": "Root",
+    "looks": "An olive bulb with two curved stems on top and a curled tail.",
+    "in": {
+     "box": [
+      248,
+      295,
+      302,
+      390
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-16",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale coiled root with orange bands and a curled tail.",
+    "in": {
+     "box": [
+      302,
+      290,
+      360,
+      390
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-17",
+    "kind": "root",
+    "name": "Root",
+    "looks": "An olive bent root with a fan of long thin stems.",
+    "in": {
+     "box": [
+      360,
+      295,
+      492,
+      375
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-18",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale root with a red streak and a short stem on top.",
+    "in": {
+     "box": [
+      492,
+      300,
+      550,
+      385
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-19",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A large pale root with wavy strands, a stem on top and dark curled marks.",
+    "in": {
+     "box": [
+      550,
+      295,
+      718,
+      395
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-20",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale root with two crossed legs and a curled stem.",
+    "in": {
+     "box": [
+      150,
+      470,
+      212,
+      560
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-21",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A dark red dome with thin hanging strands.",
+    "in": {
+     "box": [
+      212,
+      470,
+      270,
+      550
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-22",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale twisted root with a long curling tail.",
+    "in": {
+     "box": [
+      272,
+      470,
+      362,
+      555
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-23",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A round pale root with orange bands and a stem on top.",
+    "in": {
+     "box": [
+      362,
+      470,
+      420,
+      555
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-24",
+    "kind": "root",
+    "name": "Root",
+    "looks": "An olive S-shaped root with fine hairs.",
+    "in": {
+     "box": [
+      432,
+      480,
+      515,
+      552
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-25",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale root with orange streaks and a bent stem.",
+    "in": {
+     "box": [
+      528,
+      465,
+      622,
+      545
+     ]
+    }
+   },
+   {
+    "id": "f99r.root-26",
+    "kind": "root",
+    "name": "Root with a leaf",
+    "looks": "A pale root of long strands on a tall stem topped by a long bent green leaf.",
+    "in": {
+     "box": [
+      628,
+      390,
+      718,
+      565
+     ]
+    }
+   },
+   {
+    "id": "f99r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A long orange-striped root fringed with fine hairs, with a long pale stem bearing pointed green leaves and two dark red hanging pods.",
+    "in": {
+     "poly": [
+      [
+       165,
+       660
+      ],
+      [
+       724,
+       640
+      ],
+      [
+       724,
+       985
+      ],
+      [
+       400,
+       985
+      ],
+      [
+       400,
+       940
+      ],
+      [
+       530,
+       940
+      ],
+      [
+       530,
+       830
+      ],
+      [
+       165,
+       830
       ]
      ]
     }

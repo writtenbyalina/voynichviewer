@@ -171,6 +171,7 @@ def pieces(img: str, im: np.ndarray | None = None):
     keep = np.zeros(n, bool)
     keep[1:] = st[1:, cv2.CC_STAT_AREA] >= 12
     marks = keep[lab]
+    raw = marks.copy()          # before the edges are taken off: a drawing on the page's edge can ask for it back ("edge")
     # the page's edges out: the binding, the edges of the leaves under it, the trimmed edge's stains, which lie along
     # the panel's border: what runs into the border within a band round it; a drawing that reaches the band keeps
     # what is inside it
@@ -217,7 +218,7 @@ def pieces(img: str, im: np.ndarray | None = None):
     # hairline gaps closed: a drawing's outline is one piece
     joined = cv2.morphologyEx(marks.astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
     n, lab, st, cen = cv2.connectedComponentsWithStats(joined, connectivity=8)
-    return dict(labels=lab, stats=st, n=n, ink=ink, paint=paint, clear=clear, writing=writing, page=page, dark=d, full=full,
+    return dict(labels=lab, stats=st, n=n, ink=ink, paint=paint, clear=clear, writing=writing, page=page, dark=d, full=full, raw=raw,
                 marks=marks, joined=joined.astype(bool), h=h, w=w)
 
 
@@ -502,6 +503,12 @@ def cut(img: str, drawings: list[dict], P=None):
     res = []
     under = P["ink"] & P["writing"] & P["page"]
     for did, dr, m in out:
+        if dr.get("edge") and m.any():
+            # a drawing running onto the page's edge (a flower touching the top): what was taken off as the edge,
+            # inside its region and carrying on from it, given back; the region should be drawn tight round it
+            R = regs[dr["id"]]
+            back = cv2.morphologyEx((P["raw"] & R).astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))).astype(bool)
+            m = m | grow_into(m & back, back)
         if dr.get("take", "pieces") == "pieces":
             m = specks_out(m, dr.get("keep", 0.04), int(dr.get("near", 6) * k))
         if dr.get("take", "pieces") in ("pieces", "each"):
