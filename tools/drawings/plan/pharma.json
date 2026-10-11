@@ -7529,6 +7529,796 @@
      }
     ]
    }
+  ],
+  "f89v1": [
+   {
+    "id": "f89v1.jar-1",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A green goblet-shaped jar with a pale banded lid, a dripping pale rim and a green foot.",
+    "in": {
+     "box": [
+      15,
+      50,
+      130,
+      300
+     ]
+    },
+    "take": "faint"
+   },
+   {
+    "id": "f89v1.jar-2",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A tall jar with a pale spire, a green cone, a blue bulb, a thin pale neck with green rings, a blue cylinder body and green pointed feet.",
+    "in": {
+     "poly": [
+      [
+       58,
+       345
+      ],
+      [
+       78,
+       345
+      ],
+      [
+       86,
+       380
+      ],
+      [
+       100,
+       430
+      ],
+      [
+       104,
+       520
+      ],
+      [
+       92,
+       525
+      ],
+      [
+       92,
+       580
+      ],
+      [
+       122,
+       588
+      ],
+      [
+       124,
+       700
+      ],
+      [
+       136,
+       710
+      ],
+      [
+       136,
+       748
+      ],
+      [
+       28,
+       748
+      ],
+      [
+       28,
+       590
+      ],
+      [
+       60,
+       580
+      ],
+      [
+       60,
+       525
+      ],
+      [
+       36,
+       520
+      ],
+      [
+       36,
+       430
+      ],
+      [
+       55,
+       380
+      ]
+     ]
+    },
+    "take": "faint"
+   },
+   {
+    "id": "f89v1.root-1",
+    "kind": "root",
+    "name": "Root with a leaf",
+    "looks": "A tan root with long rootlets and pale stems, and a lobed green leaf on a curved stem.",
+    "in": {
+     "poly": [
+      [
+       120,
+       30
+      ],
+      [
+       215,
+       30
+      ],
+      [
+       306,
+       55
+      ],
+      [
+       306,
+       150
+      ],
+      [
+       265,
+       150
+      ],
+      [
+       245,
+       200
+      ],
+      [
+       215,
+       300
+      ],
+      [
+       120,
+       300
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f89v1.root-2",
+    "kind": "root",
+    "name": "Root with a leaf",
+    "looks": "A pink-brown root with long pale rootlets spreading wide, tall pale stems and a large green leaf on a curved stem.",
+    "in": {
+     "poly": [
+      [
+       265,
+       10
+      ],
+      [
+       565,
+       10
+      ],
+      [
+       565,
+       90
+      ],
+      [
+       455,
+       90
+      ],
+      [
+       455,
+       300
+      ],
+      [
+       215,
+       300
+      ],
+      [
+       245,
+       200
+      ],
+      [
+       265,
+       150
+      ],
+      [
+       306,
+       150
+      ],
+      [
+       306,
+       55
+      ]
+     ]
+    },
+    "take": "faint",
+    "not": [
+     {
+      "poly": [
+       [
+        395,
+        88
+       ],
+       [
+        460,
+        88
+       ],
+       [
+        460,
+        140
+       ],
+       [
+        395,
+        140
+       ]
+      ]
+     },
+     {
+      "box": [
+       265,
+       10,
+       330,
+       48
+      ]
+     },
+     {
+      "box": [
+       420,
+       0,
+       520,
+       18
+      ]
+     }
+    ]
+   },
+   {
+    "id": "f89v1.root-3",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "A dark red-brown lumpy root with clawed rootlets, stems, and two clawed green leaves.",
+    "in": {
+     "box": [
+      455,
+      40,
+      660,
+      300
+     ]
+    }
+   },
+   {
+    "id": "f89v1.root-4",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "A very pale root with fine strands and two long toothed green leaves on stems.",
+    "in": {
+     "poly": [
+      [
+       130,
+       610
+      ],
+      [
+       270,
+       610
+      ],
+      [
+       270,
+       750
+      ],
+      [
+       240,
+       760
+      ],
+      [
+       232,
+       850
+      ],
+      [
+       255,
+       995
+      ],
+      [
+       80,
+       995
+      ],
+      [
+       80,
+       740
+      ],
+      [
+       130,
+       740
+      ]
+     ]
+    },
+    "take": "faint"
+   },
+   {
+    "id": "f89v1.root-5",
+    "kind": "root",
+    "name": "Root with a leaf",
+    "looks": "A tan root with curling lobes and rootlets, stems on top and a long green leaf on a stem.",
+    "in": {
+     "poly": [
+      [
+       270,
+       610
+      ],
+      [
+       480,
+       600
+      ],
+      [
+       480,
+       690
+      ],
+      [
+       400,
+       700
+      ],
+      [
+       395,
+       800
+      ],
+      [
+       370,
+       900
+      ],
+      [
+       350,
+       995
+      ],
+      [
+       255,
+       995
+      ],
+      [
+       232,
+       850
+      ],
+      [
+       240,
+       760
+      ],
+      [
+       270,
+       750
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f89v1.root-6",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "A large brown root with many long wavy strands, tall stems and two round spiky green leaves.",
+    "in": {
+     "poly": [
+      [
+       480,
+       600
+      ],
+      [
+       671,
+       600
+      ],
+      [
+       671,
+       995
+      ],
+      [
+       350,
+       995
+      ],
+      [
+       370,
+       900
+      ],
+      [
+       395,
+       800
+      ],
+      [
+       400,
+       700
+      ],
+      [
+       480,
+       690
+      ]
+     ]
+    }
+   }
+  ],
+  "f89v2": [
+   {
+    "id": "f89v2.jar-1",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A jar with a small finial, a green domed lid, a blue band between pale rims, and green feet.",
+    "in": {
+     "box": [
+      45,
+      50,
+      160,
+      300
+     ]
+    }
+   },
+   {
+    "id": "f89v2.jar-2",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A tall jar with a pale spire, two blue bands between pale rings, a blue stem and a pale round foot.",
+    "in": {
+     "poly": [
+      [
+       55,
+       320
+      ],
+      [
+       130,
+       320
+      ],
+      [
+       140,
+       450
+      ],
+      [
+       152,
+       470
+      ],
+      [
+       152,
+       545
+      ],
+      [
+       130,
+       560
+      ],
+      [
+       158,
+       575
+      ],
+      [
+       158,
+       605
+      ],
+      [
+       55,
+       605
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f89v2.jar-3",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A round blue jar with a pale lid and finial, a green ring and a pale flared foot.",
+    "in": {
+     "box": [
+      70,
+      605,
+      180,
+      845
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-1",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A tan root with many long curling strands and thin pale stems.",
+    "in": {
+     "box": [
+      165,
+      50,
+      335,
+      280
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-2",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "Pale outlined bulbs with dark tan strands below and a pale green wash of leaves above.",
+    "in": {
+     "box": [
+      300,
+      35,
+      545,
+      235
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-3",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A small red-orange root with pale stems and thin trailing rootlets.",
+    "in": {
+     "box": [
+      540,
+      30,
+      632,
+      215
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-4",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale outlined root with fine strands, thin stems and a pale green wash above.",
+    "in": {
+     "box": [
+      632,
+      30,
+      790,
+      215
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-5",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "A brown root with long strands, one running far down to a forked end, and two toothed green leaves.",
+    "in": {
+     "box": [
+      800,
+      40,
+      1051,
+      345
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-6",
+    "kind": "root",
+    "name": "Root with a leaf",
+    "looks": "A red ribbon-like root that loops round, with pale stems and a green leaf with a hooked stalk.",
+    "in": {
+     "poly": [
+      [
+       152,
+       355
+      ],
+      [
+       362,
+       355
+      ],
+      [
+       362,
+       575
+      ],
+      [
+       158,
+       575
+      ],
+      [
+       130,
+       560
+      ],
+      [
+       152,
+       545
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-7",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale orange root of long looping strands with thin stems rising from it.",
+    "in": {
+     "poly": [
+      [
+       380,
+       320
+      ],
+      [
+       600,
+       320
+      ],
+      [
+       600,
+       500
+      ],
+      [
+       690,
+       500
+      ],
+      [
+       690,
+       575
+      ],
+      [
+       380,
+       575
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-8",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "A red-orange root with sweeping red rootlets, long stems and two large toothed green leaves.",
+    "in": {
+     "poly": [
+      [
+       600,
+       320
+      ],
+      [
+       1051,
+       320
+      ],
+      [
+       1051,
+       620
+      ],
+      [
+       690,
+       620
+      ],
+      [
+       690,
+       500
+      ],
+      [
+       600,
+       500
+      ]
+     ]
+    },
+    "not": {
+     "poly": [
+      [
+       672,
+       478
+      ],
+      [
+       765,
+       468
+      ],
+      [
+       765,
+       505
+      ],
+      [
+       672,
+       505
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-9",
+    "kind": "root",
+    "name": "Faint root",
+    "looks": "A faint pale sketch of a root with a fringed leaf and a branching sprig.",
+    "in": {
+     "box": [
+      170,
+      760,
+      330,
+      1000
+     ]
+    },
+    "take": "faint"
+   },
+   {
+    "id": "f89v2.leaf-1",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A large round green leaf with finger-like lobes.",
+    "in": {
+     "box": [
+      335,
+      735,
+      475,
+      865
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-10",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A faint red-orange root with pale strands.",
+    "in": {
+     "box": [
+      478,
+      690,
+      552,
+      990
+     ]
+    },
+    "take": "faint"
+   },
+   {
+    "id": "f89v2.leaf-2",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A round green leaf with finger-like lobes on a short stem.",
+    "in": {
+     "box": [
+      552,
+      745,
+      655,
+      840
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-11",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "A faint pale root with long strands and three small round green leaves on stems.",
+    "in": {
+     "poly": [
+      [
+       655,
+       695
+      ],
+      [
+       790,
+       695
+      ],
+      [
+       790,
+       800
+      ],
+      [
+       760,
+       830
+      ],
+      [
+       745,
+       995
+      ],
+      [
+       600,
+       995
+      ],
+      [
+       600,
+       845
+      ],
+      [
+       655,
+       845
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f89v2.root-12",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "A large tan root with many long strands, tall stems and two clawed green leaves.",
+    "in": {
+     "poly": [
+      [
+       790,
+       690
+      ],
+      [
+       1051,
+       690
+      ],
+      [
+       1051,
+       990
+      ],
+      [
+       745,
+       990
+      ],
+      [
+       760,
+       830
+      ],
+      [
+       790,
+       800
+      ]
+     ]
+    }
+   }
   ]
  }
 }

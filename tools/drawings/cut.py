@@ -202,7 +202,10 @@ def pieces(img: str, im: np.ndarray | None = None):
     top[:int(0.08 * h), :] = top[-int(0.08 * h):, :] = True
     lines |= hz & top
     lines = cv2.dilate(lines.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
-    edge |= lines & marks
+    # but never through paint laid thick (a leaf down the side of the page: f49v, f52v)
+    thick = cv2.morphologyEx(clear.astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))).astype(bool)
+    thick = cv2.dilate(thick.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))).astype(bool)
+    edge |= lines & marks & ~thick
     tall = np.zeros(n, bool)
     cx = st[:, cv2.CC_STAT_LEFT] + st[:, cv2.CC_STAT_WIDTH] / 2
     cy = st[:, cv2.CC_STAT_TOP] + st[:, cv2.CC_STAT_HEIGHT] / 2

@@ -3490,8 +3490,368 @@
        244,
        356
       ]
+     },
+     {
+      "box": [
+       456,
+       151,
+       487,
+       284
+      ]
+     },
+     {
+      "box": [
+       508,
+       282,
+       538,
+       389
+      ]
+     },
+     {
+      "box": [
+       671,
+       486,
+       728,
+       510
+      ]
+     },
+     {
+      "box": [
+       551,
+       489,
+       579,
+       546
+      ]
+     },
+     {
+      "box": [
+       553,
+       554,
+       579,
+       703
+      ]
+     },
+     {
+      "box": [
+       183,
+       717,
+       219,
+       741
+      ]
+     },
+     {
+      "box": [
+       251,
+       580,
+       284,
+       602
+      ]
+     },
+     {
+      "box": [
+       291,
+       528,
+       318,
+       559
+      ]
+     },
+     {
+      "box": [
+       258,
+       365,
+       331,
+       401
+      ]
+     },
+     {
+      "box": [
+       509,
+       165,
+       584,
+       345
+      ]
+     },
+     {
+      "box": [
+       606,
+       350,
+       683,
+       386
+      ]
+     },
+     {
+      "box": [
+       519,
+       386,
+       578,
+       437
+      ]
+     },
+     {
+      "box": [
+       515,
+       427,
+       581,
+       479
+      ]
+     },
+     {
+      "box": [
+       405,
+       549,
+       454,
+       581
+      ]
+     },
+     {
+      "box": [
+       386,
+       647,
+       465,
+       690
+      ]
+     },
+     {
+      "box": [
+       187,
+       472,
+       224,
+       551
+      ]
+     },
+     {
+      "box": [
+       300,
+       279,
+       404,
+       340
+      ]
      }
     ]
+   },
+   {
+    "id": "f68r3.star-a",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      545,
+      236,
+      15
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-b",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      622,
+      369,
+      16
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-c",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      656,
+      371,
+      16
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-d",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      537,
+      422,
+      15
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-e",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      544,
+      455,
+      15
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-f",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      423,
+      566,
+      16
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-g",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      405,
+      676,
+      17
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-h",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      445,
+      666,
+      17
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-i",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      201,
+      487,
+      17
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-j",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      208,
+      532,
+      17
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-k",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      316,
+      305,
+      15
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-l",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      342,
+      326,
+      15
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-m",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      363,
+      295,
+      15
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68r3.star-n",
+    "kind": "star",
+    "name": "Star",
+    "looks": "A small eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      388,
+      322,
+      15
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
    }
   ]
  }
