@@ -31,6 +31,13 @@ function textIcon() {
   el.innerHTML = '<path d="M2.5 4h11M2.5 8h11M2.5 12h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>';
   return el;
 }
+/* a leaf drawn in outline: the icon of the Drawings button */
+function drawIcon() {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  el.setAttribute("viewBox", "0 0 16 16"); el.setAttribute("width", "15"); el.setAttribute("height", "15"); el.setAttribute("aria-hidden", "true"); el.classList.add("ico-text");
+  el.innerHTML = '<path d="M3 13C3 7 7 3 13.5 2.5 13.5 9 9.5 13 3 13Zm0 0 6-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2.2 1.6"/>';
+  return el;
+}
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const store = {
   get(k, d) { try { const v = localStorage.getItem("vv:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -81,7 +88,7 @@ const SECTION = { H: "Herbal", A: "Astronomical", Z: "Zodiac", B: "Balneological
 let D;                       // codex.json
 const SHEETS = new Map();    // "77|82" -> sheet
 let ORDERS = new Map();      // id -> resolved order
-const APP_VERSION = "1.6";
+const APP_VERSION = "1.7";
 const PAGE_SHEET = new Map();   // "f78v" -> "78|81", every page including lost ones
 const RETIRED = { "davis-blog-2025": "davis" };   // orders taken out of the menu -> the order an old link now opens
 
@@ -352,7 +359,7 @@ function goToPage(page, { open = false } = {}) {
 }
 
 function setHash() {
-  const at = S.view === "read" ? short(curLabel() || "") : S.view === "three" ? View3D.state() : S.view === "info" ? (Info.at || "") : S.view === "text" ? TextTab.state() : "";
+  const at = S.view === "read" ? short(curLabel() || "") : S.view === "three" ? View3D.state() : S.view === "info" ? (Info.at || "") : S.view === "text" ? TextTab.state() : S.view === "draw" ? DrawTab.state() : "";
   const text = S.view === "read" && TextUI.open ? TextUI.hash() : "";
   const hash = `#${S.view}/${encodeURIComponent(S.order)}${at || text ? "/" + at : ""}${text ? "/" + text : ""}`;
   if (location.hash !== hash) history.replaceState(history.state, "", hash);   // (keeping what text.js put there for Back)
@@ -363,7 +370,7 @@ function setHash() {
 function readHash() {
   const [view, order, at, more] = location.hash.replace(/^#\/?/, "").split("/").map(x => { try { return decodeURIComponent(x); } catch { return x; } });
   if (view === "read") TextUI.fromHash(more);
-  if (["read", "three", "info", "text"].includes(view)) S.view = view;
+  if (["read", "three", "info", "text", "draw"].includes(view)) S.view = view;
   if (view === "sources" || view === "collation") S.view = "info";   // the old Sources and Folio order tabs are sections of Info now
   const oid = RETIRED[order] || order;
   if (oid && ORDERS.has(oid)) S.order = oid;
@@ -404,6 +411,7 @@ function show(view) {
   if (view === "three") View3D.mount();
   if (view === "info") Info.render();
   if (view === "text") TextTab.mount();
+  if (view === "draw") DrawTab.mount();
   setHash();
 }
 
@@ -435,6 +443,8 @@ const Reader = {
           h("button", { title: "Go to a folio (G)", onclick: () => Reader.ask() }, "Go to…"),
           h("button", { id: "rd-textbtn", title: "Read the text: point at any word on the page (T)", "aria-pressed": "false",
             "aria-controls": "rd-text", onclick: () => TextUI.toggle() }, textIcon(), "Text"),
+          h("button", { id: "rd-drawbtn", title: "Outline the drawings on the page: point at one to see what it is (D)", "aria-pressed": String(DrawUI.open),
+            class: DrawUI.open ? "on" : "", onclick: () => DrawUI.toggle() }, drawIcon(), "Drawings"),
           h("button", { id: "rd-bm", title: "Bookmark a page of this opening (B)", onclick: () => Bookmarks.here() }, "☆", h("span", { class: "txt" }, " Bookmark")),
           h("button", { id: "rd-gridbtn", title: "See every page at once, to jump anywhere (O)", onclick: () => Reader.toggleGrid() }, h("span", { class: "ico" }, "▦ "), "Grid"),
         )),
@@ -509,6 +519,7 @@ const Reader = {
     for (const q of R.spreads?.[R.at] || []) if (q && !q.lost) (R.visited ||= new Set()).add(q.shown.page);   // the strip marks where you have been
     this.markVisited();
     TextUI.sync();
+    DrawUI.sync();
   },
 
   /* label of the current page, or of the nearest page that is not a lost leaf (used when hiding them) */
@@ -1162,6 +1173,7 @@ const Reader = {
     $("#rd-note").replaceChildren(h("span", { class: "rd-note-text" }, ...flags.flatMap(f => [f, " "]), nt));
     this.toggleNote(false);
     TextUI.sync();
+    DrawUI.sync();
   },
 
   renderStrip() {
@@ -1319,7 +1331,9 @@ const Reader = {
     else if ((e.key === "r" || e.key === "R") && !e.metaKey && !e.ctrlKey) this.rotateBy(e.shiftKey ? -90 : 90);
     else if (e.key === "g" || e.key === "G") this.ask();
     else if (e.key === "t" || e.key === "T") TextUI.toggle();
+    else if (DrawUI.open && DrawUI.key(e)) e.preventDefault();
     else if (TextUI.open && TextUI.key(e)) e.preventDefault();
+    else if (e.key === "d" || e.key === "D") DrawUI.toggle();
     else if (e.key === "c" || e.key === "C") {
       const p = curSide();
       const sg = p && !p.lost && (p.shown.img ? p.shown : p.segs.find(x => !x.missing));
@@ -1585,6 +1599,7 @@ const SheetView = {
       $("#rd-stage .sv-over")?.remove();
       this.inReader = false;
       TextUI.sync();
+      DrawUI.sync();
     }
     $("#sheet-dlg")?.open && $("#sheet-dlg").close();
   },
@@ -1636,7 +1651,7 @@ const SheetView = {
           h("button", { title: "Back to the book (Esc)", onclick: () => this.close() }, "Close")),
         svStage,
         h("div", { class: "sv-hint" }, "Pinch or ⌘-scroll to zoom · drag to move · double-click a spot"));
-      if (this.inReader) TextUI.sync();
+      if (this.inReader) { TextUI.sync(); DrawUI.sync(); }
     };
     draw(face);
     if (!stage && !host.open) host.showModal();
@@ -1750,6 +1765,52 @@ const TextTab = {
     if (S.view !== "text") show("text");
     this.load().then(m => setTimeout(() => m.focus(), 0)).catch(() => {});
   },
+};
+
+// ================================================================ DRAWINGS (drawings.js)
+/* The Drawings tab: every drawing in the book cut out of its photograph (data/drawings/, made by tools/drawings/cut.py),
+   and what is known of each: what most agree it is, the ideas people have had, what nobody knows. The code
+   (assets/drawings.js) loads the first time the tab opens, or the first time the Reader outlines the drawings (DrawUI). */
+const DrawTab = {
+  mod: null, loading: null,
+  load() {
+    this.loading ||= import(ASSETS + "drawings.js").then(m => (this.mod = m.default)).catch(e => {
+      this.loading = null;
+      Privacy.event("error_drawings_load");
+      $("#v-draw").replaceChildren(h("p", { class: "dw-fail" }, "The drawings could not load: " + e.message));
+      throw e;
+    });
+    return this.loading;
+  },
+  mount() {   // at once when loaded, so that the address it reads is the one show() writes back
+    if (this.mod) this.mod.mount(); else this.load().then(m => m.mount()).catch(() => {});
+  },
+  state() {   // before drawings.js has loaded: what the address asks for, or "all" (every drawing)
+    if (this.mod) return this.mod.state();
+    const m = location.hash.match(/^#\/?draw(?:\/[^/]*)?(?:\/(.*))?$/);
+    return (m && m[1]) || "all";
+  },
+  key(e) { this.mod?.key(e); },
+};
+/* The drawings outlined on the Reader's pages: point at one to see what it is, click it to light it up. */
+const DrawUI = {
+  open: store.get("draw:open", false),
+  toggle(on = !this.open) {
+    if (on && !this.open) Privacy.event("drawings_outlined");
+    this.open = on;
+    store.set("draw:open", on);
+    this.place();
+  },
+  place() {
+    const b = $("#rd-drawbtn");
+    if (b) { b.classList.toggle("on", this.open); b.setAttribute("aria-pressed", String(this.open)); }
+    if (!this.open) DrawTab.mod?.undecorate();
+    this.sync();
+  },
+  sync() {
+    if (this.open && R.spreads && S.view === "read") DrawTab.load().then(m => m.decorate()).catch(() => {});
+  },
+  key(e) { return DrawTab.mod ? DrawTab.mod.readerKey(e) : false; },
 };
 
 // ================================================================ FOLIO ORDER (a section of Info)
@@ -2089,6 +2150,7 @@ const Info = {
       ["Lisa Fagin Davis's research", [["blog", "“Voynich Codicology” in brief"], ["quires", "Folio order: her quire diagrams"], ["history", "Her history of the book"],
         ["singulions", "The 2026 proposal"], ["folds", "How the foldouts fold"]]],
       ["Reading the text", [["text", "Letters for shapes"], ["consensus", "The text you see"], ["search", "Searching the text"], ["transcribers", "Who made the text"]]],
+      ["The drawings", [["drawings", "Every drawing, cut out"]]],
       ["Reference", [["sure", "Known or guessed?"], ["notes", "Notes on single sheets"], ["words", "Words used here"], ["sources", "Sources"], ["privacy", "Privacy and cookies"]]]];
     const cite = k => this.cite(k);
     const blogUrl = D.orders.sources.LFD2025blog.url, yaleUrl = D.orders.sources.Yale.url;
@@ -2345,6 +2407,21 @@ const Info = {
         h("p", {}, "Where each word sits on the page comes from The Voynichese Project's word boxes (2014, Apache License 2.0), which the viewer fits to Yale's photographs and carries over to RF1b's words; a word in a ring is then drawn as the stretch of the ring its box holds. On the Rosettes foldout, which that project did not cover, the words' places are Alessandro Placa's (voynich-spatial-data, 2026, CC BY 4.0), carried to Yale's photograph and to RF1b's words. Each box is then fitted to the word's own ink. f116v has none. A dashed outline marks a word whose place could not be confirmed on the ink. On the Rosettes, each word was also read from Yale's photograph by Claude, Anthropic's AI model, without being shown any transcription: an independent reading, not checked by a person, shown beside RF1b and never instead of it."),
         h("p", {}, "The glyphs are drawn with ", h("b", {}, "Voynich VV"), ": Glen Claston's Voynich font (2005, given to the public domain; William Porquet fixed it for Unicode), with 89 rare glyphs added for this viewer from Claston's own shapes. The words about the words are set in Newsreader, by Production Type (SIL Open Font License).")),
 
+      // ---------------------------------------------------------------- the drawings (drawings.js)
+      h("div", { class: "info-part" }, "The drawings"),
+      this.sec("drawings", "Every drawing, cut out",
+        h("p", {}, "The ", h("b", {}, "Drawings"), " tab shows every drawing in the book on its own, cut out of Yale's photographs: each plant, jar, root and leaf, each round diagram and the picture at its centre, each of the women round the zodiac and in the pools, each star. Click one to see it alone, larger, or ", h("b", {}, "on its page"), " (", h("kbd", {}, "F"), "), with the rest of the page dimmed; ", h("kbd", {}, "←"), " ", h("kbd", {}, "→"), " go to the drawing before or after. ", h("b", {}, "Save picture"), " gives it as a PNG with a see-through background, cut from Yale's full-size photograph. In the Reader, ", h("kbd", {}, "D"), " (or the Drawings button) outlines the drawings on the page; point at one to see what it is, and click it to light it up. ",
+          this.link("#draw/beinecke/all", "See them all")),
+        h("p", {}, "Beside each drawing, in plain words:"),
+        h("dl", { class: "info-dl" },
+          ...[["Most agree", "most people who have studied it agree what it is. “Shown by the book itself” when something in the book proves it, such as a month's name written beside a zodiac sign; “Most agree, not proven” when it is only a shared opinion. No plant in the book has been proven."],
+            ["Ideas only", "people have proposed what it is, each with who said it and where; they do not agree."],
+            ["Nobody knows", "no one has said what it is, in the sources checked."],
+            ["Not looked into yet", "the sources have not been searched for this drawing yet: there may be ideas about it that are not listed."]]
+            .flatMap(([t, d]) => [h("dt", {}, t), h("dd", {}, d)])),
+        h("p", {}, h("b", {}, "Written beside it"), " lists the label words nearest the drawing, from RF1b; ", h("b", {}, "Painted with"), " the paints that cover it, measured on the photograph; ", h("b", {}, "Drawn alike"), " other drawings of a like outline and colouring, found by computer, which is not a claim that they show the same thing."),
+        h("p", {}, "How the outlines are made: a computer finds the ink and the paint on each page (what is darker, or another colour, than the parchment round it), takes the writing off using each word's place on the photograph, and joins what is left into pieces; a plan written page by page by looking at the photographs says which pieces make each drawing. Everything a drawing's ink closes round is part of it. The cut-outs were checked by eye, but a very faint stroke may be missing. The tool and its plan are in the viewer's source (tools/drawings). “What it shows” is written from the photograph by Claude, Anthropic's AI model; what people think a drawing is comes from the sources named beside it.")),
+
       // ---------------------------------------------------------------- reference
       h("div", { class: "info-part" }, "Reference"),
       this.sec("sure", "Known or guessed?",
@@ -2500,6 +2577,7 @@ async function boot() {
     if (e.key === "/") { e.preventDefault(); TextTab.focus(); return; }
     if (S.view === "read") Reader.key(e);
     else if (S.view === "three") View3D.key(e);
+    else if (S.view === "draw") DrawTab.key(e);
   });
   window.addEventListener("hashchange", () => {
     const at2 = readHash();

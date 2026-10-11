@@ -200,3 +200,75 @@ test.describe("what's new (changelog.json)", () => {
     expect({ changelog: latest, badge: badge, APP_VERSION: app }, "a release bumps all three together").toEqual({ changelog: latest, badge: latest, APP_VERSION: latest });
   });
 });
+
+// The drawings (data/drawings/, made by tools/drawings/cut.py; about.json written by hand): every drawing has its outline,
+// sits on a real panel, and everything said about it points at drawings and sources that exist.
+test.describe("drawings", () => {
+  const ix = read("data/drawings/index.json").drawings;
+  const about = read("data/drawings/about.json");
+  const similar = read("data/drawings/similar.json").similar;
+  const panels = new Map(segments.filter(x => !x.seg.missing).map(x => [x.seg.img, x.seg]));
+  const ids = new Set(ix.map(d => d.id));
+  const groups = new Set(ix.map(d => d.group).filter(Boolean));
+  const KINDS = ["plant", "root", "leaf", "jar", "diagram", "emblem", "sun", "moon", "star", "woman", "person", "animal", "pool", "rosette", "building", "other"];
+
+  test("every drawing has a unique id, a known kind and a box on a panel of the book", () => {
+    expect(ix.length, "no drawings listed").toBeGreaterThan(0);
+    expect(ids.size, "drawing ids are unique").toBe(ix.length);
+    for (const d of ix) {
+      expect(d.id, "an id is <panel>.<name>").toMatch(/^[A-Za-z0-9-]+\.[a-z0-9-]+$/);
+      expect(d.id.startsWith(d.img + "."), `${d.id}: its id names its panel`).toBe(true);
+      expect(panels.has(d.img), `${d.id}: panel ${d.img} exists`).toBe(true);
+      expect(panels.get(d.img).page, `${d.id}: the page of ${d.img}`).toBe(d.page);
+      expect(KINDS, `${d.id}: kind`).toContain(d.kind);
+      const [x, y, w, h] = d.box;
+      expect(w > 0 && h > 0 && x >= 0 && y >= 0 && y + h <= 1000.5, `${d.id}: box ${d.box} lies on the panel`).toBe(true);
+      if (d.group) expect(d.id, `${d.id}: a group's member is numbered`).toBe(`${d.group}-${d.n}`);
+    }
+  });
+
+  test("every drawing has its outline, and every outline file belongs to a panel with drawings", () => {
+    const files = fs.readdirSync(path.join(ROOT, "data/drawings/paths")).filter(f => f.endsWith(".json"));
+    const byImg = new Map();
+    for (const d of ix) byImg.set(d.img, [...(byImg.get(d.img) || []), d.id]);
+    expect(files.sort()).toEqual([...byImg.keys()].map(i => i + ".json").sort());
+    for (const f of files) {
+      const doc = read(`data/drawings/paths/${f}`);
+      expect(Object.keys(doc.paths).sort(), `${f}: the outlines are those of the drawings listed`).toEqual(byImg.get(doc.img).sort());
+      for (const [id, p] of Object.entries(doc.paths)) expect(p, `${id}: an SVG path`).toMatch(/^M[-\d. ]+(l[-\d. ]+)+z/);
+      expect(doc.aspect, `${f}: the panel's shape`).toBeGreaterThan(0.2);
+    }
+  });
+
+  test("what is said about the drawings names real drawings and real sources", () => {
+    const srcs = new Set(Object.keys(about.sources));
+    for (const [id, e] of Object.entries(about.drawings)) {
+      expect(ids.has(id) || groups.has(id), `about.json: "${id}" is not a drawing or a group`).toBe(true);
+      for (const x of e.ideas || []) {
+        expect(x.what?.trim(), `${id}: an idea says what`).toBeTruthy();
+        if (x.src) expect(srcs.has(x.src), `${id}: source "${x.src}"`).toBe(true);
+      }
+      for (const k of [].concat(e.agreedSrc || [])) expect(srcs.has(k), `${id}: source "${k}"`).toBe(true);
+      for (const f of e.facts || []) if (f.src) expect(srcs.has(f.src), `${id}: source "${f.src}"`).toBe(true);
+      for (const s of e.see || []) expect(ids.has(s), `${id}: sees "${s}"`).toBe(true);
+      if (e.strength) expect(["strong", "broad"], `${id}: strength`).toContain(e.strength);
+      if (e.strength) expect(e.agreed, `${id}: a strength needs something agreed`).toBeTruthy();
+    }
+    for (const [k, e] of Object.entries(about.kinds || {})) {
+      expect(KINDS, `about.json kinds: "${k}"`).toContain(k);
+      for (const x of e.ideas || []) if (x.src) expect(srcs.has(x.src), `kind ${k}: source "${x.src}"`).toBe(true);
+    }
+    for (const g of about.general || []) if (g.src) expect(srcs.has(g.src), `general: source "${g.src}"`).toBe(true);
+    for (const [k, s] of Object.entries(about.sources)) {
+      expect(s.who || s.title, `source ${k} says whose it is`).toBeTruthy();
+      if (s.url) expect(s.url, `source ${k}: url`).toMatch(/^https?:\/\//);
+    }
+  });
+
+  test("the drawings found alike are drawings", () => {
+    for (const [id, list] of Object.entries(similar)) {
+      expect(ids.has(id), `similar.json: "${id}"`).toBe(true);
+      for (const [o] of list) expect(ids.has(o) && o !== id, `${id}: alike "${o}"`).toBe(true);
+    }
+  });
+});

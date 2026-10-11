@@ -13,7 +13,7 @@ const unnamed = page => page.evaluate(() => {
   return { controls, pictures };
 });
 
-for (const [label, hash] of [["3D", "#three/beinecke"], ["the Reader", "#read/beinecke/78v"], ["Info", "#info/beinecke"]]) {
+for (const [label, hash] of [["3D", "#three/beinecke"], ["the Reader", "#read/beinecke/78v"], ["Info", "#info/beinecke"], ["Drawings", "#draw/beinecke/all"]]) {
   test(`${label}: every control has a name and every picture has alt text`, async ({ page }) => {
     await openSite(page, hash);
     await page.waitForTimeout(800);

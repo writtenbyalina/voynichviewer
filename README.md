@@ -35,6 +35,13 @@ Site: [voynichviewer.com](https://voynichviewer.com).
   within and across words, repeated words, regular expressions, filters such as `scribe:2`), narrow the results by
   scribe, section, language, quire and kind of text, see the hits page by page in any order, open a result in the
   Reader, export results as CSV or IVTFF, and save searches and page sets in Your work.
+- **Drawings tab**: every drawing in the book cut out of Yale's photographs on its own: each plant, jar, root and leaf,
+  each round diagram and the picture at its centre, each woman round the zodiac and in the pools, each star. A drawing
+  opens alone, larger, or lit up **on its page** (F), with what is known of it: what most agree it is (and whether
+  the book itself proves it), the ideas people have had, each with who had it and a source, and what nobody knows
+  (or that it has not been looked into yet); the label words written beside it, the paints that cover it, the others
+  of its page and drawings of a like outline found by computer. **Save picture** gives a PNG with a see-through
+  background. In the Reader, **D** outlines the drawings on the page: point at one to name it, click to light it up.
 - **Bookmarks**: the ☆ in a page's corner (Reader), next to a page (3D), or key B; ★ at the top lists them. Name them,
   and go to one: 3D and the Reader both follow.
 - **Info**: credits, a plain-language guide, Davis's research (her 2025 post in brief, the Folio order tables built
@@ -59,7 +66,8 @@ another one (the page images are cut again from Yale's photographs on import).
 3D and the Reader follow the same place: the page you are on in the Reader is the sheet picked out in 3D, and the sheet
 or opening you pick in 3D is where the Reader opens. Every view has its own URL (`#read/<order>/<page>`, `#three/<order>/<view>`), so a
 view can be bookmarked or shared. The Reader's text panel adds `/text` (`#read/beinecke/1r/text?w=f1r.15.8&n=2` for the
-two words from the eighth of f1r.15, `?s=daiin+shol` a set, `?like=f71r.L` pages like 71r's labels, `?ring=f57v.3`), and a search is `#text/<order>/search?q=qok*&steps=scribe:2`.
+two words from the eighth of f1r.15, `?s=daiin+shol` a set, `?like=f71r.L` pages like 71r's labels, `?ring=f57v.3`), and a search is `#text/<order>/search?q=qok*&steps=scribe:2`, a drawing `#draw/<order>/<id>` (`#draw/beinecke/f9v.plant`, `?on=page` on its page) and the drawings
+`#draw/<order>/all?s=herbal&k=plant&w=agreed&q=pansy`.
 
 ## Run it locally
 
@@ -86,6 +94,7 @@ assets/arrange.js       Rearrange in 3D: the table's selection, bar, menus and k
 assets/view3d.js        the 3D view (ES module, loaded when the 3D tab first opens)
 assets/text.js          the Reader's text panel, the word card and the interlinear (ES module, loaded when the text opens)
 assets/search.js        the Text tab: search, facets, the book strip, export (ES module)
+assets/drawings.js      the Drawings tab and the drawings outlined in the Reader (ES module, loaded when either first opens)
 assets/query.js         the search query language: parse, say back in words, compile to a regular expression
 assets/search-worker.js runs the searches off the page's thread
 assets/fonts/voynich-vv.woff2   Voynich VV: Glen Claston's public-domain v101 font, with rare glyphs and kerning added
@@ -112,6 +121,13 @@ tools/text/             the text pipeline: fetch.py (the pinned transcriptions),
                         test_text.py; the method is docs/TEXT.md section 3, the Reader's text docs/text/REDESIGN.md 8
 tools/font/             builds Voynich VV from Claston's font (build_font.py), with test_font.py
 docs/TEXT.md            the design of Text: sources, method, data, query language, screens, tests
+data/drawings/          every drawing cut out (built by tools/drawings/cut.py): index.json (each drawing's panel, kind, name
+                        and box), paths/<img>.json (its outline as an SVG path in thousandths of the panel's height, the
+                        label words beside it and its paints), similar.json (the drawings most like it); about.json, by
+                        hand: what most agree each drawing is, the ideas people have had with their sources, what nobody
+                        knows
+tools/drawings/         cut.py (cuts the drawings out of data/panels/ by the plan) and plan/*.json (which drawings each
+                        panel holds and roughly where, written by looking at the pages); how it works: its README
 data/folds.json         which way each foldout's folds go and which faces touch when the book is closed, as Lisa
                         Fagin Davis described them; 3D folds the sheets by it and marks those contacts confirmed
 tools/import_from_scout.py   refreshes data/codex.json and data/panels/ from a local Voynich Scout checkout

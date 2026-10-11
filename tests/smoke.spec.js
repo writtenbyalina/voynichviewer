@@ -14,7 +14,7 @@ test("the site opens on the 3D book with the header in place", async ({ page }) 
   for (const sel of ["#cx-tabs", "#cx-order", "#cx-bm", "#cx-work", "#cx-help", "#cx-bug", "#cx-ver"]) {
     await expect(page.locator(sel), sel).toBeVisible();
   }
-  await expect(page.locator("#cx-tabs button")).toHaveText(["3D", "Reader", "Text", "Info"]);
+  await expect(page.locator("#cx-tabs button")).toHaveText(["3D", "Reader", "Text", "Drawings", "Info"]);
 });
 
 test("each tab shows its own view, and only that one", async ({ page }) => {
