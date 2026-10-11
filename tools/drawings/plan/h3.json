@@ -4261,6 +4261,48 @@
     ],
     "take": "pieces"
    }
+  ],
+  "f44v": [
+   {
+    "id": "f44v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Two pale buds striped with red lines on thin stalks above a bunch of rounded wavy-edged green leaves on pale stalks, a thick olive-brown stem with knobbly joints at the top and two curving root branches.",
+    "in": [
+     {
+      "box": [
+       535,
+       235,
+       700,
+       400
+      ]
+     },
+     {
+      "box": [
+       355,
+       340,
+       720,
+       905
+      ]
+     }
+    ],
+    "take": "pieces"
+   },
+   {
+    "id": "f44v.strokes",
+    "kind": "other",
+    "name": "Faint pen strokes",
+    "looks": "A faint pen line along the bottom of the page with a few short curved strokes rising from it.",
+    "in": {
+     "box": [
+      110,
+      915,
+      370,
+      968
+     ]
+    },
+    "take": "faint"
+   }
   ]
  }
 }

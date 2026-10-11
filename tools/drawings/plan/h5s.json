@@ -17158,6 +17158,24 @@
      ]
     }
    }
+  ],
+  "f103v": [
+   {
+    "id": "f103v.star",
+    "kind": "star",
+    "name": "Star",
+    "looks": "Small seven- and eight-pointed stars drawn in outline, some with a red dot or red paint at the centre.",
+    "in": {
+     "box": [
+      100,
+      30,
+      165,
+      810
+     ]
+    },
+    "take": "each",
+    "min": 300
+   }
   ]
  }
 }
