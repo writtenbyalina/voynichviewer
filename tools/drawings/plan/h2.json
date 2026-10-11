@@ -24962,6 +24962,79 @@
      }
     ]
    }
+  ],
+  "f30v": [
+   {
+    "id": "f30v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Two curling stalks hung with small round yellow fruits, a thin pale stem with six toothed brown-olive leaves in pairs, and a wavy brown band of root along the bottom of the page.",
+    "in": {
+     "poly": [
+      [
+       505,
+       170
+      ],
+      [
+       700,
+       170
+      ],
+      [
+       742,
+       330
+      ],
+      [
+       742,
+       720
+      ],
+      [
+       575,
+       720
+      ],
+      [
+       575,
+       940
+      ],
+      [
+       745,
+       940
+      ],
+      [
+       745,
+       999
+      ],
+      [
+       195,
+       999
+      ],
+      [
+       195,
+       940
+      ],
+      [
+       530,
+       940
+      ],
+      [
+       530,
+       720
+      ],
+      [
+       380,
+       720
+      ],
+      [
+       380,
+       330
+      ],
+      [
+       505,
+       300
+      ]
+     ]
+    },
+    "edge": true
+   }
   ]
  }
 }
