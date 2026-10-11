@@ -49,5 +49,17 @@
 ],
 "f9v": [
  {"id": "f9v.plant", "kind": "plant", "name": "Plant", "looks": "Four blue flowers and one blue-and-yellow flower on thin stems, narrow toothed green leaves along the branches and a tuft of pale brown roots.", "in": {"box": [345, 135, 768, 995]}, "not": [{"box": [595, 812, 725, 905]}]}
+],
+"f10r": [
+ {"id": "f10r.plant", "kind": "plant", "name": "Plant", "looks": "Toothed green and olive-brown leaves on a pale stem, a long thin stalk hooking over to a dark blue flower with a yellow centre, and a root ending in two red bulbs.", "in": [{"poly": [[245, 440], [420, 430], [470, 435], [625, 445], [632, 560], [628, 700], [620, 860], [560, 875], [450, 870], [440, 880], [400, 880], [340, 868], [300, 860], [285, 800], [268, 720], [248, 650], [245, 600]]}, {"poly": [[380, 860], [445, 860], [440, 900], [400, 930], [380, 945], [520, 940], [525, 900], [615, 895], [615, 965], [530, 968], [380, 968], [160, 972], [160, 990], [30, 990], [30, 915], [165, 920], [180, 950], [330, 948], [355, 915], [385, 880]]}, {"box": [355, 230, 480, 435]}, {"box": [500, 175, 672, 430]}, {"poly": [[425, 260], [445, 215], [490, 185], [560, 172], [590, 190], [580, 215], [555, 195], [495, 200], [460, 225], [445, 265]]}], "keep": 0.01, "not": [{"box": [100, 430, 246, 720]}, {"poly": [[200, 780], [275, 780], [290, 850], [330, 865], [345, 880], [345, 905], [300, 915], [200, 915]]}, {"box": [618, 870, 700, 995]}, {"box": [220, 700, 250, 760]}]}
+],
+"f10v": [
+ {"id": "f10v.plant", "kind": "plant", "name": "Plant", "looks": "Two thin stems arching over to hanging dark blue flowers, long wavy green leaves down both sides and a broad pale brown root spreading to the right.", "in": {"poly": [[318, 300], [460, 300], [600, 320], [640, 380], [680, 420], [680, 790], [740, 800], [745, 990], [360, 990], [360, 850], [325, 800], [322, 500], [312, 420]]}, "not": [{"box": [398, 725, 462, 810]}, {"poly": [[488, 600], [536, 614], [540, 630], [517, 646], [502, 680], [489, 708]]}]}
+],
+"f11r": [
+ {"id": "f11r.plant", "kind": "plant", "name": "Plant", "looks": "A round crown of scalloped green leaves dotted with small dark blue flowers on three pale stems, each set in a hairy tube, with two crossing pale brown roots spreading wide below.", "in": {"poly": [[255, 240], [698, 240], [698, 580], [640, 600], [620, 830], [698, 900], [698, 1000], [22, 1000], [22, 940], [300, 900], [400, 850], [330, 700], [320, 600], [255, 580]]}}
+],
+"f11v": [
+ {"id": "f11v.plant", "kind": "plant", "name": "Plant", "looks": "A tall rounded crown of overlapping green and brown scale-like leaves topped with a small blue and white flower, on a bundle of thin red-lined stems over a spray of pale roots with cut ends.", "in": {"poly": [[310, 20], [722, 20], [722, 480], [560, 480], [555, 750], [660, 760], [660, 950], [390, 950], [390, 760], [420, 750], [425, 480], [310, 480]]}, "not": [{"box": [343, 436, 378, 463]}]}
 ]
 }}

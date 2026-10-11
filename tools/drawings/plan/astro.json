@@ -4172,329 +4172,2412 @@
     "id": "f68v1.rays",
     "kind": "other",
     "name": "Star of rays",
-    "looks": "Long blue rays with many small stars drawn between them, and wavy yellow flames round the middle.",
+    "looks": "Long blue rays and pale rays edged with dotted lines, with many small stars drawn between them, and wavy yellow flames round the middle.",
     "in": {
      "circle": [
       352,
       441,
-      185
+      168
      ]
     },
     "whole": 1.01,
-    "not": {
-     "circle": [
-      356,
-      441,
-      40
-     ]
-    }
+    "not": [
+     {
+      "circle": [
+       356,
+       441,
+       40
+      ]
+     },
+     {
+      "circle": [
+       248,
+       239,
+       15
+      ]
+     },
+     {
+      "circle": [
+       356,
+       221,
+       15
+      ]
+     },
+     {
+      "circle": [
+       383,
+       213,
+       15
+      ]
+     },
+     {
+      "circle": [
+       405,
+       235,
+       15
+      ]
+     },
+     {
+      "circle": [
+       205,
+       271,
+       15
+      ]
+     },
+     {
+      "circle": [
+       232,
+       261,
+       15
+      ]
+     },
+     {
+      "circle": [
+       257,
+       264,
+       15
+      ]
+     },
+     {
+      "circle": [
+       381,
+       246,
+       15
+      ]
+     },
+     {
+      "circle": [
+       397,
+       269,
+       15
+      ]
+     },
+     {
+      "circle": [
+       223,
+       290,
+       15
+      ]
+     },
+     {
+      "circle": [
+       242,
+       313,
+       15
+      ]
+     },
+     {
+      "circle": [
+       260,
+       294,
+       15
+      ]
+     },
+     {
+      "circle": [
+       376,
+       281,
+       15
+      ]
+     },
+     {
+      "circle": [
+       481,
+       317,
+       15
+      ]
+     },
+     {
+      "circle": [
+       503,
+       298,
+       15
+      ]
+     },
+     {
+      "circle": [
+       529,
+       307,
+       15
+      ]
+     },
+     {
+      "circle": [
+       137,
+       354,
+       15
+      ]
+     },
+     {
+      "circle": [
+       477,
+       339,
+       15
+      ]
+     },
+     {
+      "circle": [
+       500,
+       350,
+       15
+      ]
+     },
+     {
+      "circle": [
+       506,
+       321,
+       15
+      ]
+     },
+     {
+      "circle": [
+       530,
+       339,
+       15
+      ]
+     },
+     {
+      "circle": [
+       140,
+       381,
+       15
+      ]
+     },
+     {
+      "circle": [
+       172,
+       367,
+       15
+      ]
+     },
+     {
+      "circle": [
+       207,
+       398,
+       15
+      ]
+     },
+     {
+      "circle": [
+       124,
+       407,
+       15
+      ]
+     },
+     {
+      "circle": [
+       150,
+       412,
+       15
+      ]
+     },
+     {
+      "circle": [
+       176,
+       404,
+       15
+      ]
+     },
+     {
+      "circle": [
+       525,
+       441,
+       15
+      ]
+     },
+     {
+      "circle": [
+       550,
+       443,
+       15
+      ]
+     },
+     {
+      "circle": [
+       556,
+       464,
+       15
+      ]
+     },
+     {
+      "circle": [
+       577,
+       449,
+       15
+      ]
+     },
+     {
+      "circle": [
+       131,
+       509,
+       15
+      ]
+     },
+     {
+      "circle": [
+       166,
+       504,
+       15
+      ]
+     },
+     {
+      "circle": [
+       197,
+       514,
+       15
+      ]
+     },
+     {
+      "circle": [
+       199,
+       486,
+       15
+      ]
+     },
+     {
+      "circle": [
+       519,
+       481,
+       15
+      ]
+     },
+     {
+      "circle": [
+       549,
+       485,
+       15
+      ]
+     },
+     {
+      "circle": [
+       581,
+       491,
+       15
+      ]
+     },
+     {
+      "circle": [
+       157,
+       535,
+       15
+      ]
+     },
+     {
+      "circle": [
+       189,
+       549,
+       15
+      ]
+     },
+     {
+      "circle": [
+       164,
+       568,
+       15
+      ]
+     },
+     {
+      "circle": [
+       295,
+       595,
+       15
+      ]
+     },
+     {
+      "circle": [
+       444,
+       565,
+       15
+      ]
+     },
+     {
+      "circle": [
+       447,
+       593,
+       15
+      ]
+     },
+     {
+      "circle": [
+       470,
+       575,
+       15
+      ]
+     },
+     {
+      "circle": [
+       497,
+       591,
+       15
+      ]
+     },
+     {
+      "circle": [
+       312,
+       628,
+       15
+      ]
+     },
+     {
+      "circle": [
+       334,
+       602,
+       15
+      ]
+     },
+     {
+      "circle": [
+       344,
+       635,
+       15
+      ]
+     },
+     {
+      "circle": [
+       454,
+       629,
+       15
+      ]
+     },
+     {
+      "circle": [
+       480,
+       610,
+       15
+      ]
+     },
+     {
+      "circle": [
+       514,
+       614,
+       15
+      ]
+     },
+     {
+      "circle": [
+       281,
+       640,
+       15
+      ]
+     },
+     {
+      "circle": [
+       299,
+       670,
+       15
+      ]
+     },
+     {
+      "circle": [
+       322,
+       655,
+       15
+      ]
+     },
+     {
+      "circle": [
+       344,
+       674,
+       15
+      ]
+     },
+     {
+      "circle": [
+       458,
+       659,
+       15
+      ]
+     },
+     {
+      "circle": [
+       483,
+       643,
+       15
+      ]
+     },
+     {
+      "circle": [
+       354,
+       252,
+       15
+      ]
+     },
+     {
+      "circle": [
+       271,
+       312,
+       15
+      ]
+     },
+     {
+      "circle": [
+       227,
+       499,
+       15
+      ]
+     },
+     {
+      "circle": [
+       319,
+       572,
+       15
+      ]
+     },
+     {
+      "circle": [
+       500,
+       457,
+       15
+      ]
+     }
+    ]
    },
    {
-    "id": "f68v1.star",
+    "id": "f68v1.star-1",
     "kind": "star",
     "name": "Star",
-    "looks": "Eight-pointed stars painted yellow.",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      248,
+      239,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-2",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      356,
+      221,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-3",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      383,
+      213,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-4",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      405,
+      235,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-5",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      205,
+      271,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-6",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      232,
+      261,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-7",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      257,
+      264,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-8",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      381,
+      246,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-9",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      397,
+      269,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-10",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      223,
+      290,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-11",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      242,
+      313,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-12",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      260,
+      294,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-13",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      376,
+      281,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-14",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      481,
+      317,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-15",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      503,
+      298,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-16",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      529,
+      307,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-17",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      137,
+      354,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-18",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      477,
+      339,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-19",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      500,
+      350,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-20",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      506,
+      321,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-21",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      530,
+      339,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-22",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      140,
+      381,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-23",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      172,
+      367,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-24",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      207,
+      398,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-25",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      124,
+      407,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-26",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      150,
+      412,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-27",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      176,
+      404,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-28",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      525,
+      441,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-29",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      550,
+      443,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-30",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      556,
+      464,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-31",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      577,
+      449,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-32",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      131,
+      509,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-33",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      166,
+      504,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-34",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      197,
+      514,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-35",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      199,
+      486,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-36",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      519,
+      481,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-37",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      549,
+      485,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-38",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      581,
+      491,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-39",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      157,
+      535,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-40",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      189,
+      549,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-41",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      164,
+      568,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-42",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      295,
+      595,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-43",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      444,
+      565,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-44",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      447,
+      593,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-45",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      470,
+      575,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-46",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      497,
+      591,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-47",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      312,
+      628,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-48",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      334,
+      602,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-49",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      344,
+      635,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-50",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      454,
+      629,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-51",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      480,
+      610,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-52",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      514,
+      614,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-53",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      281,
+      640,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-54",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      299,
+      670,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-55",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      322,
+      655,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-56",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      344,
+      674,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-57",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      458,
+      659,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-58",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      483,
+      643,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v1.star-59",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star drawn in brown ink, barely painted.",
+    "in": {
+     "circle": [
+      354,
+      252,
+      12
+     ]
+    },
+    "take": "faint",
+    "level": 0.08,
+    "gap": 5
+   },
+   {
+    "id": "f68v1.star-60",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star drawn in brown ink, barely painted.",
+    "in": {
+     "circle": [
+      271,
+      312,
+      12
+     ]
+    },
+    "take": "faint",
+    "level": 0.08,
+    "gap": 5
+   },
+   {
+    "id": "f68v1.star-61",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star drawn in brown ink, barely painted.",
+    "in": {
+     "circle": [
+      227,
+      499,
+      12
+     ]
+    },
+    "take": "faint",
+    "level": 0.08,
+    "gap": 5
+   },
+   {
+    "id": "f68v1.star-62",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star drawn in brown ink, barely painted.",
+    "in": {
+     "circle": [
+      319,
+      572,
+      12
+     ]
+    },
+    "take": "faint",
+    "level": 0.08,
+    "gap": 5
+   },
+   {
+    "id": "f68v1.star-63",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star drawn in brown ink, barely painted.",
+    "in": {
+     "circle": [
+      500,
+      457,
+      12
+     ]
+    },
+    "take": "faint",
+    "level": 0.08,
+    "gap": 5
+   }
+  ],
+  "f68v2": [
+   {
+    "id": "f68v2.diagram",
+    "kind": "diagram",
+    "name": "Round diagram",
+    "looks": "A ring of writing round eight sectors of stars and words, with a blue flower of six petals at the middle.",
     "in": {
      "poly": [
       [
-       628.0,
-       446.0
+       556.0,
+       433.0
       ],
       [
-       626.9,
-       474.1
+       555.0,
+       456.4
       ],
       [
-       623.6,
-       501.9
+       551.9,
+       479.7
       ],
       [
-       618.1,
-       529.3
+       546.9,
+       502.6
       ],
       [
-       610.5,
-       556.1
+       539.9,
+       525.0
       ],
       [
-       600.8,
-       582.1
+       531.0,
+       546.7
       ],
       [
-       589.1,
-       607.0
+       520.2,
+       567.5
       ],
       [
-       575.6,
-       630.7
+       507.7,
+       587.3
       ],
       [
-       560.2,
-       653.0
+       493.5,
+       605.9
       ],
       [
-       543.1,
-       673.7
-      ],
-      [
-       524.4,
-       692.7
-      ],
-      [
-       504.3,
-       709.8
-      ],
-      [
-       483.0,
-       724.9
+       477.8,
+       623.2
       ],
       [
        460.6,
-       737.8
+       639.1
       ],
       [
-       437.2,
-       748.6
+       442.1,
+       653.4
       ],
       [
-       413.1,
-       757.0
+       422.5,
+       666.0
       ],
       [
-       388.4,
-       763.1
+       401.8,
+       676.8
       ],
       [
-       363.3,
-       766.8
+       380.3,
+       685.8
       ],
       [
-       338.0,
-       768.0
+       358.1,
+       692.8
       ],
       [
-       312.7,
-       766.8
+       335.4,
+       697.9
       ],
       [
-       287.6,
-       763.1
+       312.3,
+       701.0
       ],
       [
-       262.9,
-       757.0
+       289.0,
+       702.0
       ],
       [
-       238.8,
-       748.6
+       265.7,
+       701.0
       ],
       [
-       215.4,
-       737.8
+       242.6,
+       697.9
       ],
       [
-       193.0,
-       724.9
+       219.9,
+       692.8
       ],
       [
-       171.7,
-       709.8
+       197.7,
+       685.8
       ],
       [
-       151.6,
-       692.7
+       176.2,
+       676.8
       ],
       [
-       132.9,
-       673.7
+       155.5,
+       666.0
       ],
       [
-       115.8,
-       653.0
+       135.9,
+       653.4
       ],
       [
-       100.4,
-       630.7
+       117.4,
+       639.1
       ],
       [
-       86.9,
-       607.0
+       100.2,
+       623.2
       ],
       [
-       75.2,
-       582.1
+       84.5,
+       605.9
       ],
       [
-       65.5,
-       556.1
+       70.3,
+       587.3
       ],
       [
-       57.9,
-       529.3
+       57.8,
+       567.5
       ],
       [
-       52.4,
-       501.9
+       47.0,
+       546.7
       ],
       [
-       49.1,
-       474.1
+       38.1,
+       525.0
       ],
       [
-       48.0,
-       446.0
+       31.1,
+       502.6
       ],
       [
-       49.1,
-       417.9
+       26.1,
+       479.7
       ],
       [
-       52.4,
-       390.1
+       23.0,
+       456.4
       ],
       [
-       57.9,
-       362.7
+       22.0,
+       433.0
       ],
       [
-       65.5,
-       335.9
+       23.0,
+       409.6
       ],
       [
-       75.2,
-       309.9
+       26.1,
+       386.3
       ],
       [
-       86.9,
-       285.0
+       31.1,
+       363.4
       ],
       [
-       100.4,
-       261.3
+       38.1,
+       341.0
       ],
       [
-       115.8,
-       239.0
+       47.0,
+       319.3
       ],
       [
-       132.9,
-       218.3
+       57.8,
+       298.5
       ],
       [
-       151.6,
-       199.3
+       70.3,
+       278.7
       ],
       [
-       171.7,
-       182.2
+       84.5,
+       260.1
       ],
       [
-       193.0,
-       167.1
+       100.2,
+       242.8
       ],
       [
-       215.4,
-       154.2
+       117.4,
+       226.9
       ],
       [
-       238.8,
-       143.4
+       135.9,
+       212.6
       ],
       [
-       262.9,
-       135.0
+       155.5,
+       200.0
       ],
       [
-       287.6,
-       128.9
+       176.2,
+       189.2
       ],
       [
-       312.7,
-       125.2
+       197.7,
+       180.2
       ],
       [
-       338.0,
-       124.0
+       219.9,
+       173.2
       ],
       [
-       363.3,
-       125.2
+       242.6,
+       168.1
       ],
       [
-       388.4,
-       128.9
+       265.7,
+       165.0
       ],
       [
-       413.1,
-       135.0
+       289.0,
+       164.0
       ],
       [
-       437.2,
-       143.4
+       312.3,
+       165.0
+      ],
+      [
+       335.4,
+       168.1
+      ],
+      [
+       358.1,
+       173.2
+      ],
+      [
+       380.3,
+       180.2
+      ],
+      [
+       401.8,
+       189.2
+      ],
+      [
+       422.5,
+       200.0
+      ],
+      [
+       442.1,
+       212.6
       ],
       [
        460.6,
-       154.2
+       226.9
       ],
       [
-       483.0,
-       167.1
+       477.8,
+       242.8
       ],
       [
-       504.3,
-       182.2
+       493.5,
+       260.1
       ],
       [
-       524.4,
-       199.3
+       507.7,
+       278.7
       ],
       [
-       543.1,
-       218.3
+       520.2,
+       298.5
       ],
       [
-       560.2,
-       239.0
+       531.0,
+       319.3
       ],
       [
-       575.6,
-       261.3
+       539.9,
+       341.0
       ],
       [
-       589.1,
-       285.0
+       546.9,
+       363.4
       ],
       [
-       600.8,
-       309.9
+       551.9,
+       386.3
       ],
       [
-       610.5,
-       335.9
-      ],
-      [
-       618.1,
-       362.7
-      ],
-      [
-       623.6,
-       390.1
-      ],
-      [
-       626.9,
-       417.9
+       555.0,
+       409.6
       ]
      ]
     },
-    "take": "each",
-    "min": 400,
-    "not": {
+    "take": "region"
+   },
+   {
+    "id": "f68v2.centre",
+    "kind": "emblem",
+    "name": "Blue flower",
+    "looks": "A flower of six blue petals edged in brown, with a yellow star at its middle.",
+    "in": {
      "circle": [
-      352,
-      441,
-      185
+      292,
+      435,
+      98
      ]
-    }
+    },
+    "whole": 1.01
+   },
+   {
+    "id": "f68v2.star-1",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      241,
+      214,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-2",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      288,
+      210,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-3",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      338,
+      206,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-4",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      246,
+      261,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-5",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      283,
+      248,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-6",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      324,
+      248,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-7",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      162,
+      318,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-8",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      274,
+      298,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-9",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      314,
+      284,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-10",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      410,
+      311,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-11",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      294,
+      323,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-12",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      470,
+      395,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-13",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      509,
+      393,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-14",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      96,
+      430,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-15",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      150,
+      430,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-16",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      403,
+      431,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-17",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      431,
+      418,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-18",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      474,
+      433,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-19",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      513,
+      433,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-20",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      78,
+      463,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-21",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      129,
+      468,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-22",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      180,
+      454,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-23",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      442,
+      451,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-24",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      120,
+      511,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-25",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      163,
+      497,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-26",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      81,
+      526,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-27",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      295,
+      558,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-28",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      217,
+      580,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-29",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      327,
+      581,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-30",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      363,
+      579,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-31",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      298,
+      623,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-32",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      377,
+      629,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-33",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      291,
+      660,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-34",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted yellow.",
+    "in": {
+     "circle": [
+      331,
+      648,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.15,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-35",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted green.",
+    "in": {
+     "circle": [
+      314,
+      527,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.1,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-36",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted green.",
+    "in": {
+     "circle": [
+      338,
+      546,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.1,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-37",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted green.",
+    "in": {
+     "circle": [
+      435,
+      527,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.1,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-38",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star painted green.",
+    "in": {
+     "circle": [
+      497,
+      471,
+      14
+     ]
+    },
+    "take": "faint",
+    "level": 0.1,
+    "gap": 3
+   },
+   {
+    "id": "f68v2.star-39",
+    "kind": "star",
+    "name": "Star",
+    "looks": "An eight-pointed star drawn in brown ink, unpainted.",
+    "in": {
+     "circle": [
+      54,
+      411,
+      13
+     ]
+    },
+    "take": "faint",
+    "level": 0.1,
+    "gap": 3
    }
   ]
  }

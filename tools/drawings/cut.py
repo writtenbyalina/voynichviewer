@@ -589,9 +589,17 @@ def look(img: str, path: Path, scale: float = 0.75):
     cv2.imwrite(str(path), vis, [cv2.IMWRITE_JPEG_QUALITY, 85])
 
 
+def empty(res, drawings):
+    got = {dr["id"] for _, dr, _ in res}
+    for dr in drawings:
+        if dr["id"] not in got:
+            print(f"  {dr['id']}: planned, but nothing was cut (its region holds no ink?)", file=sys.stderr)
+
+
 def check(img: str, drawings: list[dict], path: Path, scale: float = 0.75):
     im = load(img)
     res, P = cut(img, drawings)
+    empty(res, drawings)
     vis = (im.astype(np.float32) * 0.35 + 150).astype(np.uint8)
     for j, (did, dr, m) in enumerate(res):
         col = np.array(PALETTE[j % len(PALETTE)][::-1], np.float32)
@@ -612,6 +620,7 @@ def sheet_of(img: str, drawings: list[dict], path: Path, cell: int = 220):
     """every cut-out of a panel on a dark ground, side by side (what the site shows)"""
     im = load(img)
     res, P = cut(img, drawings)
+    empty(res, drawings)
     tiles = []
     for did, dr, m in res:
         ys, xs = np.nonzero(m)
@@ -626,6 +635,8 @@ def sheet_of(img: str, drawings: list[dict], path: Path, cell: int = 220):
         tile[:t.shape[0], (cell - t.shape[1]) // 2:(cell - t.shape[1]) // 2 + t.shape[1]] = t
         cv2.putText(tile, did.split(".", 1)[-1], (4, cell + 13), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (230, 230, 230), 1, cv2.LINE_AA)
         tiles.append(tile)
+    if not tiles:
+        return
     cols = 6
     rows = [np.hstack(tiles[i:i + cols] + [np.full_like(tiles[0], 38)] * (cols - len(tiles[i:i + cols]))) for i in range(0, len(tiles), cols)]
     cv2.imwrite(str(path), np.vstack(rows), [cv2.IMWRITE_JPEG_QUALITY, 88])
@@ -834,8 +845,13 @@ def write(imgs: list[str], plan: dict):
                           "colours": colours(im, m, P), "sig": signature(im, m)}
             if near.get(did):
                 facts[did]["labels"] = near[did]
+        empty(res, plan[img])
+        f = OUT / "paths" / f"{img}.json"
+        if not paths:
+            f.unlink(missing_ok=True)
+            continue
         doc = {"img": img, "page": pages[img], "aspect": round(P["w"] / P["h"], 5), "paths": paths, "facts": facts}
-        (OUT / "paths" / f"{img}.json").write_text(json.dumps(doc, separators=(",", ":")) + "\n")
+        f.write_text(json.dumps(doc, separators=(",", ":")) + "\n")
         print(f"{img}: {len(res)} drawings, {sum(len(v) for v in paths.values()) // 1024} KB of outline")
     index(plan, pages)
 

@@ -9801,8 +9801,16 @@
      "box": [
       72,
       40,
-      158,
+      152,
       222
+     ]
+    },
+    "not": {
+     "box": [
+      150.5,
+      180,
+      175,
+      212
      ]
     }
    },
@@ -9888,6 +9896,26 @@
       325,
       140
      ]
+    },
+    "not": {
+     "poly": [
+      [
+       296,
+       15
+      ],
+      [
+       330,
+       15
+      ],
+      [
+       330,
+       62
+      ],
+      [
+       296,
+       62
+      ]
+     ]
     }
    },
    {
@@ -9902,7 +9930,25 @@
       375,
       150
      ]
-    }
+    },
+    "not": [
+     {
+      "box": [
+       322,
+       15,
+       334,
+       52
+      ]
+     },
+     {
+      "box": [
+       344,
+       15,
+       380,
+       50
+      ]
+     }
+    ]
    },
    {
     "id": "f99r.root-5",
@@ -9916,6 +9962,14 @@
       415,
       140
      ]
+    },
+    "not": {
+     "box": [
+      372,
+      15,
+      420,
+      44
+     ]
     }
    },
    {
@@ -9923,14 +9977,24 @@
     "kind": "root",
     "name": "Root",
     "looks": "A cluster of five pale tube-like shapes on thin stems.",
-    "in": {
-     "box": [
-      415,
-      20,
-      478,
-      145
-     ]
-    }
+    "in": [
+     {
+      "box": [
+       415,
+       20,
+       478,
+       135
+      ]
+     },
+     {
+      "box": [
+       380,
+       135,
+       440,
+       168
+      ]
+     }
+    ]
    },
    {
     "id": "f99r.root-7",
@@ -10006,6 +10070,14 @@
       300,
       200
      ]
+    },
+    "not": {
+     "box": [
+      282,
+      168,
+      320,
+      235
+     ]
     }
    },
    {
@@ -10014,11 +10086,51 @@
     "name": "Root",
     "looks": "A long orange root with a hooked head and many short legs along its underside.",
     "in": {
+     "poly": [
+      [
+       320,
+       168
+      ],
+      [
+       320,
+       140
+      ],
+      [
+       350,
+       140
+      ],
+      [
+       380,
+       168
+      ],
+      [
+       432,
+       168
+      ],
+      [
+       432,
+       178
+      ],
+      [
+       465,
+       178
+      ],
+      [
+       465,
+       218
+      ],
+      [
+       318,
+       218
+      ]
+     ]
+    },
+    "not": {
      "box": [
-      318,
-      140,
-      432,
-      218
+      282,
+      165,
+      324,
+      235
      ]
     }
    },
@@ -10030,7 +10142,7 @@
     "in": {
      "poly": [
       [
-       432,
+       440,
        140
       ],
       [
@@ -10054,8 +10166,20 @@
        212
       ],
       [
-       432,
+       465,
        212
+      ],
+      [
+       465,
+       178
+      ],
+      [
+       432,
+       178
+      ],
+      [
+       440,
+       168
       ]
      ]
     }
@@ -10167,7 +10291,7 @@
      "box": [
       150,
       470,
-      212,
+      217,
       560
      ]
     }
@@ -10179,7 +10303,7 @@
     "looks": "A dark red dome with thin hanging strands.",
     "in": {
      "box": [
-      212,
+      217,
       470,
       270,
       550
@@ -10221,7 +10345,7 @@
     "looks": "An olive S-shaped root with fine hairs.",
     "in": {
      "box": [
-      432,
+      447,
       480,
       515,
       552
@@ -10294,6 +10418,404 @@
       [
        165,
        830
+      ]
+     ]
+    }
+   }
+  ],
+  "f99v": [
+   {
+    "id": "f99v.jar-1",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A tall stepped jar with a blue mouth, red bands with white dots, blue and pale rings and a red lower body on a ribbed pale foot.",
+    "in": {
+     "box": [
+      95,
+      35,
+      215,
+      290
+     ]
+    }
+   },
+   {
+    "id": "f99v.jar-2",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A red cylindrical jar with a blue mouth, pale bands and a fringed pale foot.",
+    "in": {
+     "box": [
+      95,
+      255,
+      175,
+      415
+     ]
+    }
+   },
+   {
+    "id": "f99v.jar-3",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A red cylindrical jar with a blue mouth and pale banded rims and foot.",
+    "in": {
+     "box": [
+      90,
+      415,
+      185,
+      615
+     ]
+    }
+   },
+   {
+    "id": "f99v.jar-4",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A red cylindrical jar with a blue-grey lid and pale banded rims and foot.",
+    "in": {
+     "box": [
+      95,
+      640,
+      215,
+      800
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-1",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A long root with a red core, pale ribbed sides and a pale stem on top.",
+    "in": {
+     "box": [
+      168,
+      15,
+      232,
+      165
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-2",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A dark red root with hanging strands and a pale stem looping above it.",
+    "in": {
+     "box": [
+      232,
+      10,
+      300,
+      150
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-3",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A dark brown cap with many long tan strands hanging down and a tall pale stem.",
+    "in": {
+     "box": [
+      280,
+      2,
+      380,
+      150
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-4",
+    "kind": "root",
+    "name": "Root with a leaf",
+    "looks": "A small red bulb with short strands under a large pale green toothed leaf.",
+    "in": {
+     "box": [
+      355,
+      2,
+      470,
+      125
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-5",
+    "kind": "root",
+    "name": "Root",
+    "looks": "An olive root with many curled spreading rootlets and pale looping stems.",
+    "in": {
+     "box": [
+      440,
+      5,
+      545,
+      135
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-6",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A red root with thin red strands and pale stems rising high.",
+    "in": {
+     "box": [
+      545,
+      5,
+      600,
+      125
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-7",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A dark olive U-shaped root with two arms up and a long sweeping base, with pale stems on top.",
+    "in": {
+     "poly": [
+      [
+       600,
+       5
+      ],
+      [
+       650,
+       5
+      ],
+      [
+       650,
+       135
+      ],
+      [
+       668,
+       135
+      ],
+      [
+       668,
+       152
+      ],
+      [
+       505,
+       152
+      ],
+      [
+       505,
+       135
+      ],
+      [
+       600,
+       135
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-8",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale cone-shaped root with red streaks, tapering into a long thin tail.",
+    "in": {
+     "box": [
+      650,
+      5,
+      725,
+      225
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-9",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale ribbed root with blue-grey and red streaks.",
+    "in": {
+     "box": [
+      170,
+      262,
+      222,
+      378
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-10",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale root with red streaks and two pointed lobes.",
+    "in": {
+     "box": [
+      222,
+      265,
+      280,
+      380
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-11",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A dark brown star-shaped root with spiky arms and a pale stem.",
+    "in": {
+     "box": [
+      280,
+      255,
+      362,
+      325
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-12",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pink-red root curling into two broad lobes, with a pale stem.",
+    "in": {
+     "box": [
+      362,
+      255,
+      482,
+      375
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-13",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A round orange-red bulb with a pale stem curving above it and a pale tail.",
+    "in": {
+     "box": [
+      482,
+      255,
+      575,
+      368
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-14",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale root head with a fan of long olive and pink strands.",
+    "in": {
+     "box": [
+      575,
+      250,
+      738,
+      360
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-15",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale pink round root with a tall stem and short legs.",
+    "in": {
+     "box": [
+      175,
+      455,
+      237,
+      578
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-16",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pink root with a long curved body and leg-like rootlets, and a curled stem.",
+    "in": {
+     "box": [
+      237,
+      450,
+      345,
+      578
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-17",
+    "kind": "root",
+    "name": "Root",
+    "looks": "An olive-tan fringed root with a tall stem.",
+    "in": {
+     "box": [
+      345,
+      450,
+      450,
+      578
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-18",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A dark red-brown lumpy root with a tall pale stem.",
+    "in": {
+     "box": [
+      450,
+      435,
+      560,
+      612
+     ]
+    }
+   },
+   {
+    "id": "f99v.root-19",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A pale outlined twisted root with blue and brown streaks, its strands crossing below a curved top.",
+    "in": {
+     "box": [
+      560,
+      440,
+      740,
+      630
+     ]
+    }
+   },
+   {
+    "id": "f99v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A blue-grey root of long spreading strands with a tall green stem curving over into a large green leaf with a scalloped edge.",
+    "in": {
+     "poly": [
+      [
+       450,
+       678
+      ],
+      [
+       735,
+       678
+      ],
+      [
+       735,
+       870
+      ],
+      [
+       730,
+       1000
+      ],
+      [
+       70,
+       1000
+      ],
+      [
+       70,
+       920
+      ],
+      [
+       280,
+       870
+      ],
+      [
+       440,
+       860
+      ],
+      [
+       450,
+       860
       ]
      ]
     }

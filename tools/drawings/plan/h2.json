@@ -17115,6 +17115,479 @@
     ],
     "fill": "all"
    }
+  ],
+  "f27r": [
+   {
+    "id": "f27r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Two dark blue bell-shaped flowers and a pale leafy sprig at the top of a thin stem, three large pointed green leaves with fine veins, a long bare stem below and a root curving out to both sides.",
+    "in": {
+     "poly": [
+      [
+       360,
+       25
+      ],
+      [
+       535,
+       25
+      ],
+      [
+       535,
+       200
+      ],
+      [
+       700,
+       200
+      ],
+      [
+       700,
+       600
+      ],
+      [
+       462,
+       650
+      ],
+      [
+       462,
+       905
+      ],
+      [
+       515,
+       905
+      ],
+      [
+       515,
+       1000
+      ],
+      [
+       310,
+       1000
+      ],
+      [
+       310,
+       900
+      ],
+      [
+       425,
+       900
+      ],
+      [
+       425,
+       640
+      ],
+      [
+       250,
+       600
+      ],
+      [
+       250,
+       280
+      ],
+      [
+       360,
+       280
+      ]
+     ]
+    },
+    "not": [
+     {
+      "box": [
+       275,
+       530,
+       343,
+       560
+      ]
+     },
+     {
+      "box": [
+       420,
+       760,
+       435.5,
+       815
+      ]
+     },
+     {
+      "box": [
+       451.5,
+       760,
+       470,
+       815
+      ]
+     }
+    ],
+    "keep": 0.005
+   },
+   {
+    "id": "f27r.plant-2",
+    "kind": "plant",
+    "name": "Small plant",
+    "looks": "Three round green leaves with wavy edges on thin forked stalks, a pale stem, and a short tan root with curved strands at the bottom.",
+    "in": {
+     "poly": [
+      [
+       465,
+       650
+      ],
+      [
+       712,
+       640
+      ],
+      [
+       712,
+       1000
+      ],
+      [
+       540,
+       1000
+      ],
+      [
+       540,
+       905
+      ],
+      [
+       465,
+       905
+      ]
+     ]
+    }
+   }
+  ],
+  "f27v": [
+   {
+    "id": "f27v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "Several tall thin stalks ending in pale star-like flowers with red centres and fine rays, small blue buds, many toothed green leaves along branching pale stems, and a lumpy brown root.",
+    "in": {
+     "poly": [
+      [
+       400,
+       180
+      ],
+      [
+       560,
+       180
+      ],
+      [
+       560,
+       240
+      ],
+      [
+       620,
+       240
+      ],
+      [
+       680,
+       250
+      ],
+      [
+       680,
+       280
+      ],
+      [
+       757,
+       280
+      ],
+      [
+       757,
+       880
+      ],
+      [
+       625,
+       880
+      ],
+      [
+       625,
+       1000
+      ],
+      [
+       410,
+       1000
+      ],
+      [
+       410,
+       880
+      ],
+      [
+       205,
+       880
+      ],
+      [
+       205,
+       695
+      ],
+      [
+       155,
+       695
+      ],
+      [
+       155,
+       545
+      ],
+      [
+       270,
+       545
+      ],
+      [
+       270,
+       410
+      ],
+      [
+       330,
+       300
+      ],
+      [
+       400,
+       300
+      ]
+     ]
+    },
+    "keep": 0.004,
+    "not": [
+     {
+      "box": [
+       150,
+       655,
+       200,
+       712
+      ]
+     },
+     {
+      "box": [
+       725,
+       340,
+       760,
+       395
+      ]
+     },
+     {
+      "poly": [
+       [
+        322,
+        355
+       ],
+       [
+        364,
+        355
+       ],
+       [
+        373,
+        378
+       ],
+       [
+        384,
+        400
+       ],
+       [
+        389,
+        428
+       ],
+       [
+        322,
+        428
+       ]
+      ]
+     }
+    ]
+   }
+  ],
+  "f28r": [
+   {
+    "id": "f28r.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A tall thin pale-red stem carrying three ribbed white seed-like heads, the top one with a yellow-and-red tip, a ring of wavy green leaves with curled tips round the lowest head, and a red root with curling tentacle-like strands.",
+    "in": {
+     "poly": [
+      [
+       380,
+       50
+      ],
+      [
+       468,
+       50
+      ],
+      [
+       468,
+       300
+      ],
+      [
+       602,
+       300
+      ],
+      [
+       602,
+       520
+      ],
+      [
+       560,
+       640
+      ],
+      [
+       470,
+       640
+      ],
+      [
+       470,
+       770
+      ],
+      [
+       585,
+       770
+      ],
+      [
+       585,
+       955
+      ],
+      [
+       345,
+       955
+      ],
+      [
+       345,
+       770
+      ],
+      [
+       425,
+       770
+      ],
+      [
+       425,
+       640
+      ],
+      [
+       265,
+       560
+      ],
+      [
+       260,
+       380
+      ],
+      [
+       345,
+       300
+      ],
+      [
+       380,
+       300
+      ]
+     ]
+    },
+    "not": [
+     {
+      "box": [
+       400,
+       645,
+       428,
+       715
+      ]
+     },
+     {
+      "box": [
+       438,
+       870,
+       463,
+       915
+      ]
+     }
+    ],
+    "fill": "all"
+   }
+  ],
+  "f28v": [
+   {
+    "id": "f28v.plant",
+    "kind": "plant",
+    "name": "Plant",
+    "looks": "A wide ring of curved green leaflets on thin wavy stalks round a bare centre, a green stem with a small ribbed bud and two pointed green leaves, and a pale tan root splitting into long tapering strands.",
+    "in": {
+     "poly": [
+      [
+       372,
+       290
+      ],
+      [
+       720,
+       290
+      ],
+      [
+       748,
+       330
+      ],
+      [
+       748,
+       600
+      ],
+      [
+       640,
+       600
+      ],
+      [
+       640,
+       780
+      ],
+      [
+       700,
+       780
+      ],
+      [
+       700,
+       992
+      ],
+      [
+       395,
+       992
+      ],
+      [
+       395,
+       860
+      ],
+      [
+       470,
+       860
+      ],
+      [
+       470,
+       620
+      ],
+      [
+       372,
+       620
+      ]
+     ]
+    },
+    "not": [
+     {
+      "poly": [
+       [
+        558,
+        686
+       ],
+       [
+        598,
+        682
+       ],
+       [
+        602,
+        645
+       ],
+       [
+        632,
+        640
+       ],
+       [
+        640,
+        750
+       ],
+       [
+        558,
+        750
+       ]
+      ]
+     }
+    ]
+   }
   ]
  }
 }
