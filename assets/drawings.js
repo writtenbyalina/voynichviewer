@@ -171,7 +171,7 @@ const T = {
 
   /* the address, after #draw/<order>/ */
   state() {
-    if (this.at) return encodeURIComponent(this.at) + (this.on === "page" ? "?on=page" : "");
+    if (this.at) return encodeURIComponent(this.at) + (this.on === "page" ? "?on=page" : this.on === "beside" && this.with ? "?with=" + encodeURIComponent(this.with) : "");
     const q = new URLSearchParams(Object.entries(this.f).filter(([k, v]) => v && v !== DEFAULTS[k])).toString();
     return "all" + (q ? "?" + q : "");
   },
@@ -181,7 +181,11 @@ const T = {
     const p = new URLSearchParams(query);
     let id = null;
     try { id = decodeURIComponent(what); } catch { id = what; }
-    if (id && id !== "all") { this.at = id; this.on = p.get("on") === "page" ? "page" : "cut"; }   // checked once the list is here (show)
+    if (id && id !== "all") {   // checked once the list is here (show)
+      this.at = id;
+      this.with = p.get("with") || null;
+      this.on = this.with ? "beside" : p.get("on") === "page" ? "page" : "cut";
+    }
     else {
       this.at = null;
       this.f = { ...DEFAULTS };
@@ -217,7 +221,11 @@ const T = {
       h("option", { value: "" }, "Every kind"),
       ...Object.entries(KINDS).filter(([k]) => Data.list.some(d => d.kind === k)).map(([k, [, many]]) => h("option", { value: k }, many)));
     this.top = h("div", { class: "dw-top" },
-      h("div", { class: "dw-row" }, h("div", { class: "dw-qbox" }, box), this.count),
+      h("div", { class: "dw-row" }, h("div", { class: "dw-qbox" }, box), this.count,
+        h("button", { class: "dw-luck", title: "Open a drawing picked at random from those listed", onclick: () => {
+          const list = this.filtered();
+          if (list.length) { Privacy.event("drawing_random"); this.open(list[Math.floor(Math.random() * list.length)].id); }
+        } }, "Surprise me")),
       h("div", { class: "dw-opts" },
         chips("s", PARTS.filter(p => Data.list.some(d => d.part === p.key)).map(p => [p.key, p.name, p.say]), "Part of the book"),
         h("span", { class: "dw-sep", "aria-hidden": "true" }),
@@ -342,6 +350,12 @@ const T = {
     this.lastCard = d.group ? (Data.groups.get(d.group)?.[0]?.id || d.id) : d.id;
     this.renderView(d);
   },
+  /* what goes beside a drawing at first: one seen elsewhere in the book, else the most alike, else a neighbour on its page */
+  besideOf(d) {
+    const a = aboutOf(d);
+    const ids = [...(a.see || []), ...(Data.similar[d.id] || []).map(([id]) => id), ...(d.group ? (Data.groups.get(d.group) || []).map(x => x.id) : [])];
+    return ids.map(id => Data.byId.get(id)).find(x => x && x !== d) || null;
+  },
   /* the drawings stepped through with ← →: those the gallery shows, in the book's order */
   around(d) {
     const list = this.filtered();
@@ -357,11 +371,15 @@ const T = {
     const layer = h("div", { class: "dw-layer" });
     stage.append(layer);
     const sharp = h("span", { class: "dw-sharp", role: "status" });
+    if (this.on === "beside" && !Data.byId.get(this.with)) this.with = this.besideOf(d)?.id || null;
+    if (this.on === "beside" && !this.with) this.on = "cut";
     const modeBtn = on => h("button", { class: this.on === on ? "on" : "", "aria-pressed": String(this.on === on),
-      onclick: () => { this.on = on; this.renderView(d); setHash(); } }, on === "cut" ? "Cut out" : ["On", h("span", { class: "txt" }, " its"), " page"]);
+      title: on === "beside" ? "Put another drawing beside this one: pick it under “Drawn alike” or “All on this page”" : null,
+      onclick: () => { this.on = on; this.renderView(d); setHash(); } },
+      on === "cut" ? "Cut out" : on === "page" ? ["On", h("span", { class: "txt" }, " its"), " page"] : ["Side", h("span", { class: "txt" }, " by side")]);
     const bar = h("div", { class: "dw-stagebar" },
       h("button", { class: "dw-back", onclick: () => this.back(), title: "Back to every drawing (Esc)" }, "‹ All", h("span", { class: "txt" }, " drawings")),
-      h("div", { class: "dw-seg", role: "group", "aria-label": "Show the drawing" }, modeBtn("cut"), modeBtn("page")),
+      h("div", { class: "dw-seg", role: "group", "aria-label": "Show the drawing" }, modeBtn("cut"), modeBtn("page"), this.besideOf(d) ? modeBtn("beside") : ""),
       h("span", { class: "grow" }),
       h("button", { title: "Save the drawing, cut out, as a picture with a see-through background", onclick: () => this.save(d) }, "Save", h("span", { class: "txt" }, " picture")));
     const navBtn = (x, dir) => h("button", { class: `dw-nav ${dir}`, disabled: !x, "aria-label": x ? `${dir === "prev" ? "Previous" : "Next"} drawing: ${titleOf(x)}, page ${pageOf(x)}` : null,
@@ -379,6 +397,18 @@ const T = {
         const c = $("canvas.dw-big", layer) || h("canvas", { class: "dw-big", role: "img", "aria-label": `${titleOf(d)}, cut out of page ${pageOf(d)}` });
         await paint(c, d, { w: W, h: H, pad: 0.04, src });
         if (!c.isConnected) layer.replaceChildren(c);
+      } else if (this.on === "beside") {
+        // the two drawings at the same scale, so their sizes on the page can be compared too
+        const o = Data.byId.get(this.with);
+        const pair = $(".dw-pair", layer) || h("div", { class: "dw-pair" });
+        const fig = (x, i) => h("figure", {}, h("canvas", { role: "img", "aria-label": `${titleOf(x)}, page ${pageOf(x)}` }),
+          h("figcaption", {}, h("b", {}, titleOf(x)), " · ", pageOf(x), i ? [" · ", h("button", { class: "linkish", onclick: () => this.open(x.id, "cut") }, "open")] : ""));
+        pair.replaceChildren(fig(d, 0), fig(o, 1), h("p", { class: "dw-pair-say" }, "At the same scale. Pick another drawing beside the description to put it here."));
+        if (!pair.isConnected) layer.replaceChildren(pair);
+        const [c0, c1] = $$("canvas", pair), Wh = (W - 24) / 2, Hh = H - 36;
+        const s0 = Math.min(Wh / d.box[2], Hh / d.box[3]), s1 = Math.min(Wh / o.box[2], Hh / o.box[3]), sc = Math.min(s0, s1);
+        await Promise.all([paint(c0, d, { w: d.box[2] * sc * 1.08, h: d.box[3] * sc * 1.08, pad: 0.04, src }),
+          paint(c1, o, { w: o.box[2] * sc * 1.08, h: o.box[3] * sc * 1.08, pad: 0.04 })]);
       } else {
         await this.onPage(d, layer, W, H, src);
       }
@@ -493,11 +523,15 @@ const T = {
   },
 
   /* a row of small cut-outs, each opening its drawing */
+  /* a row of small cut-outs: each opens its drawing, or, side by side, goes beside this one */
   strip(list, cur) {
     const row = h("div", { class: "dw-strip" });
     for (const x of list) {
-      const b = h("button", { class: `dw-mini${x === cur ? " cur" : ""}`, title: `${titleOf(x)} · ${pageOf(x)}`, "aria-label": `${titleOf(x)}, page ${pageOf(x)}`,
-        "aria-current": x === cur ? "true" : null, onclick: () => x !== cur && this.open(x.id) }, h("canvas", { "aria-hidden": "true" }));
+      const b = h("button", { class: `dw-mini${x === cur ? " cur" : ""}${this.on === "beside" && x.id === this.with ? " with" : ""}`, title: `${titleOf(x)} · ${pageOf(x)}`, "aria-label": `${titleOf(x)}, page ${pageOf(x)}`,
+        "aria-current": x === cur ? "true" : null, onclick: () => {
+          if (x === cur) return;
+          if (this.on === "beside") { this.with = x.id; this.renderView(cur); setHash(); } else this.open(x.id);
+        } }, h("canvas", { "aria-hidden": "true" }));
       row.append(b);
       paint($("canvas", b), x, { w: 64, h: 64, pad: 0.04, shadow: false }).catch(() => {});
     }

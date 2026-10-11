@@ -113,7 +113,7 @@ def layers(im: np.ndarray):
     clear = cv2.morphologyEx(clear.astype(np.uint8), cv2.MORPH_OPEN, k).astype(bool)
     faint = cv2.morphologyEx(((dc > 5.5) | ((dc > 4) & (dl > 9))).astype(np.uint8), cv2.MORPH_OPEN, k).astype(bool)
     paint = grow_into(clear, faint)
-    return ink, paint, clear, d, dc
+    return ink, paint, clear, d, dc, full
 
 
 # ---------------------------------------------------------------- the writing
@@ -162,7 +162,7 @@ def pieces(img: str, im: np.ndarray | None = None):
     """the panel's drawing, in pieces: (labels, stats, ink, paint, writing, page)"""
     im = load(img) if im is None else im
     h, w = im.shape[:2]
-    ink, paint, clear, d, dc = layers(im)
+    ink, paint, clear, d, dc, full = layers(im)
     writing = words_mask(img, (h, w))
     # a word's box takes its glyphs off the ink; paint under a word stays (paint is never writing)
     marks = (ink & ~writing) | paint
@@ -214,7 +214,7 @@ def pieces(img: str, im: np.ndarray | None = None):
     # hairline gaps closed: a drawing's outline is one piece
     joined = cv2.morphologyEx(marks.astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
     n, lab, st, cen = cv2.connectedComponentsWithStats(joined, connectivity=8)
-    return dict(labels=lab, stats=st, n=n, ink=ink, paint=paint, clear=clear, writing=writing, page=page,
+    return dict(labels=lab, stats=st, n=n, ink=ink, paint=paint, clear=clear, writing=writing, page=page, dark=d, full=full,
                 marks=marks, joined=joined.astype(bool), h=h, w=w)
 
 
@@ -483,6 +483,19 @@ def cut(img: str, drawings: list[dict], P=None):
                 out.append((f"{dr['id']}-{j + 1}", dr, ms[i]))
         elif take == "region":
             out.append((dr["id"], dr, R.copy()))
+        elif take == "faint":
+            # a drawing in ink too faint for the pieces (a quick sketch, a pale figure): within its region, every mark
+            # a little darker than the parchment, writing aside, joined across wider gaps, and filled
+            t = max(5.0, dr.get("level", 0.07) * P["full"])
+            m = (P["dark"] > t) & R & ~P["writing"] & P["page"] | (P["paint"] & R)
+            n2, lab2, st2, _ = cv2.connectedComponentsWithStats(m.astype(np.uint8), connectivity=8)
+            keep = np.zeros(n2, bool)
+            keep[1:] = st2[1:, cv2.CC_STAT_AREA] >= 10
+            m = keep[lab2]
+            g = int(dr.get("gap", 7)) | 1
+            m = cv2.morphologyEx(m.astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (g, g))).astype(bool) & R
+            m = specks_out(m, dr.get("keep", 0.06), int(dr.get("near", 4) * k))
+            out.append((dr["id"], dr, m))
     res = []
     under = P["ink"] & P["writing"] & P["page"]
     for did, dr, m in out:

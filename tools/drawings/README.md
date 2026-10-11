@@ -67,6 +67,9 @@ line every 50 units and a numbered line every 100.
   pixels (300); `join` (units) puts pieces that close together into one drawing (a woman and the star she holds).
 - `holes`: the bare figures a painted area closes round, each with its outline, numbered: the women in the pools.
   `min` is the smallest in pixels (1500). Two women that touch are cut apart where they join (`"split": false` stops it).
+- `faint`: for a drawing in ink too faint for the pieces (a quick pen sketch, a pale figure): within the region, every
+  mark a little darker than the parchment (`level`, 0.07 of the page's darkest ink), writing aside, joined across
+  wider gaps (`gap`, 7 px) and filled. If it still comes out in bits, draw a `poly` round it and take `region`.
 - `region`: the region itself is the drawing (a medallion's disc; a shape the pieces cannot give, drawn by hand).
 
 ## Kinds

@@ -126,3 +126,21 @@ test("the Reader outlines the drawings (D): pointing names one, a click lights i
   await page.keyboard.press("d");
   await expect(page.locator("#rd-stage .seg-draws")).toHaveCount(0);
 });
+
+test("side by side puts another drawing beside this one at the same scale, and the address keeps it", async ({ page }) => {
+  const other = ix.find(d => d.id !== plant.id && d.kind === plant.kind) || ix.find(d => d.id !== plant.id);
+  await openSite(page, `#draw/beinecke/${plant.id}?with=${other.id}`);
+  await expect(page.locator(".dw-pair figure")).toHaveCount(2);
+  await expect(page.locator(".dw-pair figcaption").nth(1)).toContainText(other.page.replace(/^f/, ""));
+  await page.locator(".dw-seg button", { hasText: "Cut out" }).click();
+  await expect(page.locator("canvas.dw-big")).toBeVisible();
+  expect(hashOf(page)).toBe(`#draw/beinecke/${plant.id}`);
+});
+
+test("Surprise me opens a drawing from those listed", async ({ page }) => {
+  await openSite(page, "#draw/beinecke/all?k=plant");
+  await page.getByRole("button", { name: "Surprise me" }).click();
+  await expect(page.locator(".dw-view")).toBeVisible();
+  const id = hashOf(page).split("/")[2];
+  expect(ix.find(d => d.id === id)?.kind).toBe("plant");
+});

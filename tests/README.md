@@ -72,9 +72,9 @@ Clarity are blocked on purpose, so the tests never depend on them and never send
 
 | File | What it checks |
 | --- | --- |
-| `data.spec.js` | `codex.json`, `orders.json`, `changelog.json`: shapes, unique ids, every sheet in every order exists and appears once, every source cited exists, every page has both its pictures and each is a whole JPEG, changelog dates and versions (and that the version is the same in the changelog, the badge and `APP_VERSION`) |
+| `data.spec.js` | `codex.json`, `orders.json`, `changelog.json`: shapes, unique ids, every sheet in every order exists and appears once, every source cited exists, every page has both its pictures and each is a whole JPEG, changelog dates and versions (and that the version is the same in the changelog, the badge and `APP_VERSION`); the drawings: unique ids, known kinds, boxes on real panels, an outline for each, and every drawing and source that `about.json` and `similar.json` name exists |
 | `site.spec.js` | `index.html` points at files that exist, ids are unique, scripts load in order and parse, imports resolve, icons, `CNAME`, `.nojekyll`, no oversized file |
-| `smoke.spec.js` | the site starts; the three tabs; the order menu; What's new; the help, bug and Your work dialogs; a clear message when data cannot load |
+| `smoke.spec.js` | the site starts; the tabs; the order menu; What's new; the help, bug and Your work dialogs; a clear message when data cannot load |
 | `reader.spec.js` | turning pages every way; **walking every opening of every order** (pictures load, labels show, no page cut off); zoom limits; Go to; foldouts, with and without animation; the grid; labels, scribes and lost leaves; window sizes; the layout staying steady |
 | `three.spec.js` | the 3D book is really drawn (not blank); every order; every key in the help; the five camera views; stepping through sheets; the controls; 3D and the Reader following each other; odd addresses; the message when WebGL is missing |
 | `routing.spec.js` | every kind of address, old links, nonsense links; stale or damaged saved data; a browser that will not store anything |
@@ -87,6 +87,7 @@ Clarity are blocked on purpose, so the tests never depend on them and never send
 | `rearrange-progress.spec.js` | an order made on the table, with every kind of change, goes out in a progress file and comes back exactly; copies keep the order they came from; importing over the open order |
 | `three-folds.spec.js`, `davis-order.spec.js` | the foldouts fold as Davis describes them (`data/folds.json`), the faces that touch in the closed book; her proposed order re-sequences only quires 13 and 20, and says so |
 | `reader-foldouts.spec.js`, `reader-turns.spec.js` | a folded foldout is one leaf in the Reader; every move turns a leaf, with the animation on |
+| `drawings.spec.js` | the Drawings tab: every drawing listed (a page's group as one card), search and filters kept in the address, a drawing alone, on its page and side by side, the arrows and Escape, the others of its page, Save picture (a real PNG), Surprise me; in the Reader, D outlines the drawings, pointing names one and a click lights it up and opens it |
 | `mobile.spec.js` | on a phone: no sideways scrolling, controls on screen and tappable, the Reader, 3D, cookie strip and Info all fit |
 
 Several tests are named **"1.1 fix: …"**. They guard bugs `data/changelog.json` lists as fixed, so a fix cannot quietly
