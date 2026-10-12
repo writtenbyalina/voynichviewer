@@ -493,6 +493,9 @@ const T = {
     if (a.unknown) el.append(sec("What nobody knows", h("p", {}, a.unknown)));
     if (a.kindNote) el.append(h("p", { class: "dw-kindnote muted" }, `This is said of every ${(KINDS[d.kind]?.[0] || "drawing").toLowerCase()} in the book, not of this one alone.`));
     if (a.whose === "group") el.append(h("p", { class: "dw-kindnote muted" }, `Said of all ${grp?.length || ""} on this page together.`));
+    if (a.pageNote) el.append(sec("About this page", h("p", {}, a.pageNote)));
+    if (a.seePages?.length) el.append(h("p", { class: "dw-seepages" }, "See also ",
+      ...a.seePages.flatMap((pg, i) => [i ? ", " : "", h("a", { href: `#draw/${encodeURIComponent(S.order)}/all?q=${encodeURIComponent(short(pg))}` }, `the drawings of ${short(pg)}`)])));
     if (a.facts?.length) el.append(sec("Worth knowing", h("ul", { class: "dw-facts" }, a.facts.map(f => h("li", {}, typeof f === "string" ? f : [f.fact, f.src && srcLink(f.src) ? [" ", h("span", { class: "dw-src" }, "(", srcLink(f.src), ")")] : ""])))));
     // what it shows
     const looks = d.looks || (d.group && Data.byId.get(d.group + "-1")?.looks) || "";

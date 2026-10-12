@@ -251,6 +251,7 @@ test.describe("drawings", () => {
       for (const k of [].concat(e.agreedSrc || [])) expect(srcs.has(k), `${id}: source "${k}"`).toBe(true);
       for (const f of e.facts || []) if (f.src) expect(srcs.has(f.src), `${id}: source "${f.src}"`).toBe(true);
       for (const s of e.see || []) expect(ids.has(s), `${id}: sees "${s}"`).toBe(true);
+      for (const pg of e.seePages || []) expect(segments.some(x => x.seg.page === pg), `${id}: page "${pg}"`).toBe(true);
       if (e.strength) expect(["strong", "broad"], `${id}: strength`).toContain(e.strength);
       if (e.strength) expect(e.agreed, `${id}: a strength needs something agreed`).toBeTruthy();
     }
