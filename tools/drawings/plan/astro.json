@@ -9131,17 +9131,19 @@
     "in": {
      "circle": [
       452,
-      457,
-      70
+      459,
+      64
      ]
     },
-    "not": {
-     "circle": [
-      530,
-      490,
-      8
-     ]
-    }
+    "not": [
+     {
+      "circle": [
+       530,
+       490,
+       8
+      ]
+     }
+    ]
    },
    {
     "id": "f70v1.woman-inner",
@@ -9152,13 +9154,23 @@
      "ring": [
       458,
       465,
-      80,
-      208
+      72,
+      177
      ]
     },
     "take": "each",
     "min": 700,
-    "join": 4
+    "join": 4,
+    "not": [
+     {
+      "box": [
+       270,
+       480,
+       380,
+       570
+      ]
+     }
+    ]
    },
    {
     "id": "f70v1.woman-outer",
@@ -9169,13 +9181,321 @@
      "ring": [
       458,
       465,
-      208,
+      180,
       334
      ]
     },
     "take": "each",
     "min": 700,
-    "join": 4
+    "join": 4,
+    "not": [
+     {
+      "box": [
+       536,
+       165,
+       600,
+       215
+      ]
+     },
+     {
+      "box": [
+       575,
+       380,
+       800,
+       720
+      ]
+     },
+     {
+      "box": [
+       130,
+       390,
+       330,
+       635
+      ]
+     }
+    ]
+   },
+   {
+    "id": "f70v1.woman-a",
+    "kind": "woman",
+    "name": "Woman holding a star",
+    "looks": "A woman in a tub patterned with rings, lying with her head to the right, holding a star on a string.",
+    "in": {
+     "poly": [
+      [
+       637,
+       392
+      ],
+      [
+       690,
+       383
+      ],
+      [
+       750,
+       385
+      ],
+      [
+       755,
+       440
+      ],
+      [
+       755,
+       482
+      ],
+      [
+       712,
+       482
+      ],
+      [
+       700,
+       452
+      ],
+      [
+       640,
+       452
+      ]
+     ]
+    },
+    "not": []
+   },
+   {
+    "id": "f70v1.woman-b",
+    "kind": "woman",
+    "name": "Woman holding a star",
+    "looks": "A woman in a striped tub, lying with her head to the right, holding a star on a looped string.",
+    "in": {
+     "poly": [
+      [
+       622,
+       515
+      ],
+      [
+       650,
+       500
+      ],
+      [
+       700,
+       503
+      ],
+      [
+       752,
+       503
+      ],
+      [
+       757,
+       545
+      ],
+      [
+       742,
+       592
+      ],
+      [
+       690,
+       597
+      ],
+      [
+       630,
+       568
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f70v1.woman-c",
+    "kind": "woman",
+    "name": "Woman holding a star",
+    "looks": "A woman in a tub painted with green stripes, upside down, holding a star below her.",
+    "in": {
+     "poly": [
+      [
+       578,
+       585
+      ],
+      [
+       625,
+       588
+      ],
+      [
+       662,
+       612
+      ],
+      [
+       668,
+       660
+      ],
+      [
+       652,
+       702
+      ],
+      [
+       612,
+       702
+      ],
+      [
+       588,
+       672
+      ],
+      [
+       576,
+       620
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f70v1.woman-d",
+    "kind": "woman",
+    "name": "Woman holding a star",
+    "looks": "A faint woman lying on her side by a tub drawn with rings, with a pale star above her.",
+    "in": {
+     "poly": [
+      [
+       140,
+       430
+      ],
+      [
+       160,
+       400
+      ],
+      [
+       195,
+       400
+      ],
+      [
+       200,
+       418
+      ],
+      [
+       258,
+       418
+      ],
+      [
+       260,
+       485
+      ],
+      [
+       200,
+       495
+      ],
+      [
+       150,
+       490
+      ],
+      [
+       138,
+       465
+      ]
+     ]
+    },
+    "take": "faint",
+    "level": 0.08,
+    "gap": 5
+   },
+   {
+    "id": "f70v1.woman-e",
+    "kind": "woman",
+    "name": "Woman holding a star",
+    "looks": "A faint woman lying on her side by a tub, with a pale star beside her.",
+    "in": {
+     "poly": [
+      [
+       165,
+       560
+      ],
+      [
+       200,
+       548
+      ],
+      [
+       240,
+       550
+      ],
+      [
+       300,
+       562
+      ],
+      [
+       305,
+       625
+      ],
+      [
+       255,
+       632
+      ],
+      [
+       230,
+       625
+      ],
+      [
+       200,
+       632
+      ],
+      [
+       178,
+       610
+      ]
+     ]
+    },
+    "take": "faint",
+    "level": 0.08,
+    "gap": 5
+   },
+   {
+    "id": "f70v1.woman-f",
+    "kind": "woman",
+    "name": "Woman holding a star",
+    "looks": "A woman in a tub, lying with her head down to the left, holding a star on a string.",
+    "in": {
+     "poly": [
+      [
+       283,
+       488
+      ],
+      [
+       300,
+       482
+      ],
+      [
+       340,
+       478
+      ],
+      [
+       375,
+       486
+      ],
+      [
+       378,
+       540
+      ],
+      [
+       345,
+       560
+      ],
+      [
+       305,
+       562
+      ],
+      [
+       290,
+       540
+      ],
+      [
+       282,
+       510
+      ]
+     ]
+    },
+    "take": "faint",
+    "level": 0.1,
+    "gap": 5,
+    "not": {
+     "box": [
+      250,
+      490,
+      282,
+      515
+     ]
+    }
    }
   ]
  }
