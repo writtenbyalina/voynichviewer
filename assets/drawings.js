@@ -47,6 +47,7 @@ const KNOWN = {
   open: { name: "Nobody knows", say: "No one has said what it is, in the sources checked" },
   unchecked: { name: "Not looked into yet", say: "The sources have not been searched for this drawing yet" },
 };
+const SETS = new Set(["woman", "star"]);   // kinds a page's drawings of are shown together, as one card
 const STRENGTH = { strong: "Shown by the book itself", broad: "Most agree, not proven" };
 
 // ---------------------------------------------------------------- data
@@ -59,10 +60,17 @@ const Data = {
       this.about = about || { sources: {}, drawings: {}, kinds: {}, general: [] };
       this.similar = (sim && sim.similar) || {};
       this.list = ix.drawings.map((d, i) => ({ ...d, i, part: partOf(this.segs.get(d.img)) }));
+      // a page's set: its drawings shown as one card and stepped through together. A group cut out piece by piece
+      // (the women round a medallion), or the women or the stars of a panel however they were cut, when there are
+      // three or more of them
+      const many = new Map();
+      for (const d of this.list) if (SETS.has(d.kind)) many.set(`${d.img}:${d.kind}`, (many.get(`${d.img}:${d.kind}`) || 0) + 1);
       for (const d of this.list) {
         this.byId.set(d.id, d);
-        if (d.group) { if (!this.groups.has(d.group)) this.groups.set(d.group, []); this.groups.get(d.group).push(d); }
+        d.set = SETS.has(d.kind) && many.get(`${d.img}:${d.kind}`) >= 3 ? `${d.img}:${d.kind}` : d.group || null;
+        if (d.set) { if (!this.groups.has(d.set)) this.groups.set(d.set, []); this.groups.get(d.set).push(d); }
       }
+      for (const m of this.groups.values()) m.forEach((d, i) => { d.at = i + 1; });
       for (const d of this.list) { d.know = known(d); d.words = words(d); }
     }).catch(e => { this.ready = null; throw e; });
   },
@@ -79,7 +87,8 @@ const Data = {
 /* What is said about a drawing: its own entry, else its group's (the women round one medallion), else its kind's
    (true of every such drawing). `whose` says which. */
 function aboutOf(d) {
-  const A = Data.about, own = A.drawings?.[d.id], grp = d.group && A.drawings?.[d.group], kind = A.kinds?.[d.kind];
+  const A = Data.about, own = A.drawings?.[d.id], kind = A.kinds?.[`${d.kind}@${d.part}`] || A.kinds?.[d.kind];   // a kind in one part of the book, or anywhere
+  const grp = (d.group && A.drawings?.[d.group]) || (d.set && A.drawings?.[d.set]);
   const e = own || grp || null;
   return { ...(kind || {}), ...(e || {}), whose: own ? "own" : grp ? "group" : kind ? "kind" : null, kindNote: !e && !!kind };
 }
@@ -268,10 +277,10 @@ const T = {
     const got = this.filtered();
     const shown = [], seen = new Set();
     for (const d of got) {
-      if (!d.group) { shown.push(d); continue; }
-      if (seen.has(d.group)) continue;
-      seen.add(d.group);
-      shown.push({ group: d.group, members: got.filter(x => x.group === d.group), first: d });
+      if (!d.set) { shown.push(d); continue; }
+      if (seen.has(d.set)) continue;
+      seen.add(d.set);
+      shown.push({ group: d.set, members: got.filter(x => x.set === d.set), first: d });
     }
     const pages = new Set(got.map(d => d.page)).size;
     this.count.textContent = got.length ? `${got.length.toLocaleString("en")} drawing${got.length === 1 ? "" : "s"} on ${pages} page${pages === 1 ? "" : "s"}`
@@ -347,13 +356,13 @@ const T = {
     this.gallery.hidden = !!d;
     this.detail.hidden = !d;
     if (!d) { this.view = null; this.renderGallery(); return; }
-    this.lastCard = d.group ? (Data.groups.get(d.group)?.[0]?.id || d.id) : d.id;
+    this.lastCard = d.set ? (Data.groups.get(d.set)?.[0]?.id || d.id) : d.id;
     this.renderView(d);
   },
   /* what goes beside a drawing at first: one seen elsewhere in the book, else the most alike, else a neighbour on its page */
   besideOf(d) {
     const a = aboutOf(d);
-    const ids = [...(a.see || []), ...(Data.similar[d.id] || []).map(([id]) => id), ...(d.group ? (Data.groups.get(d.group) || []).map(x => x.id) : [])];
+    const ids = [...(a.see || []), ...(Data.similar[d.id] || []).map(([id]) => id), ...(d.set ? (Data.groups.get(d.set) || []).map(x => x.id) : [])];
     return ids.map(id => Data.byId.get(id)).find(x => x && x !== d) || null;
   },
   /* the drawings stepped through with ← →: those the gallery shows, in the book's order */
@@ -468,13 +477,13 @@ const T = {
   info(d, a, seg) {
     const doc = Data.docs.get(d.img);
     const part = PARTS.find(p => p.key === d.part);
-    const grp = d.group ? Data.groups.get(d.group) : null;
+    const grp = d.set ? Data.groups.get(d.set) : null;
     const sec = (title, ...kids) => h("section", { class: "dw-sec" }, h("h3", {}, title), ...kids);
     const el = h("aside", { class: "dw-info", "aria-label": "About this drawing" },
       h("h2", { class: "dw-title" }, titleOf(d)),
       h("p", { class: "dw-where" },
         h("span", {}, `Page ${panelSay(d)}`), " · ", h("span", {}, part?.name || ""),
-        grp ? [" · ", h("span", {}, `${d.n} of ${grp.length} on the page`)] : "",
+        grp ? [" · ", h("span", {}, `${d.at} of ${grp.length} on the page`)] : "",
         " · ", h("a", { href: "#", class: "dw-read", onclick: e => { e.preventDefault(); this.toReader(d); } }, "Open in the Reader")),
       knownTag(d, true));
     // what it is
@@ -483,7 +492,8 @@ const T = {
       a.agreedSrc ? h("p", { class: "dw-src" }, "Sources: ", ...[].concat(a.agreedSrc).flatMap((k, i) => [i ? "; " : "", srcLink(k)])) : ""));
     else el.append(sec("What it is", h("p", { class: "dw-agreed none" },
       d.know === "unchecked" ? "Not looked into yet. The sources have not been searched for this drawing here, so there may be ideas about it that are not listed."
-        : "Nobody knows. No one has shown what it is, and the sources checked agree on nothing.")));
+        : d.know === "ideas" ? "Not agreed. People have had the ideas below, but none is proven, and they do not agree."
+          : "Nobody knows. No one has said what it is, in the sources checked.")));
     if (a.ideas?.length) el.append(sec(`Ideas people have had (${a.ideas.length})`,
       h("ul", { class: "dw-ideas" }, a.ideas.map(x => h("li", {},
         h("b", {}, x.what),
@@ -491,14 +501,14 @@ const T = {
         x.note ? h("span", { class: "note" }, x.note) : "",
         x.src && srcLink(x.src) ? h("span", { class: "dw-src" }, srcLink(x.src)) : "")))));
     if (a.unknown) el.append(sec("What nobody knows", h("p", {}, a.unknown)));
-    if (a.kindNote) el.append(h("p", { class: "dw-kindnote muted" }, `This is said of every ${(KINDS[d.kind]?.[0] || "drawing").toLowerCase()} in the book, not of this one alone.`));
+    if (a.kindNote) el.append(h("p", { class: "dw-kindnote muted" }, `This is said of every ${(KINDS[d.kind]?.[0] || "drawing").toLowerCase()} in the ${PARTS.find(p => p.key === d.part)?.name.toLowerCase() || ""} pages, not of this one alone.`));
     if (a.whose === "group") el.append(h("p", { class: "dw-kindnote muted" }, `Said of all ${grp?.length || ""} on this page together.`));
     if (a.pageNote) el.append(sec("About this page", h("p", {}, a.pageNote)));
     if (a.seePages?.length) el.append(h("p", { class: "dw-seepages" }, "See also ",
       ...a.seePages.flatMap((pg, i) => [i ? ", " : "", h("a", { href: `#draw/${encodeURIComponent(S.order)}/all?q=${encodeURIComponent(short(pg))}` }, `the drawings of ${short(pg)}`)])));
     if (a.facts?.length) el.append(sec("Worth knowing", h("ul", { class: "dw-facts" }, a.facts.map(f => h("li", {}, typeof f === "string" ? f : [f.fact, f.src && srcLink(f.src) ? [" ", h("span", { class: "dw-src" }, "(", srcLink(f.src), ")")] : ""])))));
     // what it shows
-    const looks = d.looks || (d.group && Data.byId.get(d.group + "-1")?.looks) || "";
+    const looks = d.looks || (d.set && Data.groups.get(d.set)?.find(x => x.looks)?.looks) || "";
     if (looks) el.append(sec("What it shows", h("p", {}, looks), h("p", { class: "dw-by muted" }, "Described from the photograph by Claude (Anthropic's AI model).")));
     // the facts worked out from the photograph, once the panel's outlines are here
     const more = h("div", { class: "dw-more" });
@@ -712,7 +722,7 @@ const Lit = {
     const d = this.sel && Data.byId.get(this.sel);
     if (!d) return;
     const a = aboutOf(d);
-    const looks = d.looks || (d.group && Data.byId.get(d.group + "-1")?.looks) || "";
+    const looks = d.looks || (d.set && Data.groups.get(d.set)?.find(x => x.looks)?.looks) || "";
     const line = a.agreed || (a.ideas?.length ? `Ideas: ${a.ideas.slice(0, 3).map(x => x.what).join("; ")}${a.ideas.length > 3 ? "…" : ""}` : looks || KNOWN[d.know].say + ".");
     const pop = h("div", { id: "dw-pop", class: "dw-pop", role: "dialog", "aria-label": titleOf(d) },
       h("div", { class: "dw-pop-pic" }, h("canvas", { "aria-hidden": "true" })),

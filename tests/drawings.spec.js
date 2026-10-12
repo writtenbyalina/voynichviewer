@@ -7,14 +7,18 @@ const path = require("path");
 const read = f => JSON.parse(fs.readFileSync(path.join(__dirname, "..", f), "utf8"));
 const ix = read("data/drawings/index.json").drawings;
 const plant = ix.find(d => d.page === "f9v" && d.kind === "plant") || ix.find(d => d.kind === "plant");
-const member = ix.find(d => d.group);
+// a page's set, as the gallery shows it: the women or the stars of a panel (three or more), else a cut-out group
+const many = {};
+for (const d of ix) if (["woman", "star"].includes(d.kind)) many[`${d.img}:${d.kind}`] = (many[`${d.img}:${d.kind}`] || 0) + 1;
+const setOf = d => ["woman", "star"].includes(d.kind) && many[`${d.img}:${d.kind}`] >= 3 ? `${d.img}:${d.kind}` : d.group || null;
+const member = ix.find(d => setOf(d));
 const hashOf = page => decodeURIComponent(new URL(page.url()).hash);
 
 test("the tab lists every drawing, a page's group as one card, and the count says how many", async ({ page }) => {
   await openSite(page, "#read/beinecke");
   await goTo(page, "draw");
   await expect(page.locator(".dw-card").first()).toBeVisible();
-  const cards = ix.filter(d => !d.group).length + new Set(ix.filter(d => d.group).map(d => d.group)).size;
+  const cards = ix.filter(d => !setOf(d)).length + new Set(ix.map(setOf).filter(Boolean)).size;
   await expect(page.locator(".dw-card")).toHaveCount(cards);
   await expect(page.locator(".dw-count")).toContainText(`${ix.length.toLocaleString("en")} drawing`);
   // the cut-outs are drawn as they come into view
@@ -37,7 +41,7 @@ test("searching and filtering narrow the list, and the address keeps them", asyn
   // a filtered address opens filtered
   await page.goto("/index.html#draw/beinecke/all?k=plant");
   await expect(page.locator(".dw-kind")).toHaveValue("plant");
-  await expect(page.locator(".dw-card")).toHaveCount(ix.filter(d => d.kind === "plant" && !d.group).length);
+  await expect(page.locator(".dw-card")).toHaveCount(ix.filter(d => d.kind === "plant" && !setOf(d)).length + new Set(ix.filter(d => d.kind === "plant").map(setOf).filter(Boolean)).size);
 });
 
 test("a drawing opens alone with what is known of it, steps with the arrows, shows on its page, and Escape goes back", async ({ page }) => {
@@ -71,7 +75,7 @@ test("a drawing opens alone with what is known of it, steps with the arrows, sho
 test("a group's member shows the others of its page, and opening one moves to it", async ({ page }) => {
   test.skip(!member, "no grouped drawings");
   await openSite(page, `#draw/beinecke/${member.id}`);
-  const n = ix.filter(d => d.group === member.group).length;
+  const n = ix.filter(d => setOf(d) === setOf(member)).length;
   await expect(page.locator(".dw-sec h3", { hasText: `All ${n} on this page` })).toBeVisible();
   if (n > 1) {
     await page.locator(".dw-mini:not(.cur)").first().click();

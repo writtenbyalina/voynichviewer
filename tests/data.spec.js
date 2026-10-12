@@ -210,6 +210,7 @@ test.describe("drawings", () => {
   const panels = new Map(segments.filter(x => !x.seg.missing).map(x => [x.seg.img, x.seg]));
   const ids = new Set(ix.map(d => d.id));
   const groups = new Set(ix.map(d => d.group).filter(Boolean));
+  for (const d of ix) groups.add(`${d.img}:${d.kind}`);   // a panel's drawings of a kind together (the women of a page)
   const KINDS = ["plant", "root", "leaf", "jar", "diagram", "emblem", "sun", "moon", "star", "woman", "person", "animal", "pool", "rosette", "building", "other"];
 
   test("every drawing has a unique id, a known kind and a box on a panel of the book", () => {
@@ -255,8 +256,11 @@ test.describe("drawings", () => {
       if (e.strength) expect(["strong", "broad"], `${id}: strength`).toContain(e.strength);
       if (e.strength) expect(e.agreed, `${id}: a strength needs something agreed`).toBeTruthy();
     }
+    const PARTS = ["herbal", "astro", "zodiac", "bathing", "rosettes", "pharma", "stars"];
     for (const [k, e] of Object.entries(about.kinds || {})) {
-      expect(KINDS, `about.json kinds: "${k}"`).toContain(k);
+      const [kind, part] = k.split("@");
+      expect(KINDS, `about.json kinds: "${k}"`).toContain(kind);
+      if (part) expect(PARTS, `about.json kinds: "${k}": part of the book`).toContain(part);
       for (const x of e.ideas || []) if (x.src) expect(srcs.has(x.src), `kind ${k}: source "${x.src}"`).toBe(true);
     }
     for (const g of about.general || []) if (g.src) expect(srcs.has(g.src), `general: source "${g.src}"`).toBe(true);
