@@ -312,7 +312,8 @@ const T = {
         h("ul", {}, g.map(x => h("li", {}, x.fact, x.src ? [" ", h("span", { class: "dw-src" }, "(", srcLink(x.src), ")")] : ""))))
         : "",
       h("p", { class: "dw-how muted" }, "The outlines were traced by a computer from the colours of the ink and paint, page by page, and checked by eye; ",
-        "a faint stroke may be missing. “What it shows” is written from the photograph by Claude (Anthropic's AI model)."));
+        "the faintest drawings were outlined by eye instead, and a very faint stroke may be missing. “What it shows” is written from the photograph by Claude (Anthropic's AI model). ",
+        h("a", { href: "#info/beinecke/drawings" }, "How it was done")));
   },
 
   card(x) {
