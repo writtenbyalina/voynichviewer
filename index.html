@@ -14,11 +14,12 @@
 </head>
 <body>
 <header id="cx-top">
-  <a class="brand" href="./" title="Voynich Viewer">Voynich Viewer</a><button id="cx-ver" class="ver" title="What's new in Voynich Viewer" aria-haspopup="dialog">v1.6</button>
+  <a class="brand" href="./" title="Voynich Viewer">Voynich Viewer</a><button id="cx-ver" class="ver" title="What's new in Voynich Viewer" aria-haspopup="dialog">v1.7</button>
   <nav id="cx-tabs" role="tablist">
     <button role="tab" data-view="three">3D</button>
     <button role="tab" data-view="read">Reader</button>
     <button role="tab" data-view="text" title="Search the text of the whole book (/)">Text</button>
+    <button role="tab" data-view="draw" title="Every drawing in the book, cut out, and what is known of it">Drawings</button>
     <button role="tab" data-view="info">Info</button>
   </nav>
   <label class="order-pick"><span class="op-l">Order</span>
@@ -37,6 +38,7 @@
   <section id="v-read" class="view" hidden></section>
   <section id="v-three" class="view" hidden></section>
   <section id="v-text" class="view" hidden></section>
+  <section id="v-draw" class="view" hidden></section>
   <section id="v-info" class="view" hidden></section>
 </main>
 <div id="cx-toast" role="status" aria-live="polite"></div>
@@ -58,7 +60,9 @@
   <h3>Keyboard</h3>
   <div class="keys">
     <h4>Reader</h4>
-    <p><kbd>←</kbd> <kbd>→</kbd> turn the page · <kbd>U</kbd> unfold · <kbd>G</kbd> go to a folio · <kbd>O</kbd> every page · <kbd>B</kbd> bookmark · <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> zoom · <kbd>T</kbd> the text</p>
+    <p><kbd>←</kbd> <kbd>→</kbd> turn the page · <kbd>U</kbd> unfold · <kbd>G</kbd> go to a folio · <kbd>O</kbd> every page · <kbd>B</kbd> bookmark · <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd> zoom · <kbd>T</kbd> the text · <kbd>D</kbd> the drawings</p>
+    <h4>Drawings</h4>
+    <p><kbd>←</kbd> <kbd>→</kbd> the drawing before or after · <kbd>F</kbd> on its page or cut out · <kbd>Esc</kbd> back to all the drawings</p>
     <h4>3D</h4>
     <p>Drag to turn the book, scroll to zoom · <kbd>←</kbd> <kbd>→</kbd> next sheet · click a sheet to pull it out, <kbd>Enter</kbd> to read it · <kbd>A</kbd> rearrange</p>
     <h4>Anywhere</h4>

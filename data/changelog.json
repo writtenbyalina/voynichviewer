@@ -2,6 +2,16 @@
  "about": "What changed on the site, newest first. Shown under the version number (top left). Add an entry for every change people can see and every fix, in the same commit, with the date it went live. kind: new | improved | fixed. Keep it short: one line per change, a few words each, and only the points a visitor would notice; a release of fixes is usually one line. Versions: third number for fixes (1.5.1), second for new features (1.6), first for a redesign.",
  "releases": [
   {
+   "version": "1.7",
+   "date": "2026-10-11",
+   "changes": [
+    {"kind": "new", "text": "Drawings tab: every drawing in the book cut out on its own, alone or lit up on its page."},
+    {"kind": "new", "text": "For each drawing: what most agree it is, the ideas people have had and who had them, and what nobody knows."},
+    {"kind": "new", "text": "Reader: D outlines the drawings on the page. Point at one to name it; click it to light it up."},
+    {"kind": "new", "text": "Save a drawing as a picture with a see-through background, cut from Yale's full-size photograph."}
+   ]
+  },
+  {
    "version": "1.6",
    "date": "2026-10-10",
    "changes": [
