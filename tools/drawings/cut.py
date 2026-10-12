@@ -423,8 +423,9 @@ def cut(img: str, drawings: list[dict], P=None):
         inside = np.stack([np.bincount(lab[regs[dr["id"]]].ravel(), minlength=n) for dr in claim])   # drawings x pieces
         share = inside / np.maximum(area, 1)[None, :]
         whole = np.full(n, -1)
+        smallest = min(dr.get("min", 30) for dr in claim)
         for p in range(1, n):
-            if area[p] < claim[0].get("min", 30) and share[:, p].max() < 1:
+            if area[p] < smallest and share[:, p].max() < 1:
                 continue
             ins = np.nonzero(share[:, p] >= 0.05)[0]
             if len(ins) == 1 and share[ins[0], p] >= claim[ins[0]].get("whole", 0.6):
