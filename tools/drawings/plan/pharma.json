@@ -60059,6 +60059,1212 @@
      ]
     }
    }
+  ],
+  "f102v2": [
+   {
+    "id": "f102v2.jar-1",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A tall jar drawn in pale outline, with dark blue bands at its top and middle and rows of small rings.",
+    "in": {
+     "poly": [
+      [
+       95,
+       102
+      ],
+      [
+       141,
+       102
+      ],
+      [
+       148,
+       110
+      ],
+      [
+       149,
+       162
+      ],
+      [
+       154,
+       172
+      ],
+      [
+       153,
+       248
+      ],
+      [
+       150,
+       262
+      ],
+      [
+       130,
+       270
+      ],
+      [
+       130,
+       298
+      ],
+      [
+       138,
+       304
+      ],
+      [
+       141,
+       328
+      ],
+      [
+       149,
+       338
+      ],
+      [
+       152,
+       364
+      ],
+      [
+       142,
+       373
+      ],
+      [
+       84,
+       373
+      ],
+      [
+       75,
+       365
+      ],
+      [
+       77,
+       340
+      ],
+      [
+       85,
+       330
+      ],
+      [
+       88,
+       305
+      ],
+      [
+       99,
+       299
+      ],
+      [
+       99,
+       270
+      ],
+      [
+       79,
+       263
+      ],
+      [
+       74,
+       248
+      ],
+      [
+       77,
+       172
+      ],
+      [
+       87,
+       162
+      ],
+      [
+       89,
+       110
+      ]
+     ]
+    },
+    "take": "region"
+   },
+   {
+    "id": "f102v2.jar-2",
+    "kind": "jar",
+    "name": "Jar",
+    "looks": "A tall jar in pale blue and green bands between ringed bands, on curled feet.",
+    "in": {
+     "poly": [
+      [
+       82,
+       397
+      ],
+      [
+       148,
+       397
+      ],
+      [
+       152,
+       405
+      ],
+      [
+       152,
+       445
+      ],
+      [
+       156,
+       455
+      ],
+      [
+       153,
+       470
+      ],
+      [
+       152,
+       520
+      ],
+      [
+       180,
+       525
+      ],
+      [
+       185,
+       540
+      ],
+      [
+       178,
+       556
+      ],
+      [
+       150,
+       560
+      ],
+      [
+       150,
+       600
+      ],
+      [
+       162,
+       610
+      ],
+      [
+       182,
+       622
+      ],
+      [
+       185,
+       645
+      ],
+      [
+       160,
+       661
+      ],
+      [
+       130,
+       663
+      ],
+      [
+       100,
+       663
+      ],
+      [
+       84,
+       655
+      ],
+      [
+       82,
+       630
+      ],
+      [
+       86,
+       610
+      ],
+      [
+       92,
+       600
+      ],
+      [
+       92,
+       560
+      ],
+      [
+       72,
+       555
+      ],
+      [
+       68,
+       540
+      ],
+      [
+       70,
+       525
+      ],
+      [
+       88,
+       518
+      ],
+      [
+       88,
+       472
+      ],
+      [
+       72,
+       465
+      ],
+      [
+       70,
+       450
+      ],
+      [
+       82,
+       442
+      ],
+      [
+       82,
+       420
+      ],
+      [
+       80,
+       405
+      ]
+     ]
+    },
+    "take": "region"
+   },
+   {
+    "id": "f102v2.leaf-1",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A dark olive pointed leaf.",
+    "in": {
+     "poly": [
+      [
+       172,
+       122
+      ],
+      [
+       225,
+       122
+      ],
+      [
+       225,
+       165
+      ],
+      [
+       205,
+       180
+      ],
+      [
+       185,
+       195
+      ],
+      [
+       172,
+       195
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.root-1",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A tan root shaped like a hand, with fingers reaching up.",
+    "in": {
+     "poly": [
+      [
+       160,
+       195
+      ],
+      [
+       185,
+       195
+      ],
+      [
+       205,
+       180
+      ],
+      [
+       238,
+       180
+      ],
+      [
+       238,
+       272
+      ],
+      [
+       160,
+       272
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-2",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A tall green leaf with a pale outline.",
+    "in": {
+     "poly": [
+      [
+       238,
+       100
+      ],
+      [
+       282,
+       100
+      ],
+      [
+       282,
+       160
+      ],
+      [
+       272,
+       190
+      ],
+      [
+       262,
+       200
+      ],
+      [
+       238,
+       205
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.root-2",
+    "kind": "root",
+    "name": "Root with a leaf",
+    "looks": "A tan cone-shaped root topped by a curved green leaf shaped like a claw.",
+    "in": {
+     "poly": [
+      [
+       282,
+       80
+      ],
+      [
+       360,
+       80
+      ],
+      [
+       360,
+       175
+      ],
+      [
+       330,
+       175
+      ],
+      [
+       300,
+       200
+      ],
+      [
+       275,
+       215
+      ],
+      [
+       256,
+       215
+      ],
+      [
+       262,
+       200
+      ],
+      [
+       272,
+       190
+      ],
+      [
+       282,
+       160
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-3",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A green leaf shaped like a comb, with rounded fingers pointing up, on a thin curved stalk.",
+    "in": {
+     "poly": [
+      [
+       238,
+       198
+      ],
+      [
+       324,
+       198
+      ],
+      [
+       324,
+       235
+      ],
+      [
+       318,
+       240
+      ],
+      [
+       318,
+       268
+      ],
+      [
+       262,
+       268
+      ],
+      [
+       250,
+       292
+      ],
+      [
+       232,
+       292
+      ],
+      [
+       238,
+       260
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.other-1",
+    "kind": "other",
+    "name": "Blue square",
+    "looks": "A small dark blue square in a pale outlined frame.",
+    "in": {
+     "box": [
+      350,
+      135,
+      405,
+      185
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-4",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A dark blue leaf shaped like a comb, with pointed fingers drawn up in pale outline.",
+    "in": {
+     "poly": [
+      [
+       326,
+       185
+      ],
+      [
+       445,
+       185
+      ],
+      [
+       445,
+       250
+      ],
+      [
+       428,
+       262
+      ],
+      [
+       326,
+       268
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-5",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A long green leaf with a feathered tip.",
+    "in": {
+     "poly": [
+      [
+       442,
+       80
+      ],
+      [
+       500,
+       80
+      ],
+      [
+       500,
+       165
+      ],
+      [
+       470,
+       165
+      ],
+      [
+       470,
+       170
+      ],
+      [
+       436,
+       170
+      ],
+      [
+       436,
+       140
+      ],
+      [
+       442,
+       140
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-6",
+    "kind": "leaf",
+    "name": "Sprig",
+    "looks": "A sprig of narrow pointed green leaves.",
+    "in": {
+     "box": [
+      440,
+      170,
+      495,
+      240
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-7",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A green leaf with a notched outline on a long thin curving stalk.",
+    "in": {
+     "poly": [
+      [
+       505,
+       98
+      ],
+      [
+       597,
+       98
+      ],
+      [
+       597,
+       205
+      ],
+      [
+       530,
+       205
+      ],
+      [
+       495,
+       240
+      ],
+      [
+       470,
+       272
+      ],
+      [
+       456,
+       268
+      ],
+      [
+       470,
+       240
+      ],
+      [
+       500,
+       205
+      ],
+      [
+       505,
+       150
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-8",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A green leaf with deep rounded lobes on a curving stalk.",
+    "in": {
+     "poly": [
+      [
+       600,
+       88
+      ],
+      [
+       735,
+       88
+      ],
+      [
+       735,
+       150
+      ],
+      [
+       712,
+       155
+      ],
+      [
+       712,
+       187
+      ],
+      [
+       640,
+       187
+      ],
+      [
+       600,
+       200
+      ],
+      [
+       570,
+       217
+      ],
+      [
+       562,
+       207
+      ],
+      [
+       600,
+       185
+      ],
+      [
+       620,
+       165
+      ],
+      [
+       600,
+       140
+      ]
+     ]
+    },
+    "not": {
+     "box": [
+      712,
+      155,
+      800,
+      200
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-9",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A dark green leaf with curly lobes on a long thin stalk.",
+    "in": {
+     "poly": [
+      [
+       505,
+       207
+      ],
+      [
+       578,
+       207
+      ],
+      [
+       578,
+       290
+      ],
+      [
+       560,
+       292
+      ],
+      [
+       520,
+       307
+      ],
+      [
+       485,
+       318
+      ],
+      [
+       478,
+       306
+      ],
+      [
+       515,
+       290
+      ],
+      [
+       505,
+       260
+      ]
+     ]
+    },
+    "not": {
+     "box": [
+      538,
+      281,
+      562,
+      300
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-10",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A large green leaf with curly lobes on a thin stalk.",
+    "in": {
+     "poly": [
+      [
+       578,
+       197
+      ],
+      [
+       705,
+       197
+      ],
+      [
+       705,
+       308
+      ],
+      [
+       660,
+       312
+      ],
+      [
+       620,
+       332
+      ],
+      [
+       598,
+       342
+      ],
+      [
+       592,
+       330
+      ],
+      [
+       620,
+       312
+      ],
+      [
+       600,
+       300
+      ],
+      [
+       578,
+       290
+      ]
+     ]
+    },
+    "not": [
+     {
+      "box": [
+       705,
+       140,
+       800,
+       345
+      ]
+     },
+     {
+      "box": [
+       698,
+       140,
+       800,
+       200
+      ]
+     }
+    ]
+   },
+   {
+    "id": "f102v2.root-3",
+    "kind": "root",
+    "name": "Root with a leaf",
+    "looks": "A pale green leaf half under a dark stain, above a small dark brown root, at the page's edge.",
+    "in": [
+     {
+      "poly": [
+       [
+        712,
+        205
+       ],
+       [
+        722,
+        190
+       ],
+       [
+        735,
+        184
+       ],
+       [
+        746,
+        190
+       ],
+       [
+        746,
+        230
+       ],
+       [
+        740,
+        255
+       ],
+       [
+        730,
+        270
+       ],
+       [
+        722,
+        270
+       ],
+       [
+        712,
+        252
+       ],
+       [
+        707,
+        230
+       ]
+      ]
+     },
+     {
+      "poly": [
+       [
+        724,
+        268
+       ],
+       [
+        729,
+        268
+       ],
+       [
+        729,
+        296
+       ],
+       [
+        724,
+        296
+       ]
+      ]
+     },
+     {
+      "poly": [
+       [
+        707,
+        300
+       ],
+       [
+        720,
+        293
+       ],
+       [
+        740,
+        294
+       ],
+       [
+        749,
+        300
+       ],
+       [
+        749,
+        322
+       ],
+       [
+        735,
+        329
+       ],
+       [
+        715,
+        327
+       ],
+       [
+        706,
+        315
+       ]
+      ]
+     }
+    ],
+    "take": "region"
+   },
+   {
+    "id": "f102v2.root-4",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A long thin wavy brown root drawn in outline.",
+    "in": {
+     "poly": [
+      [
+       486,
+       326
+      ],
+      [
+       530,
+       323
+      ],
+      [
+       600,
+       331
+      ],
+      [
+       650,
+       335
+      ],
+      [
+       700,
+       333
+      ],
+      [
+       750,
+       337
+      ],
+      [
+       750,
+       352
+      ],
+      [
+       700,
+       348
+      ],
+      [
+       650,
+       350
+      ],
+      [
+       600,
+       346
+      ],
+      [
+       530,
+       339
+      ],
+      [
+       486,
+       340
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.leaf-11",
+    "kind": "leaf",
+    "name": "Leaf",
+    "looks": "A large pale green leaf with a toothed edge and long pointed lobes.",
+    "in": {
+     "poly": [
+      [
+       158,
+       395
+      ],
+      [
+       305,
+       395
+      ],
+      [
+       310,
+       505
+      ],
+      [
+       158,
+       520
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.root-5",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "An orange carrot-shaped root with a large dark green toothed leaf rising from its top.",
+    "in": {
+     "poly": [
+      [
+       305,
+       395
+      ],
+      [
+       505,
+       395
+      ],
+      [
+       528,
+       430
+      ],
+      [
+       528,
+       475
+      ],
+      [
+       548,
+       490
+      ],
+      [
+       548,
+       505
+      ],
+      [
+       525,
+       530
+      ],
+      [
+       500,
+       548
+      ],
+      [
+       462,
+       558
+      ],
+      [
+       462,
+       622
+      ],
+      [
+       350,
+       622
+      ],
+      [
+       350,
+       590
+      ],
+      [
+       318,
+       575
+      ],
+      [
+       300,
+       545
+      ],
+      [
+       310,
+       505
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.root-6",
+    "kind": "root",
+    "name": "Root",
+    "looks": "A red-brown root shaped like a bulb, with a pointed tail.",
+    "in": {
+     "poly": [
+      [
+       208,
+       545
+      ],
+      [
+       300,
+       545
+      ],
+      [
+       318,
+       575
+      ],
+      [
+       350,
+       590
+      ],
+      [
+       350,
+       608
+      ],
+      [
+       325,
+       608
+      ],
+      [
+       325,
+       628
+      ],
+      [
+       208,
+       628
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.root-7",
+    "kind": "root",
+    "name": "Root with leaves",
+    "looks": "A tan root with long trailing strands, under a stem with a dark brown cap and a round dark green leaf.",
+    "in": {
+     "poly": [
+      [
+       505,
+       400
+      ],
+      [
+       690,
+       400
+      ],
+      [
+       690,
+       475
+      ],
+      [
+       645,
+       480
+      ],
+      [
+       642,
+       602
+      ],
+      [
+       462,
+       602
+      ],
+      [
+       462,
+       558
+      ],
+      [
+       500,
+       548
+      ],
+      [
+       525,
+       530
+      ],
+      [
+       548,
+       505
+      ],
+      [
+       548,
+       490
+      ],
+      [
+       528,
+       475
+      ],
+      [
+       528,
+       430
+      ]
+     ]
+    }
+   },
+   {
+    "id": "f102v2.root-8",
+    "kind": "root",
+    "name": "Root with a leaf",
+    "looks": "A pale root drawn in outline, with many long strands, under a pale green leaf.",
+    "in": {
+     "poly": [
+      [
+       690,
+       400
+      ],
+      [
+       737,
+       400
+      ],
+      [
+       737,
+       455
+      ],
+      [
+       726,
+       470
+      ],
+      [
+       726,
+       605
+      ],
+      [
+       642,
+       605
+      ],
+      [
+       645,
+       480
+      ],
+      [
+       690,
+       475
+      ]
+     ]
+    },
+    "take": "faint"
+   }
   ]
  }
 }
