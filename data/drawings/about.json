@@ -5742,6 +5742,65 @@
   "f73r:woman": {
    "unknown": "Who the women are and what their labels say is not known."
   },
+  "f73v.centre": {
+   "agreed": "The crossbowman stands for Sagittarius, the archer.",
+   "strength": "strong",
+   "agreedSrc": [
+    "js_f73v",
+    "rz_q12",
+    "bax_months"
+   ],
+   "ideas": [
+    {
+     "what": "Sagittarius as a man with a crossbow appears in many German manuscripts of the 15th century.",
+     "who": "René Zandbergen",
+     "src": "rz_q12",
+     "note": "A clue to the artist's world, not proof of where the book was made."
+    },
+    {
+     "what": "The type of crossbow can help to date the drawing.",
+     "who": "Sensfelder",
+     "year": 2003,
+     "src": "sensfelder_crossbow",
+     "note": "A tentative dating based on the weapon."
+    }
+   ],
+   "unknown": "Exactly where and when this crossbow picture points to is still debated.",
+   "short": "Sagittarius, the archer",
+   "facts": [
+    {
+     "fact": "A later hand wrote the name for December.",
+     "src": "js_f73v"
+    }
+   ]
+  },
+  "f73v.diagram": {
+   "agreed": "This is the Sagittarius page: a man with a crossbow in the middle, marked with the name for December.",
+   "strength": "strong",
+   "agreedSrc": [
+    "js_f73v",
+    "rz_q12",
+    "bax_months"
+   ],
+   "unknown": "Nobody can read the rings of writing or the labels beside the women.",
+   "facts": [
+    {
+     "fact": "A later hand wrote the name for December.",
+     "src": "js_f73v"
+    },
+    {
+     "fact": "Capricorn and Aquarius do not appear; they were probably on a leaf that is now missing after this page. Nobody knows for sure whether the pages were lost or never made.",
+     "src": "rz_descr"
+    }
+   ],
+   "short": "Zodiac: Sagittarius"
+  },
+  "f73v:star": {
+   "unknown": "No one has said what this is, in the sources checked."
+  },
+  "f73v:woman": {
+   "unknown": "Who the women are and what their labels say is not known."
+  },
   "f75r.pools": {
    "unknown": "Nobody knows what these women, pools and tubes stand for, and the text that goes with them cannot be read."
   },
