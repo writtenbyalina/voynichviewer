@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -869,6 +870,16 @@ def write(imgs: list[str], plan: dict):
     index(plan, pages)
 
 
+def folio_key(img: str):
+    """a panel's place in the book by its folio number: f1r, f1v, f2r … f70v2-1, f70v2-2 … f85r2, the Rosettes, f86v3 …"""
+    if img.startswith("fRos"):
+        return (85.5, 0, 0, ["tl", "tm", "tr", "bl", "bm", "br"].index(img[5:]) if img[5:] in ("tl", "tm", "tr", "bl", "bm", "br") else 0)
+    m = re.match(r"f(\d+)([rv])(\d*)(?:-(\d+))?", img)
+    if not m:
+        return (999, 0, 0, 0)
+    return (int(m.group(1)), m.group(2) == "v", int(m.group(3) or 0), int(m.group(4) or 0))
+
+
 def index(plan: dict, pages: dict):
     """data/drawings/index.json: every drawing, in the book's order of panels, with what the site lists it by"""
     out, sigs, kinds, groups, extra = [], {}, {}, {}, {}
@@ -893,8 +904,7 @@ def index(plan: dict, pages: dict):
                 if dr.get(key):
                     e[key] = dr[key]
             out.append(e)
-    order = {img: i for i, img in enumerate(pages)}
-    out.sort(key=lambda e: (order.get(e["img"], 1e9), e.pop("_rank"), e.get("n", 0)))
+    out.sort(key=lambda e: (folio_key(e["img"]), e.pop("_rank"), e.get("n", 0)))
     (OUT / "index.json").write_text(json.dumps({"units": "thousandths of the panel's height", "drawings": out},
                                                ensure_ascii=False, separators=(",", ":")) + "\n")
     (OUT / "similar.json").write_text(json.dumps({"about": "for each drawing, the drawings most like it in outline and "

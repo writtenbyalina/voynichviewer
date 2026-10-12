@@ -9497,6 +9497,137 @@
      ]
     }
    }
+  ],
+  "f71r": [
+   {
+    "id": "f71r.diagram",
+    "kind": "diagram",
+    "name": "Zodiac medallion",
+    "looks": "Two rings of women holding stars between rings of writing, round a disc with a pale horned animal on green ground at the middle.",
+    "in": {
+     "circle": [
+      360,
+      480,
+      350
+     ]
+    },
+    "take": "region",
+    "fit": true
+   },
+   {
+    "id": "f71r.centre",
+    "kind": "emblem",
+    "name": "Ram",
+    "looks": "A pale horned animal drawn in brown ink, standing on green ground and nibbling a green sprig, with a word written on its side.",
+    "in": {
+     "circle": [
+      374,
+      482,
+      92
+     ]
+    },
+    "not": [
+     {
+      "box": [
+       352,
+       551,
+       425,
+       620
+      ]
+     },
+     {
+      "box": [
+       436,
+       440,
+       495,
+       525
+      ]
+     }
+    ],
+    "fill": "all"
+   },
+   {
+    "id": "f71r.woman-inner",
+    "kind": "woman",
+    "name": "Woman holding a star",
+    "looks": "Women in red, brown or green dresses standing in tubs painted blue or green, each holding up a star.",
+    "in": {
+     "ring": [
+      360,
+      483,
+      100,
+      243
+     ]
+    },
+    "take": "each",
+    "min": 700,
+    "join": 4
+   },
+   {
+    "id": "f71r.woman-outer",
+    "kind": "woman",
+    "name": "Woman holding a star",
+    "looks": "Women in red or pale dresses standing in tubs painted blue, green or striped, each holding out a star.",
+    "in": {
+     "ring": [
+      360,
+      483,
+      205,
+      365
+     ]
+    },
+    "take": "each",
+    "min": 700,
+    "join": 6,
+    "not": [
+     {
+      "box": [
+       680,
+       410,
+       712,
+       456
+      ]
+     },
+     {
+      "box": [
+       642,
+       586,
+       682,
+       636
+      ]
+     },
+     {
+      "box": [
+       44,
+       455,
+       148,
+       560
+      ]
+     },
+     {
+      "box": [
+       112,
+       413,
+       140,
+       445
+      ]
+     }
+    ]
+   },
+   {
+    "id": "f71r.woman-a",
+    "kind": "woman",
+    "name": "Woman holding a star",
+    "looks": "A woman with a red-painted body in a tub painted green, holding up a star beside her head.",
+    "in": {
+     "box": [
+      44,
+      455,
+      148,
+      560
+     ]
+    }
+   }
   ]
  }
 }
